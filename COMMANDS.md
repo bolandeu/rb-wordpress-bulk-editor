@@ -20,6 +20,8 @@ python -m src.cli export --output "export/tzm" --concurrency 10
 # С явным указанием credentials
 python -m src.cli export --domain https://terminalzm.ru --username master --password "XimY D2BP NPJr khQj PSbn A8ax" --output "export/tzm" --concurrency 10
 
+python -m src.cli sync --file export.xlsx --sheets service 
+
 ## Синхронизация
 
 # Только медиа

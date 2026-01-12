@@ -54,6 +54,10 @@ class ContentExporter:
                 if should_skip:
                     logger.debug(f"Skipping post type: {type_key} (matches skip pattern)")
                 else:
+                    if type_key == "post":
+                        type_key = "posts"
+                    elif type_key == "page":
+                        type_key = "pages"
                     post_types.append(type_key)
                     logger.debug(f"Found post type: {type_key} - {type_data.get('name', 'N/A')}")
 
