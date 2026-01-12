@@ -62,3 +62,9 @@ htmlcov/
 # Data files
 data/media/*
 !data/media/.gitkeep
+
+export/*
+export/
+
+credentials/*.json
+credentials/
