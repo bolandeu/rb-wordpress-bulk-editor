@@ -20,7 +20,7 @@ SYSTEM_COLUMNS = {
 VALID_ACTIONS = {"add", "update", "delete", "skip"}
 
 # Названия служебных листов
-SYSTEM_SHEETS = {"profile", "options", "media"}
+SYSTEM_SHEETS = {"options", "media"}
 
 # Стандартные таксономии WordPress
 STANDARD_TAXONOMIES = {"categories", "tags", "category", "tag"}

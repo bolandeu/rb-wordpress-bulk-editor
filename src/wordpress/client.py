@@ -169,17 +169,29 @@ class WordPressClient:
             await self.open()
 
         try:
-            logger.debug(f"POST {endpoint}")
-
             if files:
                 # Multipart для загрузки файлов
+                logger.debug(f"POST {endpoint} (multipart upload)")
+                logger.debug(f"Multipart data keys: {list(data.keys()) if data else 'None'}")
+                logger.debug(f"Multipart files keys: {list(files.keys()) if files else 'None'}")
+                # Логируем детали файлов
+                for key, file_info in files.items():
+                    logger.debug(f"File '{key}': name={file_info[0]}, MIME={file_info[2]}, size={len(file_info[1])} bytes")
+                
+                # Убираем Content-Type заголовок для multipart запросов
+                # httpx сам установит правильный multipart/form-data
+                headers = self._client.headers.copy()
+                headers.pop("Content-Type", None)
+                
                 response = await self._client.post(
                     endpoint,
                     data=data,
-                    files=files
+                    files=files,
+                    headers=headers
                 )
             else:
                 # JSON
+                logger.debug(f"POST {endpoint} with full data: {data}")
                 response = await self._client.post(endpoint, json=data)
 
             logger.debug(f"POST {endpoint} -> {response.status_code}")
@@ -219,6 +231,8 @@ class WordPressClient:
 
         try:
             logger.debug(f"PUT {endpoint} with data keys: {list(data.keys())}")
+            # Полное логирование JSON payload
+            logger.debug(f"PUT {endpoint} with full data: {data}")
             response = await self._client.put(endpoint, json=data)
 
             logger.debug(f"PUT {endpoint} -> {response.status_code}")

@@ -193,13 +193,22 @@ class ContentSync:
         # 5. Загружаем медиа (если есть img_path)
         if not self.config.sync.skip_media and mapper.should_upload_media(row):
             media_path = mapper.extract_media_path(row)
-            title = row.get("title", "")
+            # Берем title и alt_text из строки
+            title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else ""
+            alt_text = row.get("alt_text", "") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else ""
+            # Если alt_text не заполнен, используем title
+            if not alt_text:
+                alt_text = title
+            caption = row.get("caption", "") if "caption" in row.index and pd.notna(row.get("caption")) else ""
 
             try:
+                logger.debug(f"Uploading media for post {post_id}: {media_path}")
                 media_result = await self._upload_media(
                     media_endpoint,
                     media_path,
-                    title
+                    title,
+                    alt_text,
+                    caption
                 )
 
                 # Обновляем пост с featured_media
@@ -210,9 +219,13 @@ class ContentSync:
                     )
                     result["featured_media"] = media_result["id"]
                     result["image_url"] = media_result.get("source_url")
+                    logger.info(f"Attached media ID={media_result['id']} to post ID={post_id}")
+                else:
+                    logger.warning(f"Media upload returned None, skipping featured_media update")
 
             except Exception as e:
                 logger.warning(f"Failed to upload media for post {post_id}: {e}")
+                # Не прерываем выполнение, если медиа не загрузилось
 
         return result
 
@@ -248,34 +261,80 @@ class ContentSync:
             else:
                 logger.warning(f"Content file not found: {content_filename}")
 
-        # 4. Обновляем запись
-        logger.debug(f"Updating post ID={post_id}")
-        result = await posts_endpoint.update(post_id, payload)
-
-        # 5. Обновляем медиа (если img_path заполнен - всегда обновляем, даже если featured_media уже есть)
-        if not self.config.sync.skip_media and mapper.should_upload_media(row):
+        # 4. Загружаем медиа или прикрепляем существующую картинку
+        saved_media_result = None
+        
+        # Проверяем: нужно ли загружать новую картинку или прикрепить существующую
+        img_path_filled = mapper.should_upload_media(row)
+        featured_media_in_excel = "featured_media" in row.index and pd.notna(row["featured_media"]) and str(row["featured_media"]).strip() != ""
+        
+        if img_path_filled:
+            # Загружаем новую картинку
             media_path = mapper.extract_media_path(row)
-            title = row.get("title", "")
+            # Берем title и alt_text из строки
+            title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else ""
+            alt_text = row.get("alt_text", "") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else ""
+            # Если alt_text не заполнен, используем title
+            if not alt_text:
+                alt_text = title
+            caption = row.get("caption", "") if "caption" in row.index and pd.notna(row.get("caption")) else ""
 
             try:
+                logger.debug(f"Uploading media for post {post_id}: {media_path}")
                 media_result = await self._upload_media(
                     media_endpoint,
                     media_path,
-                    title
+                    title,
+                    alt_text,
+                    caption
                 )
 
                 if media_result:
-                    await posts_endpoint.update(
-                        post_id,
-                        {"featured_media": media_result["id"]}
-                    )
-                    result["featured_media"] = media_result["id"]
-                    result["image_url"] = media_result.get("source_url")
+                    # Добавляем featured_media в payload для одновременного обновления
+                    payload["featured_media"] = media_result["id"]
+                    logger.debug(f"Added featured_media to payload: {media_result['id']}")
+                    # Сохраняем media_result для последующего добавления в result
+                    saved_media_result = media_result
+                else:
+                    logger.warning(f"Media upload returned None, skipping featured_media update")
+                    saved_media_result = None
 
             except Exception as e:
                 logger.warning(f"Failed to upload media for post {post_id}: {e}")
+                saved_media_result = None
+        
+        elif featured_media_in_excel:
+            # img_path не заполнен, но featured_media есть в Excel - прикрепляем существующую картинку
+            media_id = int(row["featured_media"])
+            logger.debug(f"Attaching existing media ID={media_id} to post {post_id}")
+            payload["featured_media"] = media_id
+            
+            # Получаем данные медиа для image_url
+            try:
+                media_data = await media_endpoint.get(media_id)
+                saved_media_result = {
+                    'id': media_id,
+                    'source_url': media_data.get('source_url')
+                }
+                logger.debug(f"Got existing media data: ID={media_id}, URL={saved_media_result['source_url']}")
+            except Exception as e:
+                logger.warning(f"Failed to get media data for ID={media_id}: {e}")
+                saved_media_result = {
+                    'id': media_id,
+                    'source_url': ''
+                }
 
-        # 6. Получаем актуальные данные записи (link, modified могут отсутствовать в ответе update)
+        # 5. Обновляем запись (с featured_media если загружен)
+        logger.debug(f"Updating post ID={post_id}")
+        result = await posts_endpoint.update(post_id, payload)
+
+        # 6. Добавляем media данные в result (если они были)
+        if saved_media_result:
+            result["featured_media"] = saved_media_result.get("id")
+            result["image_url"] = saved_media_result.get("source_url")
+            logger.info(f"Added media data to result: featured_media={result['featured_media']}, image_url={result['image_url']}")
+
+        # 7. Получаем актуальные данные записи (link, modified могут отсутствовать в ответе update)
         if "link" not in result or "modified" not in result:
             try:
                 fresh_data = await posts_endpoint.get(post_id)
@@ -359,7 +418,9 @@ class ContentSync:
         self,
         media_endpoint: MediaEndpoint,
         media_path: str,
-        title: str
+        title: str = "",
+        alt_text: str = "",
+        caption: str = ""
     ) -> Optional[Dict[str, Any]]:
         """
         Загрузить медиафайл.
@@ -368,6 +429,8 @@ class ContentSync:
             media_endpoint: MediaEndpoint
             media_path: Путь к файлу (локальный или URL)
             title: Название для медиа
+            alt_text: Alt текст для изображения
+            caption: Подпись
 
         Returns:
             Результат загрузки или None
@@ -377,8 +440,8 @@ class ContentSync:
             # Загрузка по URL
             return await media_endpoint.upload_from_url(
                 media_path,
-                title=title,
-                alt_text=title
+                title=title if title else None,
+                alt_text=alt_text if alt_text else None
             )
         else:
             # Локальный файл
@@ -401,6 +464,7 @@ class ContentSync:
 
             return await media_endpoint.upload_file(
                 file_path,
-                title=title,
-                alt_text=title
+                title=title if title else None,
+                alt_text=alt_text if alt_text else None,
+                caption=caption if caption else None
             )

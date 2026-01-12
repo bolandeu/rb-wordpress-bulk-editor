@@ -40,26 +40,70 @@ class ContentMapper:
             Dict готовый для отправки в WordPress API
         """
         payload = {}
+        
+        # Логируем информацию о строке для отладки
+        row_id = row.get("id", "N/A")
+        row_title = row.get("title", "N/A")
+        logger.debug(f"Mapping row id={row_id}, title='{row_title}'")
+        
+        # Полная структура строки для диагностики
+        logger.debug(f"Row structure (all fields):")
+        for field_name in row.index:
+            value = row[field_name]
+            logger.debug(f"  {field_name}: {repr(value)} (type={type(value).__name__}, isna={pd.isna(value)})")
 
         # 1. Обычные поля контента
+        logger.debug(f"Processing content fields: {self.analysis['content']}")
         for field in self.analysis["content"]:
             if field in row.index:
                 value = row[field]
+                
+                # Поля, которые нужно отправлять всегда (включая пустые значения для обнуления)
+                send_empty_fields = {
+                    'excerpt',  # excerpt нужно обнулять явно
+                    'seo_title', 'seo_description', 'seo_meta_keywords',  # SEO поля
+                    'seo_noindex', 'seo_nofollow', 'custom_permalink'  # Другие SEO поля
+                }
+                
+                should_send_empty = field in send_empty_fields
+                
+                # Детальное логирование для SEO полей
+                if field.startswith("seo_"):
+                    logger.debug(
+                        f"SEO field '{field}': raw_value={repr(value)}, "
+                        f"type={type(value).__name__}, "
+                        f"isna={pd.isna(value)}"
+                    )
 
-                # Пропускаем пустые значения
+                # Для обычных полей пропускаем пустые значения
+                # Для полей из send_empty_fields отправляем пустые значения
                 if pd.notna(value) and value != "":
-                    payload[field] = self._convert_value(value)
+                    converted = self._convert_value(value)
+                    payload[field] = converted
+                    
+                    # Детальное логирование для SEO полей
+                    if field.startswith("seo_"):
+                        logger.debug(
+                            f"SEO field '{field}': added to payload as {repr(converted)}, "
+                            f"type={type(converted).__name__}"
+                        )
+                elif should_send_empty:
+                    # Отправляем пустое значение для обнуления на сайте
+                    payload[field] = ""
+                    logger.debug(f"Field '{field}': sending empty value to reset on server")
 
         # 2. ACF поля
         acf_data = FieldDetector.extract_acf_from_row(row)
         if acf_data:
             payload["acf"] = acf_data
+            logger.debug(f"ACF fields: {list(acf_data.keys())}")
 
         # 3. Таксономии (уже преобразованные в term IDs)
         if taxonomy_ids:
             for taxonomy, term_ids in taxonomy_ids.items():
                 if term_ids:
                     payload[taxonomy] = term_ids
+            logger.debug(f"Taxonomies: {list(taxonomy_ids.keys())}")
 
         # 4. Featured media (если есть)
         if "featured_media" in row.index and pd.notna(row["featured_media"]):
@@ -70,7 +114,14 @@ class ContentMapper:
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid featured_media value: {value}")
 
-        logger.debug(f"Mapped row to payload: {list(payload.keys())}")
+        # Итоговый лог с payload
+        logger.debug(f"Mapped row id={row_id} to payload keys: {list(payload.keys())}")
+        
+        # Детальный лог для SEO полей в финальном payload
+        seo_fields_in_payload = {k: v for k, v in payload.items() if k.startswith("seo_")}
+        if seo_fields_in_payload:
+            logger.debug(f"SEO fields in final payload: {seo_fields_in_payload}")
+        
         return payload
 
     def _convert_value(self, value: Any) -> Any:
