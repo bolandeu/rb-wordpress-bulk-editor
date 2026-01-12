@@ -1,0 +1,30 @@
+# Core dependencies (с гибкими версиями для лучшей совместимости)
+pandas>=2.2.0
+openpyxl>=3.1.0
+httpx>=0.26.0
+typer>=0.9.0
+rich>=13.7.0
+loguru>=0.7.0
+
+# Configuration
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+PyYAML>=6.0
+
+# Media handling
+Pillow>=10.0.0
+
+# Utilities
+tenacity>=8.2.0
+python-slugify>=8.0.0
+
+# Content processing
+markdown>=3.5.0
+beautifulsoup4>=4.12.0
+
+# Google Sheets integration
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
