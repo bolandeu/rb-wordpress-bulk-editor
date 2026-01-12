@@ -209,7 +209,23 @@ class TaxonomySync:
             except (ValueError, TypeError):
                 logger.warning(f"Invalid parent ID: {row['parent']}")
 
-        # Meta fields (если есть)
-        # TODO: Можно добавить поддержку кастомных meta полей если нужно
+        # Кастомные мета-поля (все остальные поля из Excel)
+        # Пропускаем системные поля
+        system_fields = {"id", "action", "name", "slug", "description", "parent", "link", "count"}
+
+        for field_name in row.index:
+            # Пропускаем уже обработанные и системные поля
+            if field_name in system_fields or field_name in payload:
+                continue
+
+            # Отправляем все остальные поля (кастомные мета-поля)
+            value = row[field_name]
+            if pd.notna(value):
+                payload[field_name] = str(value).strip()
+            else:
+                # Отправляем пустое значение для очистки
+                payload[field_name] = ""
+
+            logger.debug(f"Custom field '{field_name}': {repr(payload[field_name])}")
 
         return payload
