@@ -153,6 +153,17 @@ class ExcelWriter:
         if "image_url" in api_response:
             update_data["image_url"] = api_response["image_url"]
 
+        # После успешной операции меняем action на skip
+        update_data["action"] = "skip"
+
+        # Очищаем content_path и img_path если они были заполнены
+        if sheet_name in self._dataframes:
+            df = self._dataframes[sheet_name]
+            if "content_path" in df.columns:
+                update_data["content_path"] = ""
+            if "img_path" in df.columns:
+                update_data["img_path"] = ""
+
         # Обновляем строку
         if update_data:
             self.update_row(sheet_name, row_index, update_data)

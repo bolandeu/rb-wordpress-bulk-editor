@@ -65,7 +65,7 @@ python -m src.cli download-google-sheet
 # С явным указанием параметров
 python -m src.cli download-google-sheet --sheet-id "1B5gj1nxzVhQ-9nk1o_KVgtwRyj_gl4yibIXmG4zZUq4" --credentials "credentials/google_sheets_credentials.json" --output "my_file.xlsx"
 
-## Пайплайн: Скачивание Google Sheets и синхронизация
+## Пайплайн: Скачивание Google Sheets и синхронизация (односторонний)
 # Используя .env
 python -m src.cli sync-from-google
 
@@ -74,6 +74,22 @@ python -m src.cli sync-from-google --sheet-id "1B5gj1n..." --credentials "creden
 
 # Dry-run режим
 python -m src.cli sync-from-google --dry-run --verbose
+
+## Полный пайплайн: Google Sheets ↔ WordPress ↔ Google Sheets (двусторонний)
+# Полный цикл: скачать → синхронизировать → загрузить обратно (используя .env)
+python -m src.cli sync-google-bidirectional
+
+# С явным указанием параметров и фильтром листов
+python -m src.cli sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages
+
+# Без загрузки обратно в Google (только скачать и синхронизировать с WP)
+python -m src.cli sync-google-bidirectional --no-upload-back
+
+# Dry-run режим (скачает и покажет что будет синхронизировано, без изменений)
+python -m src.cli sync-google-bidirectional --dry-run --verbose
+
+# Указать другой путь к локальному файлу
+python -m src.cli sync-google-bidirectional --output "data/my_project.xlsx"
 
 ## Массовое удаление записей одного типа
 

@@ -1278,7 +1278,7 @@ def download_google_sheet(
     try:
         import os
         from dotenv import load_dotenv
-        from .utils.google_sheets import GoogleSheetsDownloader
+        from .utils.google_sheets import GoogleSheetsClient
 
         # Загружаем .env
         load_dotenv()
@@ -1309,7 +1309,7 @@ def download_google_sheet(
         # Скачиваем
         console.print("[yellow]Скачивание Google Sheets...[/yellow]")
 
-        downloader = GoogleSheetsDownloader(credentials_path)
+        downloader = GoogleSheetsClient(credentials_path)
 
         # Получаем информацию о документе
         info = downloader.get_spreadsheet_info(final_sheet_id)
@@ -1421,7 +1421,7 @@ def sync_from_google(
     try:
         import os
         from dotenv import load_dotenv
-        from .utils.google_sheets import GoogleSheetsDownloader
+        from .utils.google_sheets import GoogleSheetsClient
 
         # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
@@ -1455,7 +1455,7 @@ def sync_from_google(
         # Скачиваем
         console.print("[yellow]Скачивание Google Sheets...[/yellow]")
 
-        downloader = GoogleSheetsDownloader(credentials_path)
+        downloader = GoogleSheetsClient(credentials_path)
 
         # Получаем информацию о документе
         info = downloader.get_spreadsheet_info(final_sheet_id)
@@ -1509,6 +1509,234 @@ def sync_from_google(
 
         console.print(f"\n[bold green]SUCCESS! Пайплайн завершен![/bold green]")
         console.print(f"Скачанный файл: [cyan]{output}[/cyan]")
+        console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
+
+    except WPBulkEditorError as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        logger.exception("Неожиданная ошибка")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def sync_google_bidirectional(
+    sheet_id: Optional[str] = typer.Option(
+        None,
+        "--sheet-id",
+        help="ID Google Sheets документа"
+    ),
+    credentials: Optional[Path] = typer.Option(
+        None,
+        "--credentials",
+        help="Путь к JSON файлу с credentials"
+    ),
+    output: Path = typer.Option(
+        Path("export.xlsx"),
+        "--output",
+        "-o",
+        help="Путь для сохранения .xlsx файла (по умолчанию export.xlsx)"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов для обновления через запятую (posts,pages). Если не указано - обновляются все листы"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Режим dry-run (без изменений)"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        help="Количество параллельных запросов"
+    ),
+    skip_media: bool = typer.Option(
+        False,
+        "--skip-media",
+        help="Пропустить загрузку медиа"
+    ),
+    no_update_excel: bool = typer.Option(
+        False,
+        "--no-update-excel",
+        help="Не записывать ID обратно в Excel"
+    ),
+    no_upload_back: bool = typer.Option(
+        False,
+        "--no-upload-back",
+        help="Не загружать обратно в Google Sheets после синхронизации"
+    ),
+    delete_media: bool = typer.Option(
+        False,
+        "--delete-media",
+        help="Удалять featured media при удалении записей (action=delete)"
+    ),
+):
+    """
+    Двусторонняя синхронизация: Google Sheets ↔ WordPress ↔ Google Sheets
+
+    Полный пайплайн работы с Google Sheets:
+    1. Скачивает Google Sheets документ в формате Excel
+    2. Выполняет синхронизацию с WordPress
+    3. Загружает обновленный файл обратно в Google Sheets
+
+    Данные берутся из переменных окружения .env:
+    - GOOGLE_SHEET_ID - ID таблицы
+    - GOOGLE_SHEET_CREDENTIALS_PATH - путь к credentials.json
+    - WORDPRESS_URL, WORDPRESS_USERNAME, WORDPRESS_PASSWORD
+
+    Примеры:
+        # Полный цикл используя .env
+        python -m src.cli sync-google-bidirectional
+
+        # С явным указанием параметров и фильтром листов
+        python -m src.cli sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages
+
+        # Без загрузки обратно (только скачать и синхронизировать)
+        python -m src.cli sync-google-bidirectional --no-upload-back
+    """
+    console.print("\n[bold cyan]Google Sheets ↔ WordPress ↔ Google Sheets Pipeline[/bold cyan]")
+    console.print("=" * 60 + "\n")
+
+    try:
+        import os
+        from dotenv import load_dotenv
+        from .utils.google_sheets import GoogleSheetsClient
+
+        # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
+        console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
+
+        # Загружаем .env
+        load_dotenv()
+
+        # Получаем параметры (приоритет: CLI > .env)
+        final_sheet_id = sheet_id or os.getenv("GOOGLE_SHEET_ID")
+        final_credentials = credentials or os.getenv("GOOGLE_SHEET_CREDENTIALS_PATH")
+
+        # Валидация
+        if not final_sheet_id:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_ID (через --sheet-id или .env)")
+            raise typer.Exit(1)
+
+        if not final_credentials:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_CREDENTIALS_PATH (через --credentials или .env)")
+            raise typer.Exit(1)
+
+        credentials_path = Path(final_credentials)
+        if not credentials_path.exists():
+            console.print(f"[red]✗[/red] Файл credentials не найден: {credentials_path}")
+            raise typer.Exit(1)
+
+        console.print(f"[yellow]→[/yellow] Google Sheets ID: {final_sheet_id}")
+        console.print(f"[yellow]→[/yellow] Credentials: {credentials_path}")
+        console.print(f"[yellow]→[/yellow] Файл назначения: {output}")
+        console.print()
+
+        # Создаем клиент
+        console.print("[yellow]Скачивание Google Sheets...[/yellow]")
+        gs_client = GoogleSheetsClient(credentials_path)
+
+        # Получаем информацию о документе
+        info = gs_client.get_spreadsheet_info(final_sheet_id)
+        console.print(f"[green]✓[/green] Документ: {info.get('name', 'Unknown')}")
+        console.print(f"[green]✓[/green] Последнее изменение: {info.get('modified_time', 'Unknown')}")
+        console.print()
+
+        # Скачиваем файл
+        gs_client.download_as_excel(final_sheet_id, output)
+
+        console.print(f"[bold green]✓ Файл успешно скачан![/bold green]")
+        console.print(f"[bold]Сохранено:[/bold] {output}\n")
+
+        # ========== ШАГ 2: СИНХРОНИЗАЦИЯ С WORDPRESS ==========
+        console.print("[bold yellow]ШАГ 2: Синхронизация с WordPress[/bold yellow]\n")
+
+        # Загружаем credentials из .env
+        console.print("[yellow]Загрузка WordPress credentials...[/yellow]")
+        domain, username, password = load_credentials_from_env(env_file=env_file)
+        console.print(f"[green]OK[/green] WordPress: {domain}")
+        console.print(f"[green]OK[/green] User: {username}\n")
+
+        # Создаем конфигурацию для sync
+        config = AppConfig.from_excel(
+            excel_file=output,
+            wp_url=domain,
+            wp_username=username,
+            wp_password=password,
+            sync=SyncConfig(
+                dry_run=dry_run,
+                concurrency=concurrency,
+                skip_media=skip_media,
+                update_excel=not no_update_excel,
+                delete_featured_media=delete_media
+            ),
+            logging=LoggingConfig(
+                level="DEBUG" if verbose else "INFO"
+            )
+        )
+
+        # Настройка логирования
+        config.paths.ensure_dirs()
+        log_file = setup_logger(
+            logs_folder=config.paths.logs_folder,
+            config=config.logging,
+            command_name="sync_google_bidirectional"
+        )
+
+        # Запускаем синхронизацию
+        asyncio.run(run_sync(config, sheets))
+
+        console.print(f"\n[bold green]✓ Синхронизация с WordPress завершена![/bold green]\n")
+
+        # ========== ШАГ 3: ЗАГРУЗКА ОБРАТНО В GOOGLE SHEETS ==========
+        if not no_upload_back and not dry_run:
+            console.print("[bold yellow]ШАГ 3: Загрузка обратно в Google Sheets[/bold yellow]\n")
+
+            # Определяем листы для загрузки
+            sheets_to_upload = None
+            if sheets:
+                sheets_to_upload = [s.strip() for s in sheets.split(",")]
+                console.print(f"[yellow]→[/yellow] Листы для обновления: {', '.join(sheets_to_upload)}")
+            else:
+                console.print(f"[yellow]→[/yellow] Будут обновлены все листы из Excel файла")
+
+            console.print()
+            console.print("[yellow]Загрузка в Google Sheets...[/yellow]")
+
+            # Загружаем обратно
+            gs_client.upload_excel_to_sheets(
+                excel_path=output,
+                spreadsheet_id=final_sheet_id,
+                sheets_to_update=sheets_to_upload
+            )
+
+            console.print(f"[bold green]✓ Данные успешно загружены в Google Sheets![/bold green]\n")
+        elif dry_run:
+            console.print("[yellow]ШАГ 3 пропущен: DRY-RUN режим[/yellow]\n")
+        else:
+            console.print("[yellow]ШАГ 3 пропущен: --no-upload-back флаг[/yellow]\n")
+
+        # ========== ИТОГИ ==========
+        console.print(f"[bold green]SUCCESS! Полный пайплайн завершен![/bold green]")
+        console.print(f"Локальный файл: [cyan]{output}[/cyan]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
 
     except WPBulkEditorError as e:
