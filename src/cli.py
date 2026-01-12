@@ -22,6 +22,7 @@ from .wordpress.taxonomies import TaxonomyCache, normalize_taxonomy_name
 from .wordpress.options import OptionsEndpoint
 from .sync.content_sync import ContentSync
 from .sync.media_sync import MediaSync
+from .sync.taxonomy_sync import TaxonomySync
 from .mappers.response_mapper import ResponseMapper
 from .utils.logger import setup_logger, log_summary
 from .utils.content_exporter import ContentExporter
@@ -238,9 +239,10 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None):
                 if taxonomies_to_cache:
                     await taxonomy_cache.load(wp_client, list(taxonomies_to_cache))
 
-                # 4. Создаем ContentSync и MediaSync
+                # 4. Создаем ContentSync, MediaSync и TaxonomySync
                 content_sync = ContentSync(wp_client, config, taxonomy_cache)
                 media_sync = MediaSync(wp_client, config)
+                taxonomy_sync = TaxonomySync(wp_client, config)
 
                 # 5. Открываем Excel writer (если нужно)
                 excel_writer = None
@@ -258,6 +260,7 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None):
                         reader=reader,
                         content_sync=content_sync,
                         media_sync=media_sync,
+                        taxonomy_sync=taxonomy_sync,
                         excel_writer=excel_writer,
                         sheet_name=sheet_name,
                         config=config
@@ -301,6 +304,7 @@ async def process_sheet(
     reader: ExcelReader,
     content_sync: ContentSync,
     media_sync,  # MediaSync
+    taxonomy_sync: TaxonomySync,
     excel_writer: Optional[ExcelWriter],
     sheet_name: str,
     config: AppConfig
@@ -352,16 +356,14 @@ async def process_sheet(
             return stats
 
         elif sheet_type == "taxonomy":
-            # TODO: Синхронизация таксономий (отдельная логика)
-            logger.info(f"Пропуск таксономии {sheet_name} (пока не реализовано)")
-            return {
-                "total": len(df),
-                "added": 0,
-                "updated": 0,
-                "deleted": 0,
-                "skipped": len(df),
-                "errors": 0
-            }
+            # Синхронизация таксономий
+            stats = await taxonomy_sync.sync_sheet(
+                sheet_name,
+                df,
+                excel_writer
+            )
+            stats["total"] = len(df)
+            return stats
 
         else:
             logger.warning(f"Неизвестный тип листа: {sheet_name}")
@@ -1327,6 +1329,147 @@ def download_google_sheet(
         console.print(f"\n[bold red]✗ Ошибка:[/bold red] {e}")
         logger.exception("Критическая ошибка")
         raise typer.Exit(1)
+
+
+@app.command()
+def upload_to_google_sheets(
+    file: Path = typer.Option(
+        ...,
+        "--file",
+        "-f",
+        help="Путь к Excel файлу для загрузки",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    sheet_id: Optional[str] = typer.Option(
+        None,
+        "--sheet-id",
+        help="ID Google Sheets документа"
+    ),
+    credentials: Optional[Path] = typer.Option(
+        None,
+        "--credentials",
+        help="Путь к JSON файлу с credentials"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов для обновления через запятую (posts,pages). Если не указано - обновляются все листы"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    )
+):
+    """
+    Загрузить локальный Excel файл в Google Sheets
+
+    Обновляет указанные листы (или все листы) в Google Sheets документе
+    данными из локального Excel файла.
+
+    Данные берутся из переменных окружения .env:
+    - GOOGLE_SHEET_ID - ID таблицы
+    - GOOGLE_SHEET_CREDENTIALS_PATH - путь к credentials.json
+
+    Примеры:
+        # Загрузить весь файл (используя .env)
+        python -m src.cli upload-to-google-sheets --file export.xlsx
+
+        # Загрузить только определенные листы
+        python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
+
+        # С явным указанием параметров
+        python -m src.cli upload-to-google-sheets --file data.xlsx --sheet-id "1B5gj1n..." --credentials "credentials/google.json"
+    """
+    console.print("\n[bold cyan]Upload Excel → Google Sheets[/bold cyan]")
+    console.print("=" * 60 + "\n")
+
+    try:
+        import os
+        from dotenv import load_dotenv
+        from .utils.google_sheets import GoogleSheetsClient
+
+        # Настройка логирования
+        if verbose:
+            from .config import LoggingConfig
+            logs_folder = Path("logs")
+            logs_folder.mkdir(parents=True, exist_ok=True)
+            logging_config = LoggingConfig(level="DEBUG")
+            setup_logger(
+                logs_folder=logs_folder,
+                config=logging_config,
+                command_name="upload_to_google_sheets"
+            )
+
+        # Загружаем .env
+        load_dotenv()
+
+        # Получаем параметры (приоритет: CLI > .env)
+        final_sheet_id = sheet_id or os.getenv("GOOGLE_SHEET_ID")
+        final_credentials = credentials or os.getenv("GOOGLE_SHEET_CREDENTIALS_PATH")
+
+        # Валидация
+        if not final_sheet_id:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_ID (через --sheet-id или .env)")
+            raise typer.Exit(1)
+
+        if not final_credentials:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_CREDENTIALS_PATH (через --credentials или .env)")
+            raise typer.Exit(1)
+
+        credentials_path = Path(final_credentials)
+        if not credentials_path.exists():
+            console.print(f"[red]✗[/red] Файл credentials не найден: {credentials_path}")
+            raise typer.Exit(1)
+
+        console.print(f"[yellow]→[/yellow] Excel файл: {file}")
+        console.print(f"[yellow]→[/yellow] Google Sheets ID: {final_sheet_id}")
+        console.print(f"[yellow]→[/yellow] Credentials: {credentials_path}")
+
+        # Определяем листы для загрузки
+        sheets_to_upload = None
+        if sheets:
+            sheets_to_upload = [s.strip() for s in sheets.split(",")]
+            console.print(f"[yellow]→[/yellow] Листы для обновления: {', '.join(sheets_to_upload)}")
+        else:
+            console.print(f"[yellow]→[/yellow] Будут обновлены все листы из Excel файла")
+
+        console.print()
+
+        # Создаем клиент
+        console.print("[yellow]Загрузка в Google Sheets...[/yellow]")
+        gs_client = GoogleSheetsClient(credentials_path)
+
+        # Загружаем
+        gs_client.upload_excel_to_sheets(
+            excel_path=file,
+            spreadsheet_id=final_sheet_id,
+            sheets_to_update=sheets_to_upload
+        )
+
+        console.print(f"\n[bold green]✓ Данные успешно загружены в Google Sheets![/bold green]")
+        console.print(f"[bold]Локальный файл:[/bold] {file}\n")
+
+    except WPBulkEditorError as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        logger.exception("Неожиданная ошибка")
+        raise typer.Exit(code=1)
 
 
 @app.command()

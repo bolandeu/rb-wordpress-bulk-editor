@@ -153,6 +153,26 @@ class TaxonomiesEndpoint:
 
         return None
 
+    async def find_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
+        """
+        Найти термин по slug.
+
+        Args:
+            slug: Slug термина
+
+        Returns:
+            Термин или None если не найден
+        """
+        # Поиск по slug через API
+        terms = await self.list(slug=slug)
+
+        # Точное совпадение
+        for term in terms:
+            if term.get("slug", "") == slug:
+                return term
+
+        return None
+
     async def get_or_create(self, name: str, **extra_data) -> Dict[str, Any]:
         """
         Получить термин по имени или создать если не существует.

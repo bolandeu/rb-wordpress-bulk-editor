@@ -60,12 +60,21 @@ class ContentMapper:
                 
                 # Поля, которые нужно отправлять всегда (включая пустые значения для обнуления)
                 send_empty_fields = {
-                    'excerpt',  # excerpt нужно обнулять явно
-                    'seo_title', 'seo_description', 'seo_meta_keywords',  # SEO поля
-                    'seo_noindex', 'seo_nofollow', 'custom_permalink'  # Другие SEO поля
+                    # Основные текстовые поля
+                    'title', 'slug', 'content', 'excerpt',
+                    # SEO поля
+                    'seo_title', 'seo_description', 'seo_meta_keywords',
+                    'seo_noindex', 'seo_nofollow', 'custom_permalink',
+                    # Другие текстовые поля
+                    'description', 'caption', 'alt_text'
                 }
-                
-                should_send_empty = field in send_empty_fields
+
+                # Определяем должно ли поле отправляться всегда
+                should_send_empty = (
+                    field in send_empty_fields or
+                    field.startswith('seo_') or
+                    field.startswith('custom_')
+                )
                 
                 # Детальное логирование для SEO полей
                 if field.startswith("seo_"):

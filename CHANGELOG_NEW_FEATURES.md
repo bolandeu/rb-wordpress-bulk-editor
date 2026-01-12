@@ -11,9 +11,37 @@
 
 **Файл:** `src/excel/writer.py` (метод `update_from_api_response`)
 
-## 2. Двусторонняя синхронизация с Google Sheets
+## 2. Работа с Google Sheets
 
-Новая команда `sync-google-bidirectional` реализует полный цикл работы с Google Sheets:
+### 2.1. Загрузка Excel в Google Sheets
+
+**Новая команда:** `upload-to-google-sheets`
+
+Позволяет загрузить локальный Excel файл в Google Sheets (отдельная операция без синхронизации с WordPress).
+
+```bash
+# Загрузить весь файл (используя .env)
+python -m src.cli upload-to-google-sheets --file export.xlsx
+
+# Загрузить только определенные листы
+python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
+
+# С явным указанием параметров
+python -m src.cli upload-to-google-sheets --file data.xlsx --sheet-id "1B5gj1n..." --credentials "credentials/google.json"
+```
+
+**Параметры:**
+- `--file` (обязательный) - путь к Excel файлу
+- `--sheet-id` - ID Google Sheets (или из .env: `GOOGLE_SHEET_ID`)
+- `--credentials` - путь к credentials.json (или из .env: `GOOGLE_SHEET_CREDENTIALS_PATH`)
+- `--sheets` - список листов для обновления (по умолчанию все)
+- `--verbose` - подробные логи
+
+### 2.2. Двусторонняя синхронизация с Google Sheets
+
+**Новая команда:** `sync-google-bidirectional`
+
+Реализует полный цикл работы с Google Sheets:
 
 ### Пайплайн:
 1. **Скачивание** Google Sheets → Excel
@@ -111,6 +139,22 @@ python -m src.cli sync-google-bidirectional --dry-run --verbose
 # Синхронизация без загрузки обратно (для тестирования)
 python -m src.cli sync-google-bidirectional --no-upload-back
 ```
+
+## Сводка команд Google Sheets
+
+Теперь доступно 4 команды для работы с Google Sheets:
+
+1. **`download-google-sheet`** - 📥 Скачать Google Sheets → Excel
+   - Только скачивание, без синхронизации
+
+2. **`upload-to-google-sheets`** - 📤 Загрузить Excel → Google Sheets *(новая)*
+   - Только загрузка, без синхронизации
+
+3. **`sync-from-google`** - 📥🔄 Google Sheets → Excel → WordPress
+   - Односторонняя синхронизация (без загрузки обратно)
+
+4. **`sync-google-bidirectional`** - 📥🔄📤 Google Sheets ↔ WordPress ↔ Google Sheets *(новая)*
+   - Полный двусторонний цикл
 
 ## Обратная совместимость
 

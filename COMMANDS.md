@@ -65,6 +65,16 @@ python -m src.cli download-google-sheet
 # С явным указанием параметров
 python -m src.cli download-google-sheet --sheet-id "1B5gj1nxzVhQ-9nk1o_KVgtwRyj_gl4yibIXmG4zZUq4" --credentials "credentials/google_sheets_credentials.json" --output "my_file.xlsx"
 
+## Загрузка локального Excel в Google Sheets
+# Загрузить весь файл (используя .env)
+python -m src.cli upload-to-google-sheets --file export.xlsx
+
+# Загрузить только определенные листы
+python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
+
+# С явным указанием параметров
+python -m src.cli upload-to-google-sheets --file data.xlsx --sheet-id "1B5gj1n..." --credentials "credentials/google.json"
+
 ## Пайплайн: Скачивание Google Sheets и синхронизация (односторонний)
 # Используя .env
 python -m src.cli sync-from-google
