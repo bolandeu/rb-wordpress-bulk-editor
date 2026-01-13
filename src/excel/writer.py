@@ -108,6 +108,44 @@ class ExcelWriter:
 
         logger.info(f"Appended {len(rows)} rows to sheet {sheet_name}")
 
+    def replace_rows(
+        self,
+        sheet_name: str,
+        rows: list[Dict[str, Any]]
+    ):
+        """
+        Заменить все строки в листе новыми данными (кроме заголовков).
+
+        Args:
+            sheet_name: Название листа
+            rows: Список словарей с данными для новых строк
+        """
+        if sheet_name not in self._dataframes:
+            logger.warning(f"Sheet {sheet_name} not found")
+            return
+
+        if not rows:
+            logger.warning(f"No rows to replace in sheet {sheet_name}")
+            return
+
+        df = self._dataframes[sheet_name]
+
+        # Создаем новый DataFrame из новых строк
+        new_df = pd.DataFrame(rows)
+
+        # Убеждаемся что все колонки существуют
+        for col in df.columns:
+            if col not in new_df.columns:
+                new_df[col] = ""
+
+        # Сохраняем порядок колонок как в исходном листе
+        new_df = new_df[df.columns]
+
+        # Заменяем все строки новыми данными
+        self._dataframes[sheet_name] = new_df
+
+        logger.info(f"Replaced all rows in sheet {sheet_name} with {len(rows)} new rows")
+
     def update_from_api_response(
         self,
         sheet_name: str,

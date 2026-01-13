@@ -30,6 +30,9 @@ class ResponseMapper:
         """
         row = {}
 
+        # Action по умолчанию при fetch
+        row["action"] = "skip"
+
         # Базовые поля
         row["id"] = post.get("id", "")
         row["date"] = post.get("date", "")
@@ -133,12 +136,15 @@ class ResponseMapper:
         """
         row = {}
 
+        # Action по умолчанию при fetch
+        row["action"] = "skip"
+
         # Базовые поля
         row["id"] = term.get("id", "")
-        row["title"] = term.get("name", "")
+        row["name"] = term.get("name", "")
         row["slug"] = term.get("slug", "")
         row["description"] = term.get("description", "")
-        row["url"] = term.get("link", "")
+        row["link"] = term.get("link", "")
 
         # ACF поля для таксономий
         acf = term.get("acf", {})
@@ -146,7 +152,8 @@ class ResponseMapper:
             for key, value in acf.items():
                 row[f"acf_{key}"] = value
 
-        # SEO поля
+        # SEO и другие кастомные поля
+        # Пропускаем уже обработанные и системные поля API
         skip_fields = {
             "id", "name", "slug", "description", "link", "acf",
             "_links", "taxonomy", "count", "parent"

@@ -797,9 +797,9 @@ async def fetch_and_append(
                     row = mapper.map_post_to_excel(post)
                     rows.append(row)
 
-            # Добавляем строки в Excel
-            excel_writer.append_rows(sheet_name, rows)
-            logger.info(f"Добавлено {len(rows)} строк в лист '{sheet_name}'")
+            # Заменяем все строки в Excel (кроме заголовков)
+            excel_writer.replace_rows(sheet_name, rows)
+            logger.info(f"Заменено {len(rows)} строк в листе '{sheet_name}'")
 
         # Сохраняем файл
         excel_writer.save()
