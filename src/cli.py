@@ -109,12 +109,28 @@ def sync(
         "--delete-media",
         help="Удалять featured media при удалении записей (action=delete)"
     ),
+    test_mode: bool = typer.Option(
+        False,
+        "--test-mode",
+        help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"
+    ),
 ):
     """
     Синхронизация Excel → WordPress
     """
     console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+
+    # Валидация test_mode
+    if test_mode:
+        if not sheets:
+            console.print("[bold red]ERROR: Тестовый режим (--test-mode) требует указания одного листа через --sheets[/bold red]\n")
+            raise typer.Exit(code=1)
+        sheets_list = [s.strip() for s in sheets.split(",")]
+        if len(sheets_list) > 1:
+            console.print("[bold red]ERROR: Тестовый режим (--test-mode) работает только с одним листом[/bold red]\n")
+            raise typer.Exit(code=1)
+        console.print("[bold yellow]ТЕСТОВЫЙ РЕЖИМ: Будут обработаны только первые 3 строки[/bold yellow]\n")
 
     try:
         # 1. Загружаем credentials (приоритет: CLI параметры → .env файл)
@@ -155,7 +171,7 @@ def sync(
         )
 
         # 4. Запускаем синхронизацию
-        asyncio.run(run_sync(config, sheets))
+        asyncio.run(run_sync(config, sheets, test_mode=test_mode))
 
         console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
@@ -169,13 +185,14 @@ def sync(
         raise typer.Exit(code=1)
 
 
-async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None):
+async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_mode: bool = False):
     """
     Основная логика синхронизации.
 
     Args:
         config: Конфигурация приложения
         sheets_filter: Фильтр листов (например "posts,pages")
+        test_mode: Тестовый режим (обрабатывает только первые 3 строки)
     """
     started_at = datetime.now()
 
@@ -263,7 +280,8 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None):
                         taxonomy_sync=taxonomy_sync,
                         excel_writer=excel_writer,
                         sheet_name=sheet_name,
-                        config=config
+                        config=config,
+                        test_mode=test_mode
                     )
 
                     stats["sheets"][sheet_name] = sheet_stats
@@ -307,10 +325,14 @@ async def process_sheet(
     taxonomy_sync: TaxonomySync,
     excel_writer: Optional[ExcelWriter],
     sheet_name: str,
-    config: AppConfig
+    config: AppConfig,
+    test_mode: bool = False
 ) -> dict:
     """
     Обработка одного листа.
+
+    Args:
+        test_mode: Тестовый режим (обрабатывает только первые 3 строки)
 
     Returns:
         Dict со статистикой
@@ -320,6 +342,12 @@ async def process_sheet(
         df = reader.read_sheet(sheet_name)
 
         logger.info(f"Всего строк: {len(df)}")
+
+        # В тестовом режиме берем только первые 3 строки
+        if test_mode:
+            original_len = len(df)
+            df = df.head(3)
+            logger.info(f"ТЕСТОВЫЙ РЕЖИМ: Обрабатываем только первые {len(df)} строк из {original_len}")
 
         # Проверяем есть ли колонка action
         if "action" not in df.columns:

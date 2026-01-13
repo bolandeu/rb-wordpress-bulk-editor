@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordPress Bulk Editor - Справочник команд</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding-top: 70px;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+            padding: 20px 0;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .sidebar .nav-link {
+            color: #495057;
+            padding: 8px 15px;
+            margin: 2px 0;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background-color: #e7f1ff;
+            color: var(--primary-color);
+        }
+
+        .content-section {
+            padding: 30px 0;
+            min-height: 400px;
+        }
+
+        .command-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: box-shadow 0.3s;
+        }
+
+        .command-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+
+        .command-title {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .command-description {
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            position: relative;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+        }
+
+        .param-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 4px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .param-required {
+            background-color: #ffeaa7;
+            color: #d63031;
+        }
+
+        .param-optional {
+            background-color: #dfe6e9;
+            color: #636e72;
+        }
+
+        .example-title {
+            font-weight: 600;
+            color: #495057;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .constructor-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .constructor-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .constructor-form .form-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .constructor-form .form-select,
+        .constructor-form .form-control {
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.95);
+            padding: 10px 15px;
+        }
+
+        .constructor-output {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 25px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: #fff;
+            min-height: 100px;
+            position: relative;
+        }
+
+        .constructor-output pre {
+            margin: 0;
+            color: #fff;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .badge-section {
+            margin: 15px 0;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .param-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+
+        .scroll-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary-color);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .scroll-to-top.visible {
+            opacity: 1;
+        }
+
+        .scroll-to-top:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1050;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: relative;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+            }
+        }
+    </style>
+</head>
+<body data-bs-spy="scroll" data-bs-target="#navbar-nav" data-bs-smooth-scroll="true">
+
+    <!-- Toast для уведомлений -->
+    <div class="toast-container">
+        <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <i class="bi bi-check-circle me-2"></i>
+                <strong class="me-auto">Успешно</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                Команда скопирована в буфер обмена!
+            </div>
+        </div>
+    </div>
+
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#top">
+                <i class="bi bi-file-earmark-code me-2"></i>
+                WordPress Bulk Editor
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#constructor">
+                            <i class="bi bi-tools me-1"></i>Конструктор
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#commands">
+                            <i class="bi bi-book me-1"></i>Команды
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Боковое меню -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+                <div class="position-sticky">
+                    <ul class="nav flex-column" id="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#constructor">
+                                <i class="bi bi-tools me-2"></i>Конструктор команд
+                            </a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">ОСНОВНЫЕ КОМАНДЫ</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#sync">sync</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#fetch">fetch</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#export">export</a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">МЕДИА</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#export-media">export-media</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#fetch-media">fetch-media</a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">GOOGLE SHEETS</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#download-google-sheet">download-google-sheet</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#upload-to-google-sheets">upload-to-google-sheets</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#sync-from-google">sync-from-google</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#sync-google-bidirectional">sync-google-bidirectional</a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">ДОПОЛНИТЕЛЬНО</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#bulk-delete">bulk-delete</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#validate">validate</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#options">options</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Основной контент -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+
+                <!-- Конструктор команд -->
+                <section id="constructor" class="content-section">
+                    <div class="constructor-section">
+                        <h1 class="constructor-title">
+                            <i class="bi bi-hammer me-3"></i>Конструктор команд
+                        </h1>
+                        <p class="lead mb-4">Создайте нужную команду, указав параметры</p>
+
+                        <div class="constructor-form">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Команда</label>
+                                    <select class="form-select" id="commandSelect">
+                                        <option value="">-- Выберите команду --</option>
+                                        <option value="sync">sync - Синхронизация Excel → WordPress</option>
+                                        <option value="fetch">fetch - Получение данных WordPress → Excel</option>
+                                        <option value="export">export - Экспорт контента сайта</option>
+                                        <option value="export-media">export-media - Экспорт медиафайлов</option>
+                                        <option value="fetch-media">fetch-media - Список медиафайлов в Excel</option>
+                                        <option value="download-google-sheet">download-google-sheet - Скачать Google Sheets</option>
+                                        <option value="upload-to-google-sheets">upload-to-google-sheets - Загрузить в Google Sheets</option>
+                                        <option value="sync-from-google">sync-from-google - Скачать и синхронизировать</option>
+                                        <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
+                                        <option value="bulk-delete">bulk-delete - Массовое удаление</option>
+                                        <option value="validate">validate - Валидация файла</option>
+                                        <option value="options">options - Обновление настроек</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="dynamicParams"></div>
+
+                            <div class="constructor-output">
+                                <button class="btn btn-light btn-sm copy-btn" onclick="copyConstructedCommand()" style="position: absolute; top: 10px; right: 10px;">
+                                    <i class="bi bi-clipboard"></i> Копировать
+                                </button>
+                                <pre id="constructedCommand">Выберите команду для начала</pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Команды -->
+                <section id="commands" class="content-section">
+                    <h1 class="mb-5">
+                        <i class="bi bi-book me-3"></i>Справочник команд
+                    </h1>
+
+                    <!-- sync -->
+                    <div id="sync" class="command-card">
+                        <h2 class="command-title">sync</h2>
+                        <p class="command-description">Синхронизация данных из Excel файла в WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Основная команда для массового создания, обновления и удаления контента WordPress из Excel файла.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--sheets</span> список листов через запятую
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции (без изменений)
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                            <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
+                            <span class="param-badge param-optional">--skip-media</span> пропустить загрузку медиа
+                            <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                            <span class="param-badge param-optional">--env-file</span> путь к кастомному .env файлу
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Полная синхронизация всех листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file w.xlsx --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">Синхронизация только определенных листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file data.xlsx --sheets posts --dry-run --verbose</code>
+                            <div class="text-muted small mt-2">Тестовый режим с подробными логами</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file w.xlsx --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx"</code>
+                            <div class="text-muted small mt-2">С явным указанием credentials</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Прогресс синхронизации в реальном времени</li>
+                                <li>Логи операций (создание, обновление, удаление)</li>
+                                <li>Статистика: успешные/ошибки по каждому листу</li>
+                                <li>Обновленный Excel файл с заполненными ID и метаданными</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- fetch -->
+                    <div id="fetch" class="command-card">
+                        <h2 class="command-title">fetch</h2>
+                        <p class="command-description">Получение данных из WordPress в Excel файл</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Выгрузка контента из WordPress в Excel для редактирования или анализа.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--sheets</span> список листов для заполнения
+                            <span class="param-badge param-optional">--status</span> фильтр по статусу (publish/draft/any)
+                            <span class="param-badge param-optional">--limit</span> максимум записей на лист
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                            <span class="param-badge param-optional">--env-file</span> путь к кастомному .env файлу
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --file example.xlsx --status publish</code>
+                            <div class="text-muted small mt-2">Получить только опубликованные записи</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --file w.xlsx</code>
+                            <div class="text-muted small mt-2">Получить все данные (любой статус)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --file example.xlsx --sheets posts,pages --limit 50</code>
+                            <div class="text-muted small mt-2">Ограничить количество записей</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Excel файл с данными из WordPress</li>
+                                <li>Все поля включая ACF, таксономии, SEO</li>
+                                <li>Готов к редактированию и обратной синхронизации</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- export -->
+                    <div id="export" class="command-card">
+                        <h2 class="command-title">export</h2>
+                        <p class="command-description">Экспорт контента сайта в HTML файлы с индексом CSV</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Полная выгрузка контента WordPress в файловую структуру для архивации или миграции.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--output</span> папка для экспорта (default: exported_content)
+                            <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 10)
+                            <span class="param-badge param-optional">--include-media</span> включить метаданные медиа
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli export --output "export/mysite" --concurrency 10</code>
+                            <div class="text-muted small mt-2">Экспорт с использованием .env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli export --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx" --output "export/mysite"</code>
+                            <div class="text-muted small mt-2">С явными credentials</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Папки по типам контента (posts/, pages/, custom/)</li>
+                                <li>HTML файлы с контентом (ID.html)</li>
+                                <li>index.csv с метаданными всех записей</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- export-media -->
+                    <div id="export-media" class="command-card">
+                        <h2 class="command-title">export-media</h2>
+                        <p class="command-description">Экспорт медиафайлов WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Массовое скачивание медиафайлов из WordPress библиотеки.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--output</span> папка для медиа
+                            <span class="param-badge param-optional">--concurrency</span> параллельные загрузки (default: 20)
+                            <span class="param-badge param-optional">--no-download-files</span> только метаданные
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli export-media --output "export/media" --concurrency 20</code>
+                            <div class="text-muted small mt-2">Скачать все медиафайлы</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli export-media --no-download-files --output media_list</code>
+                            <div class="text-muted small mt-2">Только метаданные (без скачивания)</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Скачанные файлы в указанной папке</li>
+                                <li>CSV файл с метаданными медиафайлов</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- fetch-media -->
+                    <div id="fetch-media" class="command-card">
+                        <h2 class="command-title">fetch-media</h2>
+                        <p class="command-description">Получить список медиафайлов в Excel</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Создание Excel файла с информацией о медиафайлах для управления библиотекой.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                        </div>
+
+                        <div class="example-title">Пример использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch-media --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Получить список всех медиафайлов</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Excel файл с листом media</li>
+                                <li>Информация о каждом файле: ID, название, URL, размер</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- download-google-sheet -->
+                    <div id="download-google-sheet" class="command-card">
+                        <h2 class="command-title">download-google-sheet</h2>
+                        <p class="command-description">Скачивание Google Sheets в Excel формат</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Конвертация Google Sheets в локальный Excel файл для дальнейшей работы.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                            <span class="param-badge param-optional">--output</span> имя выходного файла
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Важно:</strong>
+                            Если параметры не указаны, берутся из .env: GOOGLE_SHEET_ID и GOOGLE_SHEET_CREDENTIALS_PATH
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli download-google-sheet</code>
+                            <div class="text-muted small mt-2">Используя настройки из .env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli download-google-sheet --sheet-id "1B5gj1nxzVhQ..." --credentials "credentials/google.json" --output "my_file.xlsx"</code>
+                            <div class="text-muted small mt-2">С явным указанием параметров</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Excel файл со всеми листами из Google Sheets</li>
+                                <li>Сохранение форматирования и данных</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- upload-to-google-sheets -->
+                    <div id="upload-to-google-sheets" class="command-card">
+                        <h2 class="command-title">upload-to-google-sheets</h2>
+                        <p class="command-description">Загрузка локального Excel в Google Sheets</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Синхронизация локального Excel файла с Google Sheets.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--sheets</span> список листов для загрузки
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli upload-to-google-sheets --file export.xlsx</code>
+                            <div class="text-muted small mt-2">Загрузить весь файл (используя .env)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">Только определенные листы</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Обновленная Google таблица</li>
+                                <li>Логи синхронизации каждого листа</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- sync-from-google -->
+                    <div id="sync-from-google" class="command-card">
+                        <h2 class="command-title">sync-from-google</h2>
+                        <p class="command-description">Пайплайн: скачивание Google Sheets и синхронизация с WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Односторонняя синхронизация: Google Sheets → WordPress. Автоматически скачивает таблицу и синхронизирует контент.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                            <span class="param-badge param-optional">--sheets</span> фильтр листов для синхронизации
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-from-google</code>
+                            <div class="text-muted small mt-2">Используя настройки из .env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-from-google --sheet-id "1B5gj1n..." --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">С фильтром листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-from-google --dry-run --verbose</code>
+                            <div class="text-muted small mt-2">Тестовый режим</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Скачанный локальный Excel файл</li>
+                                <li>Логи синхронизации с WordPress</li>
+                                <li>Статистика операций</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- sync-google-bidirectional -->
+                    <div id="sync-google-bidirectional" class="command-card">
+                        <h2 class="command-title">sync-google-bidirectional</h2>
+                        <p class="command-description">Полный пайплайн: двусторонняя синхронизация Google Sheets ↔ WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Полный цикл: скачать Google Sheets → синхронизировать с WordPress → загрузить обновления обратно в Google Sheets.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                            <span class="param-badge param-optional">--sheets</span> фильтр листов
+                            <span class="param-badge param-optional">--output</span> путь к локальному файлу
+                            <span class="param-badge param-optional">--no-upload-back</span> не загружать обратно
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-google-bidirectional</code>
+                            <div class="text-muted small mt-2">Полный цикл (используя .env)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">С фильтром листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-google-bidirectional --no-upload-back</code>
+                            <div class="text-muted small mt-2">Без загрузки обратно (только Google → WP)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync-google-bidirectional --output "data/my_project.xlsx"</code>
+                            <div class="text-muted small mt-2">Указать другой путь к локальному файлу</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Локальный Excel файл с обновленными данными</li>
+                                <li>Синхронизированный WordPress контент</li>
+                                <li>Обновленная Google таблица с ID и метаданными</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- bulk-delete -->
+                    <div id="bulk-delete" class="command-card">
+                        <h2 class="command-title">bulk-delete</h2>
+                        <p class="command-description">Массовое удаление записей одного типа</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Быстрое удаление большого количества записей по типу и статусу.
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Осторожно:</strong>
+                            Эта команда может удалить большое количество контента. Рекомендуется сначала использовать --dry-run.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--post-type</span> тип контента (posts, pages, service...)
+                            <span class="param-badge param-optional">--status</span> фильтр по статусу (draft, publish...)
+                            <span class="param-badge param-optional">--force</span> удалить полностью (не в корзину)
+                            <span class="param-badge param-optional">--delete-media</span> удалять featured media
+                            <span class="param-badge param-optional">--dry-run</span> показать что будет удалено
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                            <span class="param-badge param-optional">--env-file</span> путь к кастомному .env файлу
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli bulk-delete --post-type posts --status draft</code>
+                            <div class="text-muted small mt-2">Удалить все черновики постов в корзину</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli bulk-delete --post-type service --force --delete-media</code>
+                            <div class="text-muted small mt-2">Полное удаление с медиафайлами</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli bulk-delete --post-type posts --dry-run</code>
+                            <div class="text-muted small mt-2">Показать что будет удалено (без удаления)</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Список найденных записей</li>
+                                <li>Прогресс удаления</li>
+                                <li>Статистика: удалено успешно / ошибки</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- validate -->
+                    <div id="validate" class="command-card">
+                        <h2 class="command-title">validate</h2>
+                        <p class="command-description">Валидация структуры Excel файла</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Проверка корректности Excel файла перед синхронизацией.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                        </div>
+
+                        <div class="example-title">Пример использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli validate --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Проверить структуру файла</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Проверка наличия обязательных колонок</li>
+                                <li>Валидация значений action</li>
+                                <li>Отчет об ошибках и предупреждениях</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- options -->
+                    <div id="options" class="command-card">
+                        <h2 class="command-title">options</h2>
+                        <p class="command-description">Обновление настроек WordPress сайта</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Массовое изменение настроек WordPress через лист options в Excel.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--dry-run</span> показать без отправки
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Структура листа options:</strong>
+                            Должны быть колонки: <code>option</code> и <code>value</code>
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli options --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Обновить настройки</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli options --file example.xlsx --dry-run</code>
+                            <div class="text-muted small mt-2">Показать что будет отправлено</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Список обновленных настроек</li>
+                                <li>Результат каждой операции</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- Футер -->
+                <footer class="mt-5 py-4 border-top">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>WordPress Bulk Editor</h6>
+                            <p class="text-muted small">Python CLI-инструмент для синхронизации данных между Excel файлами и WordPress через REST API.</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <p class="text-muted small mb-0">Создано с помощью Bootstrap 5</p>
+                            <p class="text-muted small">© 2025 WordPress Bulk Editor</p>
+                        </div>
+                    </div>
+                </footer>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Кнопка прокрутки вверх -->
+    <div class="scroll-to-top" id="scrollToTop">
+        <i class="bi bi-arrow-up"></i>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Данные команд с параметрами
+        const commandsData = {
+            'sync': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов через запятую' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к кастомному .env' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' }
+                ]
+            },
+            'fetch': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов' },
+                    { name: 'status', type: 'select', required: false, options: ['publish', 'draft', 'any'], description: 'Фильтр по статусу' },
+                    { name: 'limit', type: 'number', required: false, placeholder: '50', description: 'Максимум записей' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к кастомному .env' }
+                ]
+            },
+            'export': {
+                params: [
+                    { name: 'output', type: 'text', required: false, placeholder: 'export/mysite', description: 'Папка для экспорта' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '10', description: 'Параллельные запросы' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'include-media', type: 'checkbox', required: false, description: 'Включить метаданные медиа' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                ]
+            },
+            'export-media': {
+                params: [
+                    { name: 'output', type: 'text', required: false, placeholder: 'export/media', description: 'Папка для медиа' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '20', description: 'Параллельные загрузки' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'no-download-files', type: 'checkbox', required: false, description: 'Только метаданные' }
+                ]
+            },
+            'fetch-media': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' }
+                ]
+            },
+            'download-google-sheet': {
+                params: [
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1nxzVhQ...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'my_file.xlsx', description: 'Имя выходного файла' }
+                ]
+            },
+            'upload-to-google-sheets': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'export.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов' },
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' }
+                ]
+            },
+            'sync-from-google': {
+                params: [
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                ]
+            },
+            'sync-google-bidirectional': {
+                params: [
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'data/my_project.xlsx', description: 'Путь к локальному файлу' },
+                    { name: 'no-upload-back', type: 'checkbox', required: false, description: 'Не загружать обратно' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                ]
+            },
+            'bulk-delete': {
+                params: [
+                    { name: 'post-type', type: 'text', required: true, placeholder: 'posts', description: 'Тип контента' },
+                    { name: 'status', type: 'select', required: false, options: ['draft', 'publish', 'pending', 'private'], description: 'Фильтр по статусу' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к кастомному .env' },
+                    { name: 'force', type: 'checkbox', required: false, description: 'Удалить полностью (не в корзину)' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет удалено' }
+                ]
+            },
+            'validate': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' }
+                ]
+            },
+            'options': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать без отправки' }
+                ]
+            }
+        };
+
+        // Обработчик выбора команды
+        document.getElementById('commandSelect').addEventListener('change', function() {
+            const command = this.value;
+            const dynamicParams = document.getElementById('dynamicParams');
+
+            if (!command) {
+                dynamicParams.innerHTML = '';
+                updateConstructedCommand();
+                return;
+            }
+
+            const params = commandsData[command].params;
+            let html = '';
+
+            params.forEach(param => {
+                const requiredLabel = param.required ? '<span class="text-danger">*</span>' : '';
+
+                html += `<div class="param-group">`;
+                html += `<label class="form-label">${param.description} ${requiredLabel}</label>`;
+
+                if (param.type === 'text' || param.type === 'number') {
+                    html += `<input type="${param.type}" class="form-control param-input"
+                             data-param="${param.name}"
+                             placeholder="${param.placeholder || ''}"
+                             ${param.required ? 'required' : ''}>`;
+                } else if (param.type === 'select') {
+                    html += `<select class="form-select param-input" data-param="${param.name}">
+                             <option value="">-- Выберите --</option>`;
+                    param.options.forEach(opt => {
+                        html += `<option value="${opt}">${opt}</option>`;
+                    });
+                    html += `</select>`;
+                } else if (param.type === 'checkbox') {
+                    html += `<div class="form-check">
+                             <input type="checkbox" class="form-check-input param-input"
+                                    data-param="${param.name}" id="param-${param.name}">
+                             <label class="form-check-label" for="param-${param.name}">
+                                 Включить --${param.name}
+                             </label>
+                             </div>`;
+                }
+
+                html += `</div>`;
+            });
+
+            dynamicParams.innerHTML = html;
+
+            // Добавляем обработчики для всех inputs
+            document.querySelectorAll('.param-input').forEach(input => {
+                input.addEventListener('input', updateConstructedCommand);
+                input.addEventListener('change', updateConstructedCommand);
+            });
+
+            updateConstructedCommand();
+        });
+
+        // Обновление сконструированной команды
+        function updateConstructedCommand() {
+            const command = document.getElementById('commandSelect').value;
+            const output = document.getElementById('constructedCommand');
+
+            if (!command) {
+                output.textContent = 'Выберите команду для начала';
+                return;
+            }
+
+            let cmd = `python -m src.cli ${command}`;
+
+            document.querySelectorAll('.param-input').forEach(input => {
+                const paramName = input.dataset.param;
+
+                if (input.type === 'checkbox') {
+                    if (input.checked) {
+                        cmd += ` --${paramName}`;
+                    }
+                } else if (input.value.trim()) {
+                    const value = input.value.trim();
+                    // Если в значении есть пробелы, оборачиваем в кавычки
+                    if (value.includes(' ')) {
+                        cmd += ` --${paramName} "${value}"`;
+                    } else {
+                        cmd += ` --${paramName} ${value}`;
+                    }
+                }
+            });
+
+            output.textContent = cmd;
+        }
+
+        // Копирование сконструированной команды
+        function copyConstructedCommand() {
+            const text = document.getElementById('constructedCommand').textContent;
+            if (text === 'Выберите команду для начала') {
+                return;
+            }
+            copyToClipboard(text);
+        }
+
+        // Копирование кода из примеров
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block');
+            const code = codeBlock.querySelector('code').textContent;
+            copyToClipboard(code);
+        }
+
+        // Функция копирования в буфер обмена
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+                toast.show();
+            });
+        }
+
+        // Прокрутка вверх
+        const scrollToTopBtn = document.getElementById('scrollToTop');
+
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 300) {
+                scrollToTopBtn.classList.add('visible');
+            } else {
+                scrollToTopBtn.classList.remove('visible');
+            }
+        });
+
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // Smooth scroll для навигации
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Активация пунктов меню при скролле
+        window.addEventListener('scroll', () => {
+            let current = '';
+            document.querySelectorAll('section[id], div[id]').forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

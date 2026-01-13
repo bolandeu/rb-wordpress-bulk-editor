@@ -40,6 +40,12 @@ python -m src.cli sync --file w.xlsx --domain https://terminalzm.ru --username m
 # С кастомным .env файлом
 python -m src.cli sync --file w.xlsx --env-file project2/.env
 
+### Пример: тестовый режим для листа posts
+python -m src.cli sync --file data.xlsx --sheets posts --test-mode
+
+### Пример с другими параметрами тестовый режим
+python -m src.cli sync --file data.xlsx --sheets pages --test-mode --dry-run --verbose
+
 ## Экспорт медиафайлов
 
 # С файлами (используя .env)
