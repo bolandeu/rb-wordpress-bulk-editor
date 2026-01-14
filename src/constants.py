@@ -54,3 +54,22 @@ DEFAULT_FETCH_LIMIT = 100
 
 # Формат даты для логов
 LOG_DATE_FORMAT = "%Y%m%d_%H%M%S"
+
+# ========================================
+# Async Sync Configuration (NEW)
+# ========================================
+
+# API request timeout (seconds)
+DEFAULT_API_TIMEOUT = 30
+
+# Media upload timeout (seconds)
+DEFAULT_MEDIA_TIMEOUT = 120
+
+# Initial retry delay (seconds)
+DEFAULT_RETRY_DELAY = 1.0
+
+# Circuit breaker failure threshold
+DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 10
+
+# Circuit breaker recovery timeout (seconds)
+DEFAULT_CIRCUIT_BREAKER_RECOVERY = 60

@@ -335,6 +335,18 @@
                             <a class="nav-link" href="#fetch-media">fetch-media</a>
                         </li>
                         <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">АСИНХРОННЫЕ (БЫСТРЫЕ)</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#async-sync">async-sync</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#async-sync-from-google">async-sync-from-google</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#async-sync-google-bidirectional">async-sync-google-bidirectional</a>
+                        </li>
+                        <li class="nav-item mt-3">
                             <h6 class="px-3 text-muted small">GOOGLE SHEETS</h6>
                         </li>
                         <li class="nav-item">
@@ -383,6 +395,7 @@
                                     <select class="form-select" id="commandSelect">
                                         <option value="">-- Выберите команду --</option>
                                         <option value="sync">sync - Синхронизация Excel → WordPress</option>
+                                        <option value="async-sync">async-sync - 🚀 Асинхронная синхронизация (быстрее)</option>
                                         <option value="fetch">fetch - Получение данных WordPress → Excel</option>
                                         <option value="export">export - Экспорт контента сайта</option>
                                         <option value="export-media">export-media - Экспорт медиафайлов</option>
@@ -390,7 +403,9 @@
                                         <option value="download-google-sheet">download-google-sheet - Скачать Google Sheets</option>
                                         <option value="upload-to-google-sheets">upload-to-google-sheets - Загрузить в Google Sheets</option>
                                         <option value="sync-from-google">sync-from-google - Скачать и синхронизировать</option>
+                                        <option value="async-sync-from-google">async-sync-from-google - 🚀 Async Google → WP</option>
                                         <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
+                                        <option value="async-sync-google-bidirectional">async-sync-google-bidirectional - 🚀 Async Google ↔ WP</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Обновление настроек</option>
@@ -888,6 +903,212 @@
                         </div>
                     </div>
 
+                    <!-- async-sync -->
+                    <div id="async-sync" class="command-card">
+                        <h2 class="command-title">async-sync</h2>
+                        <p class="command-description">🚀 Асинхронная синхронизация Excel → WordPress (быстрее и надежнее)</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Продвинутая версия команды sync с параллельной обработкой строк, retry механизмом и circuit breaker для устойчивости.
+                        </div>
+
+                        <div class="success-box">
+                            <strong><i class="bi bi-lightning-charge me-2"></i>Преимущества:</strong>
+                            <ul class="mb-0">
+                                <li><strong>Параллельная обработка строк</strong> через Semaphore (не батчами)</li>
+                                <li><strong>Retry с exponential backoff</strong> - автоматический повтор при ошибках (5xx, timeout, network)</li>
+                                <li><strong>Circuit breaker</strong> - защита от перегрузки сервера (блокирует запросы после N ошибок)</li>
+                                <li><strong>Отдельные таймауты</strong> для API (30s) и медиа (120s)</li>
+                                <li><strong>Тестовый режим</strong> --test-mode для отладки (первые 3 строки)</li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--sheets</span> список листов через запятую
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                            <span class="param-badge param-optional">--env-file</span> путь к кастомному .env файлу
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                            <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
+                            <span class="param-badge param-optional">--api-timeout</span> API таймаут в секундах (default: 30)
+                            <span class="param-badge param-optional">--max-retries</span> максимум повторов (default: 3)
+                            <span class="param-badge param-optional">--circuit-breaker / --no-circuit-breaker</span> включить circuit breaker (default: on)
+                            <span class="param-badge param-optional">--skip-media</span> пропустить загрузку медиа
+                            <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
+                            <span class="param-badge param-optional">--no-update-excel</span> не записывать ID обратно в Excel
+                            <span class="param-badge param-optional">--test-mode</span> обработать только первые 3 строки
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Полная асинхронная синхронизация всех листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync --file w.xlsx --sheets posts --concurrency 10</code>
+                            <div class="text-muted small mt-2">Увеличенная concurrency для быстрых серверов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync --file data.xlsx --test-mode --verbose</code>
+                            <div class="text-muted small mt-2">Тестовый режим: обработать первые 3 строки с логами</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync --file w.xlsx --max-retries 5 --api-timeout 60</code>
+                            <div class="text-muted small mt-2">Увеличить retry и timeout для медленного сервера</div>
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-gear me-2"></i>Настройка .env:</strong>
+                            Асинхронные команды используют параметры с префиксом <code>WP_*</code>:
+                            <pre class="mt-2 mb-0" style="font-size: 12px;">WP_SYNC_CONCURRENCY=5                # Параллельные запросы
+WP_API_TIMEOUT=30                    # API таймаут (секунды)
+WP_MEDIA_TIMEOUT=120                 # Медиа таймаут (секунды)
+WP_MAX_RETRIES=3                     # Максимум retry
+WP_RETRY_DELAY=1                     # Начальная задержка (exponential backoff)
+WP_CIRCUIT_BREAKER_THRESHOLD=10      # Порог ошибок для circuit breaker
+WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (секунды)</pre>
+                        </div>
+                    </div>
+
+                    <!-- async-sync-from-google -->
+                    <div id="async-sync-from-google" class="command-card">
+                        <h2 class="command-title">async-sync-from-google</h2>
+                        <p class="command-description">🚀 Асинхронная синхронизация Google Sheets → WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Асинхронная версия sync-from-google с параллельной обработкой, retry и circuit breaker.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                            <span class="param-badge param-optional">--output</span> путь для сохранения .xlsx (default: export.xlsx)
+                            <span class="param-badge param-optional">--sheets</span> фильтр листов для синхронизации
+                            <span class="param-badge param-optional">--env-file</span> путь к .env файлу
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                            <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
+                            <span class="param-badge param-optional">--max-retries</span> максимум retry (default: 3)
+                            <span class="param-badge param-optional">--circuit-breaker / --no-circuit-breaker</span> circuit breaker
+                            <span class="param-badge param-optional">--skip-media</span> пропустить медиа
+                            <span class="param-badge param-optional">--no-update-excel</span> не писать ID в Excel
+                            <span class="param-badge param-optional">--delete-media</span> удалять media при delete
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync-from-google</code>
+                            <div class="text-muted small mt-2">Используя настройки из .env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync-from-google --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <div class="text-muted small mt-2">С фильтром листов и увеличенной concurrency</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Пайплайн:</strong>
+                            <ul class="mb-0">
+                                <li>1. Скачивание Google Sheets → Excel</li>
+                                <li>2. Асинхронная синхронизация Excel → WordPress</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- async-sync-google-bidirectional -->
+                    <div id="async-sync-google-bidirectional" class="command-card">
+                        <h2 class="command-title">async-sync-google-bidirectional</h2>
+                        <p class="command-description">🚀 Асинхронная двусторонняя синхронизация Google Sheets ↔ WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Полный цикл с асинхронной обработкой: скачать Google Sheets → синхронизировать с WordPress → загрузить обратно в Google Sheets.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--sheet-id</span> ID Google таблицы
+                            <span class="param-badge param-optional">--credentials</span> путь к credentials.json
+                            <span class="param-badge param-optional">--output</span> путь к локальному файлу (default: export.xlsx)
+                            <span class="param-badge param-optional">--sheets</span> фильтр листов
+                            <span class="param-badge param-optional">--env-file</span> путь к .env файлу
+                            <span class="param-badge param-optional">--no-upload-back</span> не загружать обратно
+                            <span class="param-badge param-optional">--dry-run</span> режим симуляции
+                            <span class="param-badge param-optional">--verbose</span> подробные логи
+                            <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
+                            <span class="param-badge param-optional">--max-retries</span> максимум retry (default: 3)
+                            <span class="param-badge param-optional">--circuit-breaker / --no-circuit-breaker</span> circuit breaker
+                            <span class="param-badge param-optional">--skip-media</span> пропустить медиа
+                            <span class="param-badge param-optional">--no-update-excel</span> не писать ID в Excel
+                            <span class="param-badge param-optional">--delete-media</span> удалять media при delete
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync-google-bidirectional</code>
+                            <div class="text-muted small mt-2">Полный асинхронный цикл (используя .env)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <div class="text-muted small mt-2">С фильтром листов и высокой concurrency</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async-sync-google-bidirectional --no-upload-back</code>
+                            <div class="text-muted small mt-2">Без загрузки обратно (только Google → WP)</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Пайплайн:</strong>
+                            <ul class="mb-0">
+                                <li>1. Скачивание Google Sheets → Excel</li>
+                                <li>2. Асинхронная синхронизация Excel → WordPress</li>
+                                <li>3. Загрузка обновленного Excel → Google Sheets</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- bulk-delete -->
                     <div id="bulk-delete" class="command-card">
                         <h2 class="command-title">bulk-delete</h2>
@@ -1079,6 +1300,25 @@
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' }
                 ]
             },
+            'async-sync': {
+                params: [
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов через запятую' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к кастомному .env' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы (default: 5)' },
+                    { name: 'api-timeout', type: 'number', required: false, placeholder: '30', description: 'API таймаут в секундах' },
+                    { name: 'max-retries', type: 'number', required: false, placeholder: '3', description: 'Максимум retry' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'test-mode', type: 'checkbox', required: false, description: 'Тестовый режим (первые 3 строки)' }
+                ]
+            },
             'fetch': {
                 params: [
                     { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
@@ -1150,6 +1390,39 @@
                     { name: 'no-upload-back', type: 'checkbox', required: false, description: 'Не загружать обратно' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                ]
+            },
+            'async-sync-from-google': {
+                params: [
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'export.xlsx', description: 'Путь для сохранения .xlsx' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
+                    { name: 'max-retries', type: 'number', required: false, placeholder: '3', description: 'Максимум retry' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить медиа' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
+                ]
+            },
+            'async-sync-google-bidirectional': {
+                params: [
+                    { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'export.xlsx', description: 'Путь к локальному файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
+                    { name: 'max-retries', type: 'number', required: false, placeholder: '3', description: 'Максимум retry' },
+                    { name: 'no-upload-back', type: 'checkbox', required: false, description: 'Не загружать обратно' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить медиа' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
                 ]
             },
             'bulk-delete': {

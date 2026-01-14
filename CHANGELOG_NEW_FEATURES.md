@@ -1,5 +1,75 @@
 # Новые возможности
 
+## 🚀 Асинхронные команды с расширенными возможностями
+
+Добавлены 3 новые **асинхронные команды** для ускорения синхронизации и повышения надежности:
+
+### Команды:
+
+1. **`async-sync`** - асинхронная версия `sync`
+2. **`async-sync-from-google`** - асинхронная версия `sync-from-google`
+3. **`async-sync-google-bidirectional`** - асинхронная версия `sync-google-bidirectional`
+
+### Преимущества асинхронных команд:
+
+- ⚡ **Параллельная обработка строк** через Semaphore (не батчами, как в sync)
+- 🔄 **Retry с exponential backoff** - автоматический повтор при временных ошибках (5xx, timeout, network)
+- 🛡️ **Circuit breaker** - защита от перегрузки сервера (блокирует запросы после N последовательных ошибок)
+- ⏱️ **Отдельные таймауты** для API запросов (30s) и медиа загрузки (120s)
+- 🧪 **Тестовый режим** `--test-mode` для отладки (обрабатывает только первые 3 строки)
+
+### Настройка через .env:
+
+Асинхронные команды используют **новые параметры с префиксом `WP_*`**:
+
+```env
+# Async Sync Configuration
+WP_SYNC_CONCURRENCY=5                # Максимум параллельных запросов (default: 5)
+WP_API_TIMEOUT=30                    # API таймаут в секундах (default: 30)
+WP_MEDIA_TIMEOUT=120                 # Медиа таймаут в секундах (default: 120)
+WP_MAX_RETRIES=3                     # Максимум retry попыток (default: 3)
+WP_RETRY_DELAY=1                     # Начальная задержка для exponential backoff (default: 1s)
+WP_CIRCUIT_BREAKER_THRESHOLD=10      # Порог ошибок для circuit breaker (default: 10)
+WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления в секундах (default: 60)
+```
+
+### Почему дублируются параметры SYNC_* и WP_*?
+
+- **`SYNC_*`** - используются **старыми синхронными** командами: `sync`, `fetch`, `export` и др.
+- **`WP_*`** - используются **новыми асинхронными** командами: `async-sync`, `async-sync-from-google`, `async-sync-google-bidirectional`
+
+Асинхронные команды имеют больше параметров (retry, circuit breaker, отдельные таймауты для медиа).
+
+### Примеры использования:
+
+```bash
+# Асинхронная синхронизация с тестовым режимом
+python -m src.cli async-sync --file example.xlsx --test-mode --verbose
+
+# Асинхронная синхронизация с увеличенной concurrency для быстрых серверов
+python -m src.cli async-sync --file w.xlsx --concurrency 10 --max-retries 5
+
+# Асинхронная Google Sheets → WordPress
+python -m src.cli async-sync-from-google --sheets posts,pages --concurrency 10
+
+# Асинхронная двусторонняя синхронизация
+python -m src.cli async-sync-google-bidirectional --concurrency 10 --verbose
+```
+
+### Файлы:
+
+- `src/cli.py` - добавлены команды `async_sync`, `async_sync_from_google`, `async_sync_google_bidirectional`
+- `src/sync/content_sync_async.py` - асинхронная обработка контента
+- `src/sync/taxonomy_sync_async.py` - асинхронная обработка таксономий
+- `src/utils/async_helpers.py` - AsyncBatchProcessor для параллельной обработки
+- `src/utils/retry.py` - RetryConfig и CircuitBreaker
+- `src/config.py` - добавлена поддержка `WP_*` параметров
+- `src/constants.py` - добавлены константы для async конфигурации
+
+---
+
+# Новые возможности
+
 ## 1. Автоматическая очистка после синхронизации
 
 После успешной операции sync (add/update/delete) Excel файл автоматически обновляется:

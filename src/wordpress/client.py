@@ -15,15 +15,27 @@ from ..exceptions import (
     NetworkError,
     WordPressError
 )
+from ..utils.retry import RetryConfig, CircuitBreaker, async_retry
 
 
 class WordPressClient:
     """Асинхронный HTTP клиент для WordPress REST API"""
 
-    def __init__(self, config: WordPressConfig):
+    def __init__(
+        self,
+        config: WordPressConfig,
+        retry_config: Optional[RetryConfig] = None,
+        circuit_breaker: Optional[CircuitBreaker] = None,
+        timeout: Optional[float] = None
+    ):
         self.config = config
         self.base_url = config.url
         self._client: Optional[httpx.AsyncClient] = None
+
+        # NEW: Retry и circuit breaker для async команд
+        self.retry_config = retry_config or RetryConfig()
+        self.circuit_breaker = circuit_breaker
+        self.timeout = timeout or 30.0
 
     async def __aenter__(self):
         """Открытие клиента"""
@@ -56,7 +68,7 @@ class WordPressClient:
                 base_url=self.base_url,
                 headers=headers,
                 verify=self.config.verify_ssl,
-                timeout=30.0,
+                timeout=self.timeout,  # NEW: Configurable timeout
                 follow_redirects=True
             )
 
@@ -97,24 +109,17 @@ class WordPressClient:
                 f"WordPress API error ({response.status_code}): {message}"
             )
 
-    async def get(
+    # ========================================
+    # Internal methods with @async_retry (NEW)
+    # ========================================
+
+    @async_retry()
+    async def _get_with_retry(
         self,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        GET запрос.
-
-        Args:
-            endpoint: Путь endpoint (например /wp-json/wp/v2/posts)
-            params: Query параметры
-
-        Returns:
-            JSON ответ как словарь
-
-        Raises:
-            AuthenticationError, NotFoundError, ServerError, NetworkError
-        """
+        """Внутренний GET метод с retry."""
         if self._client is None:
             await self.open()
 
@@ -148,23 +153,14 @@ class WordPressClient:
         except httpx.TimeoutException as e:
             raise NetworkError(f"Timeout: {e}")
 
-    async def post(
+    @async_retry()
+    async def _post_with_retry(
         self,
         endpoint: str,
         data: Dict[str, Any],
         files: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        POST запрос.
-
-        Args:
-            endpoint: Путь endpoint
-            data: JSON данные для отправки
-            files: Файлы для загрузки (multipart)
-
-        Returns:
-            JSON ответ как словарь
-        """
+        """Внутренний POST метод с retry."""
         if self._client is None:
             await self.open()
 
@@ -174,15 +170,12 @@ class WordPressClient:
                 logger.debug(f"POST {endpoint} (multipart upload)")
                 logger.debug(f"Multipart data keys: {list(data.keys()) if data else 'None'}")
                 logger.debug(f"Multipart files keys: {list(files.keys()) if files else 'None'}")
-                # Логируем детали файлов
                 for key, file_info in files.items():
                     logger.debug(f"File '{key}': name={file_info[0]}, MIME={file_info[2]}, size={len(file_info[1])} bytes")
-                
-                # Убираем Content-Type заголовок для multipart запросов
-                # httpx сам установит правильный multipart/form-data
+
                 headers = self._client.headers.copy()
                 headers.pop("Content-Type", None)
-                
+
                 response = await self._client.post(
                     endpoint,
                     data=data,
@@ -220,18 +213,18 @@ class WordPressClient:
         except httpx.TimeoutException as e:
             raise NetworkError(f"Timeout: {e}")
 
-    async def put(
+    @async_retry()
+    async def _put_with_retry(
         self,
         endpoint: str,
         data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """PUT запрос (обновление)."""
+        """Внутренний PUT метод с retry."""
         if self._client is None:
             await self.open()
 
         try:
             logger.debug(f"PUT {endpoint} with data keys: {list(data.keys())}")
-            # Полное логирование JSON payload
             logger.debug(f"PUT {endpoint} with full data: {data}")
             response = await self._client.put(endpoint, json=data)
 
@@ -240,7 +233,6 @@ class WordPressClient:
             if response.status_code >= 400:
                 self._handle_error(response)
 
-            # Проверяем что ответ содержит JSON
             try:
                 result = response.json()
                 return result
@@ -262,12 +254,13 @@ class WordPressClient:
         except httpx.TimeoutException as e:
             raise NetworkError(f"Timeout: {e}")
 
-    async def delete(
+    @async_retry()
+    async def _delete_with_retry(
         self,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """DELETE запрос."""
+        """Внутренний DELETE метод с retry."""
         if self._client is None:
             await self.open()
 
@@ -300,6 +293,112 @@ class WordPressClient:
             raise NetworkError(f"Сетевая ошибка: {e}")
         except httpx.TimeoutException as e:
             raise NetworkError(f"Timeout: {e}")
+
+    # ========================================
+    # Public methods with circuit breaker
+    # ========================================
+
+    async def get(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        GET запрос с retry и circuit breaker.
+
+        Args:
+            endpoint: Путь endpoint (например /wp-json/wp/v2/posts)
+            params: Query параметры
+
+        Returns:
+            JSON ответ как словарь
+
+        Raises:
+            AuthenticationError, NotFoundError, ServerError, NetworkError, CircuitBreakerOpenError
+        """
+        if self.circuit_breaker:
+            return await self.circuit_breaker.call(
+                self._get_with_retry, endpoint, params
+            )
+        else:
+            return await self._get_with_retry(endpoint, params)
+
+    async def post(
+        self,
+        endpoint: str,
+        data: Dict[str, Any],
+        files: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        POST запрос с retry и circuit breaker.
+
+        Args:
+            endpoint: Путь endpoint
+            data: JSON данные для отправки
+            files: Файлы для загрузки (multipart)
+
+        Returns:
+            JSON ответ как словарь
+
+        Raises:
+            AuthenticationError, NotFoundError, ServerError, NetworkError, CircuitBreakerOpenError
+        """
+        if self.circuit_breaker:
+            return await self.circuit_breaker.call(
+                self._post_with_retry, endpoint, data, files
+            )
+        else:
+            return await self._post_with_retry(endpoint, data, files)
+
+    async def put(
+        self,
+        endpoint: str,
+        data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        PUT запрос с retry и circuit breaker.
+
+        Args:
+            endpoint: Путь endpoint
+            data: JSON данные для обновления
+
+        Returns:
+            JSON ответ как словарь
+
+        Raises:
+            AuthenticationError, NotFoundError, ServerError, NetworkError, CircuitBreakerOpenError
+        """
+        if self.circuit_breaker:
+            return await self.circuit_breaker.call(
+                self._put_with_retry, endpoint, data
+            )
+        else:
+            return await self._put_with_retry(endpoint, data)
+
+    async def delete(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        DELETE запрос с retry и circuit breaker.
+
+        Args:
+            endpoint: Путь endpoint
+            params: Query параметры
+
+        Returns:
+            JSON ответ как словарь
+
+        Raises:
+            AuthenticationError, NotFoundError, ServerError, NetworkError, CircuitBreakerOpenError
+        """
+        if self.circuit_breaker:
+            return await self.circuit_breaker.call(
+                self._delete_with_retry, endpoint, params
+            )
+        else:
+            return await self._delete_with_retry(endpoint, params)
 
     async def test_connection(self) -> bool:
         """

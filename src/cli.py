@@ -23,10 +23,12 @@ from .wordpress.options import OptionsEndpoint
 from .sync.content_sync import ContentSync
 from .sync.media_sync import MediaSync
 from .sync.taxonomy_sync import TaxonomySync
+from .sync.content_sync_async import ContentSyncAsync
+from .sync.taxonomy_sync_async import TaxonomySyncAsync
 from .mappers.response_mapper import ResponseMapper
 from .utils.logger import setup_logger, log_summary
 from .utils.content_exporter import ContentExporter
-from .utils.auth import load_credentials_from_env
+from .utils.auth import load_credentials_from_env, load_async_config_from_env
 from .exceptions import WPBulkEditorError
 
 app = typer.Typer(
@@ -2156,6 +2158,816 @@ async def run_bulk_delete(
 
         logger.info(f"Bulk delete completed: deleted={stats['deleted']}, errors={stats['errors']}")
         return stats
+
+
+async def run_sync_async(
+    config: AppConfig,
+    sheets_filter: Optional[str] = None,
+    test_mode: bool = False,
+    retry_config=None,
+    circuit_breaker=None
+):
+    """
+    Async версия run_sync с параллельной обработкой строк.
+
+    Отличия от run_sync:
+    - WordPressClient создается с retry_config и circuit_breaker
+    - Используются ContentSyncAsync, TaxonomySyncAsync
+    - ExcelWriter использует update_*_async()
+    """
+    started_at = datetime.now()
+
+    # Статистика
+    stats = {
+        "file": str(config.paths.excel_file),
+        "started_at": started_at.isoformat(),
+        "sheets": {},
+        "overall": {
+            "total": 0,
+            "successful": 0,
+            "errors": 0,
+            "success_rate": 0.0
+        }
+    }
+
+    try:
+        # 1. Открываем Excel файл
+        with ExcelReader(config.paths.excel_file) as reader:
+            sheets_by_type = reader.get_sheets_by_type()
+
+            logger.info(f"Найдено листов:")
+            logger.info(f"  Content: {len(sheets_by_type['content'])}")
+            logger.info(f"  Taxonomy: {len(sheets_by_type['taxonomy'])}")
+
+            # Фильтруем листы если указано
+            sheets_to_process = []
+            if sheets_filter:
+                filter_list = [s.strip() for s in sheets_filter.split(",")]
+                sheets_to_process = filter_list
+            else:
+                sheets_to_process = (
+                    sheets_by_type["content"] +
+                    sheets_by_type["taxonomy"]
+                )
+
+            logger.info(f"Листы для обработки: {sheets_to_process}")
+
+            # 2. Определяем timeout
+            timeout = config.sync.timeout if hasattr(config.sync, 'timeout') else 30
+
+            # 3. Подключаемся к WordPress API с retry и circuit breaker
+            async with WordPressClient(
+                config.wordpress,
+                retry_config=retry_config,
+                circuit_breaker=circuit_breaker,
+                timeout=timeout
+            ) as wp_client:
+                # Проверка подключения
+                await wp_client.test_connection()
+
+                # 4. Загружаем кэш таксономий
+                logger.info("Загрузка кэша таксономий...")
+                taxonomy_cache = TaxonomyCache()
+
+                # Определяем какие таксономии используются
+                taxonomies_to_cache = set()
+                for sheet_name in sheets_to_process:
+                    sheet_type = reader.classify_sheet(sheet_name)
+                    if sheet_type == "content":
+                        df = reader.read_sheet(sheet_name)
+                        # Ищем колонки таксономий
+                        for col in df.columns:
+                            if col in ["categories", "tags"] or col.endswith("-cat"):
+                                taxonomies_to_cache.add(col)
+                    elif sheet_type == "taxonomy":
+                        taxonomies_to_cache.add(sheet_name)
+
+                if taxonomies_to_cache:
+                    await taxonomy_cache.load(wp_client, list(taxonomies_to_cache))
+
+                # 5. Создаем ASYNC sync классы
+                content_sync = ContentSyncAsync(wp_client, config, taxonomy_cache)
+                taxonomy_sync = TaxonomySyncAsync(wp_client, config)
+                media_sync = MediaSync(wp_client, config)  # MediaSync уже async
+
+                # 6. Открываем Excel writer (если нужно)
+                excel_writer = None
+                if config.sync.update_excel:
+                    excel_writer = ExcelWriter(config.paths.excel_file)
+                    excel_writer.load()
+
+                # 7. Обработка каждого листа (ПОСЛЕДОВАТЕЛЬНО!)
+                for sheet_name in sheets_to_process:
+                    logger.info(f"\n{'='*50}")
+                    logger.info(f"Обработка листа: {sheet_name}")
+                    logger.info(f"{'='*50}")
+
+                    sheet_stats = await process_sheet_async(
+                        reader=reader,
+                        content_sync=content_sync,
+                        media_sync=media_sync,
+                        taxonomy_sync=taxonomy_sync,
+                        excel_writer=excel_writer,
+                        sheet_name=sheet_name,
+                        config=config,
+                        test_mode=test_mode
+                    )
+
+                    stats["sheets"][sheet_name] = sheet_stats
+
+                    # Обновляем общую статистику
+                    stats["overall"]["total"] += sheet_stats.get("total", 0)
+                    stats["overall"]["successful"] += (
+                        sheet_stats.get("added", 0) +
+                        sheet_stats.get("updated", 0) +
+                        sheet_stats.get("deleted", 0)
+                    )
+                    stats["overall"]["errors"] += sheet_stats.get("errors", 0)
+
+                # 8. Сохраняем Excel
+                if excel_writer:
+                    excel_writer.save()
+
+        # Вычисляем success rate
+        if stats["overall"]["total"] > 0:
+            stats["overall"]["success_rate"] = (
+                stats["overall"]["successful"] / stats["overall"]["total"]
+            ) * 100
+
+        # Время завершения
+        finished_at = datetime.now()
+        stats["finished_at"] = finished_at.isoformat()
+        stats["duration_seconds"] = (finished_at - started_at).total_seconds()
+
+        # Выводим summary
+        log_summary(stats, config.paths.logs_folder / "async_sync.log")
+
+    except Exception as e:
+        logger.exception("Ошибка async синхронизации")
+        raise
+
+
+async def process_sheet_async(
+    reader: ExcelReader,
+    content_sync: ContentSyncAsync,
+    media_sync,  # MediaSync
+    taxonomy_sync: TaxonomySyncAsync,
+    excel_writer: Optional[ExcelWriter],
+    sheet_name: str,
+    config: AppConfig,
+    test_mode: bool = False
+) -> dict:
+    """
+    Async версия process_sheet.
+
+    Args:
+        test_mode: Тестовый режим (обрабатывает только первые 3 строки)
+
+    Returns:
+        Dict со статистикой
+    """
+    try:
+        # Читаем лист
+        df = reader.read_sheet(sheet_name)
+
+        logger.info(f"Всего строк: {len(df)}")
+
+        # В тестовом режиме берем только первые 3 строки
+        if test_mode:
+            original_len = len(df)
+            df = df.head(3)
+            logger.info(f"ТЕСТОВЫЙ РЕЖИМ: Обрабатываем только первые {len(df)} строк из {original_len}")
+
+        # Проверяем есть ли колонка action
+        if "action" not in df.columns:
+            logger.warning(f"Лист {sheet_name} не содержит колонку 'action', пропускаем")
+            return {
+                "total": len(df),
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "skipped": len(df),
+                "errors": 0
+            }
+
+        # Синхронизируем через соответствующий async sync
+        sheet_type = reader.classify_sheet(sheet_name)
+
+        if sheet_type == "content":
+            # Асинхронная синхронизация контента
+            stats = await content_sync.sync_sheet(
+                sheet_name,
+                df,
+                excel_writer
+            )
+            stats["total"] = len(df)
+            return stats
+
+        elif sheet_type == "media":
+            # Синхронизация медиафайлов (уже async)
+            stats = await media_sync.sync_media(
+                df,
+                excel_writer
+            )
+            stats["total"] = len(df)
+            return stats
+
+        elif sheet_type == "taxonomy":
+            # Асинхронная синхронизация таксономий
+            stats = await taxonomy_sync.sync_sheet(
+                sheet_name,
+                df,
+                excel_writer
+            )
+            stats["total"] = len(df)
+            return stats
+
+        else:
+            logger.warning(f"Неизвестный тип листа: {sheet_name}")
+            return {
+                "total": len(df),
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "skipped": len(df),
+                "errors": 0
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка обработки листа {sheet_name}: {e}")
+        logger.exception(e)
+        return {
+            "total": 0,
+            "added": 0,
+            "updated": 0,
+            "deleted": 0,
+            "skipped": 0,
+            "errors": 1
+        }
+
+
+@app.command(name="async")
+def async_sync(
+    file: Path = typer.Option(
+        ...,
+        "--file",
+        "-f",
+        help="Путь к Excel файлу",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    domain: Optional[str] = typer.Option(
+        None,
+        "--domain",
+        help="WordPress domain (например, https://example.com)"
+    ),
+    username: Optional[str] = typer.Option(
+        None,
+        "--username",
+        help="WordPress username"
+    ),
+    password: Optional[str] = typer.Option(
+        None,
+        "--password",
+        help="WordPress Application Password"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов через запятую (posts,pages)"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Режим dry-run (без изменений)"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    ),
+    concurrency: Optional[int] = typer.Option(
+        None,
+        "--concurrency",
+        help="Количество параллельных запросов (default: 5)"
+    ),
+    api_timeout: Optional[int] = typer.Option(
+        None,
+        "--api-timeout",
+        help="API timeout в секундах (default: 30)"
+    ),
+    max_retries: Optional[int] = typer.Option(
+        None,
+        "--max-retries",
+        help="Максимум повторных попыток (default: 3)"
+    ),
+    enable_circuit_breaker: bool = typer.Option(
+        True,
+        "--circuit-breaker/--no-circuit-breaker",
+        help="Включить circuit breaker"
+    ),
+    skip_media: bool = typer.Option(
+        False,
+        "--skip-media",
+        help="Пропустить загрузку медиа"
+    ),
+    no_update_excel: bool = typer.Option(
+        False,
+        "--no-update-excel",
+        help="Не записывать ID обратно в Excel"
+    ),
+    delete_media: bool = typer.Option(
+        False,
+        "--delete-media",
+        help="Удалять featured media при удалении записей (action=delete)"
+    ),
+    test_mode: bool = typer.Option(
+        False,
+        "--test-mode",
+        help="Тестовый режим: обрабатывает только первые 3 строки"
+    ),
+):
+    """
+    🚀 Асинхронная синхронизация Excel → WordPress
+
+    Отличия от sync:
+    - Параллельная обработка строк (Semaphore)
+    - Retry с exponential backoff
+    - Circuit breaker для устойчивости
+    - Настраиваемые таймауты
+    """
+    console.print(f"\n[bold cyan]🚀 WordPress Bulk Editor - Async Sync[/bold cyan]\n")
+    console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+
+    # Валидация test_mode
+    if test_mode:
+        if not sheets:
+            console.print("[bold red]ERROR: Тестовый режим (--test-mode) требует указания одного листа через --sheets[/bold red]\n")
+            raise typer.Exit(code=1)
+        sheets_list = [s.strip() for s in sheets.split(",")]
+        if len(sheets_list) > 1:
+            console.print("[bold red]ERROR: Тестовый режим (--test-mode) работает только с одним листом[/bold red]\n")
+            raise typer.Exit(code=1)
+        console.print("[bold yellow]ТЕСТОВЫЙ РЕЖИМ: Будут обработаны только первые 3 строки[/bold yellow]\n")
+
+    try:
+        # 1. Загружаем credentials (приоритет: CLI параметры → .env файл)
+        console.print("[yellow]Загрузка credentials...[/yellow]")
+        domain, username, password = load_credentials_from_env(
+            env_file=env_file,
+            domain_override=domain,
+            username_override=username,
+            password_override=password
+        )
+        console.print(f"[green]OK[/green] WordPress: {domain}")
+        console.print(f"[green]OK[/green] User: {username}\n")
+
+        # 2. Загружаем async конфигурацию (приоритет CLI > .env > default)
+        concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
+            env_file=env_file,
+            cli_concurrency=concurrency,
+            cli_max_retries=max_retries
+        )
+
+        if not enable_circuit_breaker:
+            circuit_breaker_obj = None
+
+        # 3. Создаем конфигурацию
+        config = AppConfig.from_excel(
+            excel_file=file,
+            wp_url=domain,
+            wp_username=username,
+            wp_password=password,
+            sync=SyncConfig(
+                dry_run=dry_run,
+                concurrency=concurrency_val,
+                skip_media=skip_media,
+                update_excel=not no_update_excel,
+                delete_featured_media=delete_media,
+                timeout=api_timeout or 30
+            ),
+            logging=LoggingConfig(
+                level="DEBUG" if verbose else "INFO"
+            )
+        )
+
+        # 4. Настройка логирования
+        config.paths.ensure_dirs()
+        log_file = setup_logger(
+            logs_folder=config.paths.logs_folder,
+            config=config.logging,
+            command_name="async_sync"
+        )
+
+        # 5. Запускаем async синхронизацию
+        asyncio.run(run_sync_async(
+            config=config,
+            sheets_filter=sheets,
+            test_mode=test_mode,
+            retry_config=retry_cfg,
+            circuit_breaker=circuit_breaker_obj
+        ))
+
+        console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")
+        console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
+
+    except WPBulkEditorError as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        logger.exception("Неожиданная ошибка")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="async-from-google")
+def async_sync_from_google(
+    sheet_id: Optional[str] = typer.Option(
+        None,
+        "--sheet-id",
+        help="ID Google Sheets документа"
+    ),
+    credentials: Optional[Path] = typer.Option(
+        None,
+        "--credentials",
+        help="Путь к JSON файлу с credentials"
+    ),
+    output: Path = typer.Option(
+        Path("export.xlsx"),
+        "--output",
+        "-o",
+        help="Путь для сохранения .xlsx файла"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов через запятую (posts,pages)"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Режим dry-run"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    ),
+    concurrency: Optional[int] = typer.Option(
+        None,
+        "--concurrency",
+        help="Параллельные запросы (default: 5)"
+    ),
+    max_retries: Optional[int] = typer.Option(
+        None,
+        "--max-retries",
+        help="Максимум retry (default: 3)"
+    ),
+    enable_circuit_breaker: bool = typer.Option(
+        True,
+        "--circuit-breaker/--no-circuit-breaker",
+        help="Circuit breaker"
+    ),
+    skip_media: bool = typer.Option(
+        False,
+        "--skip-media",
+        help="Пропустить медиа"
+    ),
+    no_update_excel: bool = typer.Option(
+        False,
+        "--no-update-excel",
+        help="Не писать ID в Excel"
+    ),
+    delete_media: bool = typer.Option(
+        False,
+        "--delete-media",
+        help="Удалять media при delete"
+    ),
+):
+    """
+    🚀 Async Google Sheets → WordPress
+
+    1. Скачать Google Sheets
+    2. Async синхронизация с WordPress
+    """
+    console.print(f"\n[bold cyan]🚀 Google Sheets → WordPress (Async)[/bold cyan]\n")
+
+    try:
+        import os
+        from dotenv import load_dotenv
+        from .utils.google_sheets import GoogleSheetsClient
+
+        # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
+        console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
+
+        # Загружаем .env
+        load_dotenv()
+
+        # Получаем параметры (приоритет: CLI > .env)
+        final_sheet_id = sheet_id or os.getenv("GOOGLE_SHEET_ID")
+        final_credentials = credentials or os.getenv("GOOGLE_SHEET_CREDENTIALS_PATH")
+
+        # Валидация
+        if not final_sheet_id:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_ID")
+            raise typer.Exit(1)
+
+        if not final_credentials:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_CREDENTIALS_PATH")
+            raise typer.Exit(1)
+
+        credentials_path = Path(final_credentials)
+        if not credentials_path.exists():
+            console.print(f"[red]✗[/red] Файл credentials не найден: {credentials_path}")
+            raise typer.Exit(1)
+
+        # Скачиваем
+        gs_client = GoogleSheetsClient(credentials_path)
+        info = gs_client.get_spreadsheet_info(final_sheet_id)
+        console.print(f"[green]✓[/green] Документ: {info.get('name', 'Unknown')}")
+
+        gs_client.download_as_excel(final_sheet_id, output)
+        console.print(f"[bold green]✓ Файл скачан![/bold green]\n")
+
+        # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
+        console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
+
+        # Загружаем credentials
+        domain, username, password = load_credentials_from_env(env_file=env_file)
+        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+
+        # Загружаем async конфигурацию
+        concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
+            env_file=env_file,
+            cli_concurrency=concurrency,
+            cli_max_retries=max_retries
+        )
+
+        if not enable_circuit_breaker:
+            circuit_breaker_obj = None
+
+        # Создаем конфигурацию
+        config = AppConfig.from_excel(
+            excel_file=output,
+            wp_url=domain,
+            wp_username=username,
+            wp_password=password,
+            sync=SyncConfig(
+                dry_run=dry_run,
+                concurrency=concurrency_val,
+                skip_media=skip_media,
+                update_excel=not no_update_excel,
+                delete_featured_media=delete_media
+            ),
+            logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
+        )
+
+        # Настройка логирования
+        config.paths.ensure_dirs()
+        log_file = setup_logger(
+            logs_folder=config.paths.logs_folder,
+            config=config.logging,
+            command_name="async_from_google"
+        )
+
+        # Запускаем async синхронизацию
+        asyncio.run(run_sync_async(
+            config=config,
+            sheets_filter=sheets,
+            retry_config=retry_cfg,
+            circuit_breaker=circuit_breaker_obj
+        ))
+
+        console.print(f"\n[bold green]SUCCESS! Пайплайн завершен![/bold green]")
+        console.print(f"Файл: [cyan]{output}[/cyan]")
+        console.print(f"Лог: [cyan]{log_file}[/cyan]\n")
+
+    except WPBulkEditorError as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        logger.exception("Ошибка")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="async-google-bidirectional")
+def async_sync_google_bidirectional(
+    sheet_id: Optional[str] = typer.Option(
+        None,
+        "--sheet-id",
+        help="ID Google Sheets документа"
+    ),
+    credentials: Optional[Path] = typer.Option(
+        None,
+        "--credentials",
+        help="Путь к JSON файлу с credentials"
+    ),
+    output: Path = typer.Option(
+        Path("export.xlsx"),
+        "--output",
+        "-o",
+        help="Путь для сохранения .xlsx файла"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов через запятую"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Режим dry-run"
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    ),
+    concurrency: Optional[int] = typer.Option(
+        None,
+        "--concurrency",
+        help="Параллельные запросы (default: 5)"
+    ),
+    max_retries: Optional[int] = typer.Option(
+        None,
+        "--max-retries",
+        help="Максимум retry (default: 3)"
+    ),
+    enable_circuit_breaker: bool = typer.Option(
+        True,
+        "--circuit-breaker/--no-circuit-breaker",
+        help="Circuit breaker"
+    ),
+    skip_media: bool = typer.Option(
+        False,
+        "--skip-media",
+        help="Пропустить медиа"
+    ),
+    no_update_excel: bool = typer.Option(
+        False,
+        "--no-update-excel",
+        help="Не писать ID в Excel"
+    ),
+    no_upload_back: bool = typer.Option(
+        False,
+        "--no-upload-back",
+        help="Не загружать обратно в Google Sheets"
+    ),
+    delete_media: bool = typer.Option(
+        False,
+        "--delete-media",
+        help="Удалять media при delete"
+    ),
+):
+    """
+    🚀 Async Google Sheets ↔ WordPress ↔ Google Sheets
+
+    1. Скачать Google Sheets
+    2. Async синхронизация с WordPress
+    3. Загрузить обратно в Google Sheets
+    """
+    console.print(f"\n[bold cyan]🚀 Google Sheets ↔ WordPress ↔ Google Sheets (Async)[/bold cyan]\n")
+
+    try:
+        import os
+        from dotenv import load_dotenv
+        from .utils.google_sheets import GoogleSheetsClient
+
+        # ========== ШАГ 1: СКАЧИВАНИЕ ==========
+        console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
+
+        load_dotenv()
+
+        final_sheet_id = sheet_id or os.getenv("GOOGLE_SHEET_ID")
+        final_credentials = credentials or os.getenv("GOOGLE_SHEET_CREDENTIALS_PATH")
+
+        if not final_sheet_id or not final_credentials:
+            console.print("[red]✗[/red] Необходимо указать GOOGLE_SHEET_ID и GOOGLE_SHEET_CREDENTIALS_PATH")
+            raise typer.Exit(1)
+
+        credentials_path = Path(final_credentials)
+        if not credentials_path.exists():
+            console.print(f"[red]✗[/red] Credentials не найден: {credentials_path}")
+            raise typer.Exit(1)
+
+        gs_client = GoogleSheetsClient(credentials_path)
+        info = gs_client.get_spreadsheet_info(final_sheet_id)
+        console.print(f"[green]✓[/green] Документ: {info.get('name', 'Unknown')}")
+
+        gs_client.download_as_excel(final_sheet_id, output)
+        console.print(f"[bold green]✓ Файл скачан![/bold green]\n")
+
+        # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
+        console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
+
+        domain, username, password = load_credentials_from_env(env_file=env_file)
+        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+
+        concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
+            env_file=env_file,
+            cli_concurrency=concurrency,
+            cli_max_retries=max_retries
+        )
+
+        if not enable_circuit_breaker:
+            circuit_breaker_obj = None
+
+        config = AppConfig.from_excel(
+            excel_file=output,
+            wp_url=domain,
+            wp_username=username,
+            wp_password=password,
+            sync=SyncConfig(
+                dry_run=dry_run,
+                concurrency=concurrency_val,
+                skip_media=skip_media,
+                update_excel=not no_update_excel,
+                delete_featured_media=delete_media
+            ),
+            logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
+        )
+
+        config.paths.ensure_dirs()
+        log_file = setup_logger(
+            logs_folder=config.paths.logs_folder,
+            config=config.logging,
+            command_name="async_google_bidirectional"
+        )
+
+        asyncio.run(run_sync_async(
+            config=config,
+            sheets_filter=sheets,
+            retry_config=retry_cfg,
+            circuit_breaker=circuit_breaker_obj
+        ))
+
+        console.print(f"\n[bold green]✓ Синхронизация завершена![/bold green]\n")
+
+        # ========== ШАГ 3: ЗАГРУЗКА ОБРАТНО ==========
+        if not no_upload_back and not dry_run:
+            console.print("[bold yellow]ШАГ 3: Загрузка обратно в Google Sheets[/bold yellow]\n")
+
+            sheets_to_upload = [s.strip() for s in sheets.split(",")] if sheets else None
+
+            gs_client.upload_excel_to_sheets(
+                excel_path=output,
+                spreadsheet_id=final_sheet_id,
+                sheets_to_update=sheets_to_upload
+            )
+
+            console.print(f"[bold green]✓ Загружено в Google Sheets![/bold green]\n")
+        elif dry_run:
+            console.print("[yellow]ШАГ 3 пропущен: DRY-RUN режим[/yellow]\n")
+        else:
+            console.print("[yellow]ШАГ 3 пропущен: --no-upload-back[/yellow]\n")
+
+        console.print(f"[bold green]SUCCESS! Полный пайплайн завершен![/bold green]")
+        console.print(f"Файл: [cyan]{output}[/cyan]")
+        console.print(f"Лог: [cyan]{log_file}[/cyan]\n")
+
+    except WPBulkEditorError as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        logger.exception("Ошибка")
+        raise typer.Exit(code=1)
 
 
 def main():

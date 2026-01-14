@@ -2,6 +2,7 @@
 Запись данных обратно в Excel файл
 """
 
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, Optional
 import pandas as pd
@@ -13,12 +14,15 @@ class ExcelWriter:
     """
     Записывает данные обратно в Excel файл после синхронизации.
     Обновляет ID, даты, ссылки и другие поля.
+
+    Thread-safe для async операций через asyncio.Lock.
     """
 
     def __init__(self, excel_file: Path):
         self.excel_file = excel_file
         self._workbook = None
         self._dataframes: Dict[str, pd.DataFrame] = {}
+        self._locks: Dict[str, asyncio.Lock] = {}  # NEW: Lock per sheet
 
     def load(self):
         """Загрузить Excel файл для редактирования."""
@@ -33,6 +37,8 @@ class ExcelWriter:
                     sheet_name=sheet_name,
                     dtype=str
                 )
+                # NEW: Создаем lock для каждого листа
+                self._locks[sheet_name] = asyncio.Lock()
 
     def update_row(
         self,
@@ -205,6 +211,94 @@ class ExcelWriter:
         # Обновляем строку
         if update_data:
             self.update_row(sheet_name, row_index, update_data)
+
+    # ========================================
+    # Async methods with Lock (NEW)
+    # ========================================
+
+    async def update_row_async(
+        self,
+        sheet_name: str,
+        row_index: int,
+        data: Dict[str, Any]
+    ):
+        """
+        Async версия update_row с thread-safety через Lock.
+
+        Args:
+            sheet_name: Название листа
+            row_index: Индекс строки (0-based, как в pandas)
+            data: Словарь {column_name: value} для обновления
+        """
+        # Создаем lock если его нет (для случаев когда лист добавлен после load())
+        if sheet_name not in self._locks:
+            self._locks[sheet_name] = asyncio.Lock()
+
+        # Блокируем доступ на время обновления
+        async with self._locks[sheet_name]:
+            # Вызываем существующий sync метод
+            self.update_row(sheet_name, row_index, data)
+
+    async def update_from_api_response_async(
+        self,
+        sheet_name: str,
+        row_index: int,
+        api_response: Dict[str, Any],
+        action: str
+    ):
+        """
+        Async версия update_from_api_response с thread-safety.
+
+        Args:
+            sheet_name: Название листа
+            row_index: Индекс строки
+            api_response: Ответ от WordPress API
+            action: Тип операции (add, update, delete)
+        """
+        # Формируем update_data (вне блокировки для минимизации времени lock)
+        update_data = {}
+
+        # ID (для add операций)
+        if action == "add" and "id" in api_response:
+            update_data["id"] = api_response["id"]
+
+        # Даты
+        if "date" in api_response:
+            update_data["date"] = api_response["date"]
+
+        if "modified" in api_response:
+            update_data["modified"] = api_response["modified"]
+
+        # Ссылка
+        if "link" in api_response:
+            update_data["link"] = api_response["link"]
+
+        # Slug
+        if "slug" in api_response:
+            update_data["slug"] = api_response["slug"]
+
+        # Featured media
+        if "featured_media" in api_response and api_response["featured_media"]:
+            update_data["featured_media"] = api_response["featured_media"]
+
+        # Image URL (кастомное поле из API)
+        if "image_url" in api_response:
+            update_data["image_url"] = api_response["image_url"]
+
+        # После успешной операции меняем action на skip
+        update_data["action"] = "skip"
+
+        # Очищаем content_path и img_path если они были заполнены
+        if sheet_name in self._dataframes:
+            df = self._dataframes[sheet_name]
+            if "content_path" in df.columns:
+                update_data["content_path"] = ""
+            if "img_path" in df.columns:
+                update_data["img_path"] = ""
+
+        # Блокируем только момент записи
+        if update_data:
+            await self.update_row_async(sheet_name, row_index, update_data)
 
     def save(self):
         """

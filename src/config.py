@@ -12,6 +12,11 @@ from .constants import (
     DEFAULT_CONCURRENCY,
     DEFAULT_BATCH_SIZE,
     DEFAULT_MAX_RETRIES,
+    DEFAULT_API_TIMEOUT,
+    DEFAULT_MEDIA_TIMEOUT,
+    DEFAULT_RETRY_DELAY,
+    DEFAULT_CIRCUIT_BREAKER_THRESHOLD,
+    DEFAULT_CIRCUIT_BREAKER_RECOVERY,
 )
 
 
@@ -177,6 +182,14 @@ class Settings(BaseSettings):
     sync_concurrency: int = DEFAULT_CONCURRENCY
     sync_batch_size: int = DEFAULT_BATCH_SIZE
     sync_timeout: int = DEFAULT_TIMEOUT
+
+    # NEW: Async sync configuration
+    api_timeout: int = DEFAULT_API_TIMEOUT
+    media_timeout: int = DEFAULT_MEDIA_TIMEOUT
+    max_retries: int = DEFAULT_MAX_RETRIES
+    retry_delay: float = DEFAULT_RETRY_DELAY
+    circuit_breaker_threshold: int = DEFAULT_CIRCUIT_BREAKER_THRESHOLD
+    circuit_breaker_recovery: int = DEFAULT_CIRCUIT_BREAKER_RECOVERY
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_retention: str = "30 days"
