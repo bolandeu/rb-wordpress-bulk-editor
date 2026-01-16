@@ -266,7 +266,10 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_
                 # 5. Открываем Excel writer (если нужно)
                 excel_writer = None
                 if config.sync.update_excel:
-                    excel_writer = ExcelWriter(config.paths.excel_file)
+                    excel_writer = ExcelWriter(
+                        config.paths.excel_file,
+                        taxonomy_cache=taxonomy_cache
+                    )
                     excel_writer.load()
 
                 # 6. Обработка каждого листа
@@ -2253,7 +2256,10 @@ async def run_sync_async(
                 # 6. Открываем Excel writer (если нужно)
                 excel_writer = None
                 if config.sync.update_excel:
-                    excel_writer = ExcelWriter(config.paths.excel_file)
+                    excel_writer = ExcelWriter(
+                        config.paths.excel_file,
+                        taxonomy_cache=taxonomy_cache
+                    )
                     excel_writer.load()
 
                 # 7. Обработка каждого листа (ПОСЛЕДОВАТЕЛЬНО!)
@@ -2404,6 +2410,258 @@ async def process_sheet_async(
             "skipped": 0,
             "errors": 1
         }
+
+
+@app.command()
+def counter(
+    domain: Optional[str] = typer.Option(
+        None,
+        "--domain",
+        help="WordPress domain (например, https://example.com)"
+    ),
+    username: Optional[str] = typer.Option(
+        None,
+        "--username",
+        help="WordPress username"
+    ),
+    password: Optional[str] = typer.Option(
+        None,
+        "--password",
+        help="WordPress Application Password"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    post_type: str = typer.Option(
+        "posts",
+        "--type",
+        "-t",
+        help="Тип контента (posts, pages, или custom post type)"
+    ),
+    status: str = typer.Option(
+        "publish",
+        "--status",
+        "-s",
+        help="Статус записей (publish, draft, any)"
+    ),
+    output: Path = typer.Option(
+        Path("counter_output.csv"),
+        "--output",
+        "-o",
+        help="Путь к выходному CSV файлу"
+    ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        "-l",
+        help="Максимум записей для обработки"
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-c",
+        help="Количество параллельных запросов"
+    )
+):
+    """
+    Подсчет количества слов и символов в контенте записей WordPress.
+
+    Выводит результаты в CSV файл с полями:
+    id, slug, link, title, words, chars
+
+    Пример:
+        wp-bulk counter --domain https://example.com --type posts --output stats.csv
+    """
+    console.print(f"\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
+
+    try:
+        # 1. Загружаем credentials
+        console.print("[yellow]Загрузка credentials...[/yellow]")
+        domain, username, password = load_credentials_from_env(
+            env_file=env_file,
+            domain_override=domain,
+            username_override=username,
+            password_override=password
+        )
+        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+
+        # 2. Запускаем асинхронный подсчет
+        asyncio.run(count_content_stats(
+            domain=domain,
+            username=username,
+            password=password,
+            post_type=post_type,
+            status=status,
+            output_file=output,
+            limit=limit,
+            concurrency=concurrency
+        ))
+
+    except ValueError as e:
+        console.print(f"\n[bold red]VALIDATION ERROR: {e}[/bold red]\n")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        logger.exception("Ошибка при подсчете статистики")
+        raise typer.Exit(code=1)
+
+
+async def count_content_stats(
+    domain: str,
+    username: str,
+    password: str,
+    post_type: str,
+    status: str,
+    output_file: Path,
+    limit: Optional[int],
+    concurrency: int
+):
+    """
+    Асинхронный подсчет статистики контента.
+    """
+    import csv
+    import html
+    from bs4 import BeautifulSoup
+
+    wp_config = WordPressConfig(
+        url=domain,
+        username=username,
+        password=password
+    )
+
+    results = []
+
+    async with WordPressClient(wp_config) as client:
+        # Проверка подключения
+        await client.test_connection()
+        console.print("[green]OK[/green] Подключение к WordPress установлено\n")
+
+        # Создаем endpoint
+        posts_endpoint = PostsEndpoint(client, post_type)
+
+        # Получаем все записи
+        console.print(f"[yellow]Получение записей типа '{post_type}'...[/yellow]")
+
+        # Формируем параметры
+        params = {}
+        if status != "any":
+            params["status"] = status
+
+        # Получаем все записи постранично
+        all_posts = []
+        page = 1
+        per_page = 100
+
+        while True:
+            posts = await posts_endpoint.list(per_page=per_page, page=page, **params)
+
+            if not posts:
+                break
+
+            all_posts.extend(posts)
+            console.print(f"  Загружено: {len(all_posts)} записей...")
+
+            if len(posts) < per_page:
+                break
+
+            if limit and len(all_posts) >= limit:
+                all_posts = all_posts[:limit]
+                break
+
+            page += 1
+
+        console.print(f"[green]OK[/green] Всего записей: {len(all_posts)}\n")
+
+        if not all_posts:
+            console.print("[yellow]Нет записей для обработки[/yellow]")
+            return
+
+        # Обрабатываем каждую запись
+        console.print("[yellow]Подсчет статистики...[/yellow]")
+
+        def count_words_and_chars(html_content: str) -> tuple[int, int]:
+            """Подсчет слов и символов в HTML контенте."""
+            if not html_content:
+                return 0, 0
+
+            # Убираем HTML теги
+            soup = BeautifulSoup(html_content, "html.parser")
+            text = soup.get_text(separator=" ")
+
+            # Декодируем HTML entities
+            text = html.unescape(text)
+
+            # Убираем лишние пробелы
+            text = " ".join(text.split())
+
+            # Подсчет
+            chars = len(text)
+            words = len(text.split()) if text else 0
+
+            return words, chars
+
+        for post in all_posts:
+            # Извлекаем контент
+            content = post.get("content", {})
+            if isinstance(content, dict):
+                content_html = content.get("rendered", "")
+            else:
+                content_html = str(content) if content else ""
+
+            # Извлекаем title
+            title = post.get("title", {})
+            if isinstance(title, dict):
+                title_text = title.get("rendered", "")
+            else:
+                title_text = str(title) if title else ""
+
+            # Подсчитываем
+            words, chars = count_words_and_chars(content_html)
+
+            results.append({
+                "id": post.get("id", ""),
+                "slug": post.get("slug", ""),
+                "link": post.get("link", ""),
+                "title": html.unescape(BeautifulSoup(title_text, "html.parser").get_text()),
+                "words": words,
+                "chars": chars
+            })
+
+        console.print(f"[green]OK[/green] Обработано: {len(results)} записей\n")
+
+    # Записываем в CSV
+    console.print(f"[yellow]Запись в CSV: {output_file}[/yellow]")
+
+    with open(output_file, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["id", "slug", "link", "title", "words", "chars"],
+            delimiter=";"
+        )
+        writer.writeheader()
+        writer.writerows(results)
+
+    console.print(f"[green]OK[/green] Файл сохранен: {output_file}\n")
+
+    # Выводим статистику
+    total_words = sum(r["words"] for r in results)
+    total_chars = sum(r["chars"] for r in results)
+    avg_words = total_words / len(results) if results else 0
+    avg_chars = total_chars / len(results) if results else 0
+
+    console.print("[bold]Статистика:[/bold]")
+    console.print(f"  Всего записей: {len(results)}")
+    console.print(f"  Всего слов: {total_words:,}")
+    console.print(f"  Всего символов: {total_chars:,}")
+    console.print(f"  Среднее слов на запись: {avg_words:.1f}")
+    console.print(f"  Среднее символов на запись: {avg_chars:.1f}")
+    console.print()
 
 
 @app.command(name="async")

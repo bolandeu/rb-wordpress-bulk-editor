@@ -306,23 +306,26 @@ class ContentSync:
         elif featured_media_in_excel:
             # img_path не заполнен, но featured_media есть в Excel - прикрепляем существующую картинку
             media_id = int(row["featured_media"])
-            logger.debug(f"Attaching existing media ID={media_id} to post {post_id}")
-            payload["featured_media"] = media_id
-            
-            # Получаем данные медиа для image_url
-            try:
-                media_data = await media_endpoint.get(media_id)
-                saved_media_result = {
-                    'id': media_id,
-                    'source_url': media_data.get('source_url')
-                }
-                logger.debug(f"Got existing media data: ID={media_id}, URL={saved_media_result['source_url']}")
-            except Exception as e:
-                logger.warning(f"Failed to get media data for ID={media_id}: {e}")
-                saved_media_result = {
-                    'id': media_id,
-                    'source_url': ''
-                }
+
+            # Пропускаем если media_id = 0 (означает "нет картинки")
+            if media_id > 0:
+                logger.debug(f"Attaching existing media ID={media_id} to post {post_id}")
+                payload["featured_media"] = media_id
+
+                # Получаем данные медиа для image_url
+                try:
+                    media_data = await media_endpoint.get(media_id)
+                    saved_media_result = {
+                        'id': media_id,
+                        'source_url': media_data.get('source_url')
+                    }
+                    logger.debug(f"Got existing media data: ID={media_id}, URL={saved_media_result['source_url']}")
+                except Exception as e:
+                    logger.warning(f"Failed to get media data for ID={media_id}: {e}")
+                    saved_media_result = {
+                        'id': media_id,
+                        'source_url': ''
+                    }
 
         # 5. Обновляем запись (с featured_media если загружен)
         logger.debug(f"Updating post ID={post_id}")
@@ -406,8 +409,11 @@ class ContentSync:
             normalized_tax_field = normalize_taxonomy_name(tax_field)
             tax_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_tax_field)
 
-            # Обрабатываем строку с таксономиями
-            term_ids = await tax_endpoint.process_taxonomy_string(str(value))
+            # Обрабатываем строку с таксономиями (передаем кэш для обновления)
+            term_ids = await tax_endpoint.process_taxonomy_string(
+                str(value),
+                taxonomy_cache=self.taxonomy_cache
+            )
 
             if term_ids:
                 taxonomy_ids[tax_field] = term_ids

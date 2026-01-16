@@ -3,11 +3,14 @@
 """
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional
 import pandas as pd
 from openpyxl import load_workbook
 from loguru import logger
+
+from ..constants import TAXONOMY_DELIMITER
 
 
 def normalize_api_value(value: Any) -> Any:
@@ -44,11 +47,21 @@ class ExcelWriter:
     Thread-safe для async операций через asyncio.Lock.
     """
 
-    def __init__(self, excel_file: Path):
+    def __init__(
+        self,
+        excel_file: Path,
+        taxonomy_cache: Optional[Any] = None
+    ):
+        """
+        Args:
+            excel_file: Путь к Excel файлу
+            taxonomy_cache: Объект TaxonomyCache для динамической конвертации ID таксономий
+        """
         self.excel_file = excel_file
         self._workbook = None
         self._dataframes: Dict[str, pd.DataFrame] = {}
         self._locks: Dict[str, asyncio.Lock] = {}  # NEW: Lock per sheet
+        self._taxonomy_cache = taxonomy_cache
 
     def load(self):
         """Загрузить Excel файл для редактирования."""
@@ -234,10 +247,32 @@ class ExcelWriter:
             update_data["image_url"] = api_response["image_url"]
 
         # Поля с rendered/raw структурой - извлекаем raw значение
-        # title, content, excerpt (posts), name, description (taxonomies)
-        for field in ("title", "content", "excerpt", "name", "description"):
+        # title, content (posts), name, description (taxonomies)
+        for field in ("title", "content", "name", "description"):
             if field in api_response and field in existing_columns:
                 update_data[field] = normalize_api_value(api_response[field])
+
+        # Excerpt - извлекаем raw значение и очищаем от HTML тегов
+        if "excerpt" in api_response and "excerpt" in existing_columns:
+            excerpt_value = normalize_api_value(api_response["excerpt"])
+            if excerpt_value:
+                # Убираем HTML теги и обрезаем пробелы
+                excerpt_value = re.sub(r"<[^>]+>", "", str(excerpt_value)).strip()
+            update_data["excerpt"] = excerpt_value
+
+        # Таксономии - конвертируем ID обратно в имена через "; "
+        taxonomy_fields = {"categories", "tags"}
+        # Добавляем кастомные таксономии из кэша
+        if self._taxonomy_cache:
+            taxonomy_fields.update(self._taxonomy_cache.cache.keys())
+
+        for tax_field in taxonomy_fields:
+            if tax_field in api_response and tax_field in existing_columns:
+                tax_ids = api_response[tax_field]
+                if isinstance(tax_ids, list) and tax_ids:
+                    # Конвертируем ID в имена
+                    names = self._convert_taxonomy_ids_to_names(tax_ids, tax_field)
+                    update_data[tax_field] = names
 
         # ACF поля из ответа API (обновляем только те, что есть в Excel)
         acf = api_response.get("acf", {})
@@ -252,6 +287,9 @@ class ExcelWriter:
             "id", "date", "modified", "link", "slug", "featured_media", "image_url", "acf",
             "title", "content", "excerpt", "name", "description"
         }
+        # Добавляем таксономии в skip_fields
+        skip_fields.update(taxonomy_fields)
+
         for key, value in api_response.items():
             if key not in skip_fields and key not in update_data and key in existing_columns:
                 update_data[key] = normalize_api_value(value)
@@ -267,6 +305,55 @@ class ExcelWriter:
             update_data["img_path"] = ""
 
         return update_data
+
+    def _convert_taxonomy_ids_to_names(
+        self,
+        term_ids: list,
+        taxonomy: str
+    ) -> str:
+        """
+        Преобразовать массив ID терминов в строку с названиями.
+
+        Args:
+            term_ids: Список ID терминов
+            taxonomy: Название таксономии (categories, tags, etc.)
+
+        Returns:
+            Строка с названиями через "; " или пустая строка
+        """
+        if not term_ids:
+            return ""
+
+        # Если нет кэша, возвращаем ID через "; "
+        if not self._taxonomy_cache:
+            logger.warning(
+                f"No taxonomy cache available, returning IDs for '{taxonomy}'"
+            )
+            return TAXONOMY_DELIMITER.join(map(str, term_ids))
+
+        # Получаем актуальный маппинг ID->Name из кэша
+        # (включает новые термины, созданные во время синхронизации)
+        id_to_name_mapping = self._taxonomy_cache.get_id_to_name_mapping()
+
+        if taxonomy not in id_to_name_mapping:
+            logger.warning(
+                f"No cache for taxonomy '{taxonomy}', returning IDs"
+            )
+            return TAXONOMY_DELIMITER.join(map(str, term_ids))
+
+        # Преобразуем ID в названия
+        names = []
+        for term_id in term_ids:
+            term_name = id_to_name_mapping[taxonomy].get(term_id)
+            if term_name:
+                names.append(term_name)
+            else:
+                logger.warning(
+                    f"Term ID {term_id} not found in {taxonomy} cache"
+                )
+                names.append(str(term_id))  # Fallback на ID
+
+        return TAXONOMY_DELIMITER.join(names)
 
     def update_from_api_response(
         self,

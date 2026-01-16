@@ -194,7 +194,11 @@ class TaxonomiesEndpoint:
         data = {"name": name, **extra_data}
         return await self.create(data)
 
-    async def process_taxonomy_string(self, taxonomy_string: str) -> List[int]:
+    async def process_taxonomy_string(
+        self,
+        taxonomy_string: str,
+        taxonomy_cache: Optional["TaxonomyCache"] = None
+    ) -> List[int]:
         """
         Обработать строку с таксономиями из Excel.
 
@@ -202,6 +206,7 @@ class TaxonomiesEndpoint:
 
         Args:
             taxonomy_string: Строка с терминами через разделитель
+            taxonomy_cache: Опциональный кэш для обновления при создании новых терминов
 
         Returns:
             Список ID терминов
@@ -222,7 +227,11 @@ class TaxonomiesEndpoint:
         term_ids = []
         for name in term_names:
             try:
-                term = await self.get_or_create(name)
+                # Используем get_or_create_cached если есть кэш (thread-safe)
+                if taxonomy_cache:
+                    term = await self.get_or_create_cached(name, taxonomy_cache)
+                else:
+                    term = await self.get_or_create(name)
                 term_ids.append(term["id"])
             except Exception as e:
                 logger.error(f"Failed to process {self.taxonomy} term '{name}': {e}")
@@ -230,16 +239,67 @@ class TaxonomiesEndpoint:
         logger.info(f"Processed {self.taxonomy}: {len(term_ids)} terms")
         return term_ids
 
+    async def get_or_create_cached(
+        self,
+        name: str,
+        taxonomy_cache: "TaxonomyCache",
+        **extra_data
+    ) -> Dict[str, Any]:
+        """
+        Получить термин по имени или создать если не существует.
+        Thread-safe версия с использованием кэша и lock.
+
+        Args:
+            name: Название термина
+            taxonomy_cache: Кэш таксономий для проверки и обновления
+            **extra_data: Дополнительные данные для создания
+
+        Returns:
+            Термин (существующий или новый)
+        """
+        # Блокируем для предотвращения race condition при создании
+        async with taxonomy_cache._get_lock():
+            # Сначала проверяем в кэше
+            cached = taxonomy_cache.find(self.taxonomy, name)
+            if cached:
+                logger.debug(f"Found {self.taxonomy} in cache: {name} (ID={cached['id']})")
+                return cached
+
+            # Пытаемся найти через API
+            existing = await self.find_by_name(name)
+            if existing:
+                logger.debug(f"Found existing {self.taxonomy}: {name} (ID={existing['id']})")
+                # Добавляем в кэш (внутри lock)
+                taxonomy_cache.add(self.taxonomy, existing)
+                return existing
+
+            # Создаем новый
+            data = {"name": name, **extra_data}
+            new_term = await self.create(data)
+            # Добавляем в кэш (внутри lock)
+            taxonomy_cache.add(self.taxonomy, new_term)
+            return new_term
+
 
 class TaxonomyCache:
     """
     Кэш таксономий для быстрого поиска.
     Загружает все термины в память при старте.
+
+    Thread-safe для async операций через asyncio.Lock.
     """
 
     def __init__(self):
         # {taxonomy_name: {term_name: term_data}}
         self.cache: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        self._lock: Optional["asyncio.Lock"] = None
+
+    def _get_lock(self) -> "asyncio.Lock":
+        """Lazy initialization of lock (для поддержки использования вне async контекста)."""
+        import asyncio
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def load(self, client: WordPressClient, taxonomies: List[str]):
         """
@@ -284,7 +344,7 @@ class TaxonomyCache:
 
     def add(self, taxonomy: str, term: Dict[str, Any]):
         """
-        Добавить термин в кэш.
+        Добавить термин в кэш (sync версия).
 
         Args:
             taxonomy: Название таксономии
@@ -294,3 +354,29 @@ class TaxonomyCache:
             self.cache[taxonomy] = {}
 
         self.cache[taxonomy][term["name"].lower()] = term
+
+    async def add_async(self, taxonomy: str, term: Dict[str, Any]):
+        """
+        Добавить термин в кэш (async thread-safe версия).
+
+        Args:
+            taxonomy: Название таксономии
+            term: Данные термина
+        """
+        async with self._get_lock():
+            self.add(taxonomy, term)
+
+    def get_id_to_name_mapping(self) -> Dict[str, Dict[int, str]]:
+        """
+        Получить маппинг ID -> Name для всех таксономий.
+
+        Returns:
+            Словарь {taxonomy_name: {term_id: term_name}}
+        """
+        result = {}
+        for taxonomy, terms in self.cache.items():
+            result[taxonomy] = {
+                term_data["id"]: term_data["name"]
+                for term_data in terms.values()
+            }
+        return result

@@ -368,6 +368,9 @@
                             <a class="nav-link" href="#bulk-delete">bulk-delete</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="#counter">counter</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="#validate">validate</a>
                         </li>
                         <li class="nav-item">
@@ -1169,6 +1172,75 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                                 <li>Список найденных записей</li>
                                 <li>Прогресс удаления</li>
                                 <li>Статистика: удалено успешно / ошибки</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- counter -->
+                    <div id="counter" class="command-card">
+                        <h2 class="command-title">counter</h2>
+                        <p class="command-description">Подсчет слов и символов в контенте записей</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Получение статистики по количеству слов и символов в контенте записей WordPress.
+                            Результаты выводятся в CSV файл.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--type, -t</span> тип контента (posts, pages, custom) [default: posts]
+                            <span class="param-badge param-optional">--status, -s</span> фильтр по статусу (publish, draft, any) [default: publish]
+                            <span class="param-badge param-optional">--output, -o</span> путь к выходному CSV файлу [default: counter_output.csv]
+                            <span class="param-badge param-optional">--limit, -l</span> максимум записей для обработки
+                            <span class="param-badge param-optional">--concurrency, -c</span> количество параллельных запросов [default: 5]
+                            <span class="param-badge param-optional">--domain</span> URL WordPress сайта
+                            <span class="param-badge param-optional">--username</span> имя пользователя
+                            <span class="param-badge param-optional">--password</span> Application Password
+                            <span class="param-badge param-optional">--env-file</span> путь к кастомному .env файлу
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli counter --type posts --output stats.csv</code>
+                            <div class="text-muted small mt-2">Подсчет слов/символов для всех опубликованных постов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli counter --type pages --status any --limit 100</code>
+                            <div class="text-muted small mt-2">Статистика для первых 100 страниц любого статуса</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli counter --type service --output service_stats.csv</code>
+                            <div class="text-muted small mt-2">Статистика для кастомного типа "service"</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода CSV:</strong>
+                            <ul class="mb-0">
+                                <li>Кодировка: UTF-8 с BOM (utf-8-sig)</li>
+                                <li>Разделитель: точка с запятой (;)</li>
+                                <li>Поля: id, slug, link, title, words, chars</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-box mt-3">
+                            <strong><i class="bi bi-bar-chart me-2"></i>Статистика в консоли:</strong>
+                            <ul class="mb-0">
+                                <li>Всего записей обработано</li>
+                                <li>Общее количество слов и символов</li>
+                                <li>Средние значения на запись</li>
                             </ul>
                         </div>
                     </div>
