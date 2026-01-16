@@ -338,13 +338,13 @@
                             <h6 class="px-3 text-muted small">АСИНХРОННЫЕ (БЫСТРЫЕ)</h6>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#async-sync">async-sync</a>
+                            <a class="nav-link" href="#async">async</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#async-sync-from-google">async-sync-from-google</a>
+                            <a class="nav-link" href="#async-from-google">async-from-google</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#async-sync-google-bidirectional">async-sync-google-bidirectional</a>
+                            <a class="nav-link" href="#async-google-bidirectional">async-google-bidirectional</a>
                         </li>
                         <li class="nav-item mt-3">
                             <h6 class="px-3 text-muted small">GOOGLE SHEETS</h6>
@@ -395,7 +395,7 @@
                                     <select class="form-select" id="commandSelect">
                                         <option value="">-- Выберите команду --</option>
                                         <option value="sync">sync - Синхронизация Excel → WordPress</option>
-                                        <option value="async-sync">async-sync - 🚀 Асинхронная синхронизация (быстрее)</option>
+                                        <option value="async">async - 🚀 Асинхронная синхронизация (быстрее)</option>
                                         <option value="fetch">fetch - Получение данных WordPress → Excel</option>
                                         <option value="export">export - Экспорт контента сайта</option>
                                         <option value="export-media">export-media - Экспорт медиафайлов</option>
@@ -403,9 +403,9 @@
                                         <option value="download-google-sheet">download-google-sheet - Скачать Google Sheets</option>
                                         <option value="upload-to-google-sheets">upload-to-google-sheets - Загрузить в Google Sheets</option>
                                         <option value="sync-from-google">sync-from-google - Скачать и синхронизировать</option>
-                                        <option value="async-sync-from-google">async-sync-from-google - 🚀 Async Google → WP</option>
+                                        <option value="async-from-google">async-from-google - 🚀 Async Google → WP</option>
                                         <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
-                                        <option value="async-sync-google-bidirectional">async-sync-google-bidirectional - 🚀 Async Google ↔ WP</option>
+                                        <option value="async-google-bidirectional">async-google-bidirectional - 🚀 Async Google ↔ WP</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Обновление настроек</option>
@@ -903,9 +903,9 @@
                         </div>
                     </div>
 
-                    <!-- async-sync -->
-                    <div id="async-sync" class="command-card">
-                        <h2 class="command-title">async-sync</h2>
+                    <!-- async -->
+                    <div id="async" class="command-card">
+                        <h2 class="command-title">async</h2>
                         <p class="command-description">🚀 Асинхронная синхронизация Excel → WordPress (быстрее и надежнее)</p>
 
                         <div class="info-box">
@@ -950,7 +950,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync --file example.xlsx</code>
+                            <code>python -m src.cli async --file example.xlsx</code>
                             <div class="text-muted small mt-2">Полная асинхронная синхронизация всех листов</div>
                         </div>
 
@@ -958,7 +958,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync --file w.xlsx --sheets posts --concurrency 10</code>
+                            <code>python -m src.cli async --file w.xlsx --sheets posts --concurrency 10</code>
                             <div class="text-muted small mt-2">Увеличенная concurrency для быстрых серверов</div>
                         </div>
 
@@ -966,7 +966,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync --file data.xlsx --test-mode --verbose</code>
+                            <code>python -m src.cli async --file data.xlsx --test-mode --verbose</code>
                             <div class="text-muted small mt-2">Тестовый режим: обработать первые 3 строки с логами</div>
                         </div>
 
@@ -974,7 +974,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync --file w.xlsx --max-retries 5 --api-timeout 60</code>
+                            <code>python -m src.cli async --file w.xlsx --max-retries 5 --api-timeout 60</code>
                             <div class="text-muted small mt-2">Увеличить retry и timeout для медленного сервера</div>
                         </div>
 
@@ -991,9 +991,9 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                         </div>
                     </div>
 
-                    <!-- async-sync-from-google -->
-                    <div id="async-sync-from-google" class="command-card">
-                        <h2 class="command-title">async-sync-from-google</h2>
+                    <!-- async-from-google -->
+                    <div id="async-from-google" class="command-card">
+                        <h2 class="command-title">async-from-google</h2>
                         <p class="command-description">🚀 Асинхронная синхронизация Google Sheets → WordPress</p>
 
                         <div class="info-box">
@@ -1024,7 +1024,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync-from-google</code>
+                            <code>python -m src.cli async-from-google</code>
                             <div class="text-muted small mt-2">Используя настройки из .env</div>
                         </div>
 
@@ -1032,7 +1032,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync-from-google --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <code>python -m src.cli async-from-google --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
                             <div class="text-muted small mt-2">С фильтром листов и увеличенной concurrency</div>
                         </div>
 
@@ -1045,9 +1045,9 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                         </div>
                     </div>
 
-                    <!-- async-sync-google-bidirectional -->
-                    <div id="async-sync-google-bidirectional" class="command-card">
-                        <h2 class="command-title">async-sync-google-bidirectional</h2>
+                    <!-- async-google-bidirectional -->
+                    <div id="async-google-bidirectional" class="command-card">
+                        <h2 class="command-title">async-google-bidirectional</h2>
                         <p class="command-description">🚀 Асинхронная двусторонняя синхронизация Google Sheets ↔ WordPress</p>
 
                         <div class="info-box">
@@ -1079,7 +1079,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync-google-bidirectional</code>
+                            <code>python -m src.cli async-google-bidirectional</code>
                             <div class="text-muted small mt-2">Полный асинхронный цикл (используя .env)</div>
                         </div>
 
@@ -1087,7 +1087,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <code>python -m src.cli async-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
                             <div class="text-muted small mt-2">С фильтром листов и высокой concurrency</div>
                         </div>
 
@@ -1095,7 +1095,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-sync-google-bidirectional --no-upload-back</code>
+                            <code>python -m src.cli async-google-bidirectional --no-upload-back</code>
                             <div class="text-muted small mt-2">Без загрузки обратно (только Google → WP)</div>
                         </div>
 
@@ -1300,7 +1300,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' }
                 ]
             },
-            'async-sync': {
+            'async': {
                 params: [
                     { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
                     { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов через запятую' },
@@ -1392,7 +1392,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
-            'async-sync-from-google': {
+            'async-from-google': {
                 params: [
                     { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
                     { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
@@ -1408,7 +1408,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
                 ]
             },
-            'async-sync-google-bidirectional': {
+            'async-google-bidirectional': {
                 params: [
                     { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
                     { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },

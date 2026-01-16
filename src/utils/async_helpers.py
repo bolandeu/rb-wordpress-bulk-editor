@@ -85,9 +85,9 @@ class AsyncBatchProcessor:
         Args:
             action: Тип операции ("add", "update", "delete")
             row_index: Индекс строки в DataFrame
-            row: Данные строки (pandas Series)
-            process_func: Async функция обработки
-                          Signature: async def func(row, *args, **kwargs) -> Dict
+            row: Данные строки (pandas Series) - для логирования, не передаётся в func
+            process_func: Async функция обработки (partial с уже привязанными аргументами)
+                          Signature: async def func() -> Dict
             *args: Дополнительные позиционные аргументы для process_func
             **kwargs: Дополнительные именованные аргументы для process_func
 
@@ -100,8 +100,8 @@ class AsyncBatchProcessor:
         """
         async with self.semaphore:
             try:
-                # Вызываем функцию обработки
-                api_response = await process_func(row, *args, **kwargs)
+                # Вызываем функцию обработки (partial уже содержит все аргументы)
+                api_response = await process_func(*args, **kwargs)
 
                 # Успешная обработка
                 logger.debug(f"Row {row_index} ({action}): success")

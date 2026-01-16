@@ -218,6 +218,7 @@ class TaxonomySyncAsync(BaseSync):
             Payload для WordPress API
         """
         payload = {}
+        acf_data = {}
 
         # Обязательные поля
         if "name" in row.index and pd.notna(row["name"]):
@@ -248,14 +249,23 @@ class TaxonomySyncAsync(BaseSync):
         # Кастомные мета-поля (все остальные поля из Excel)
         # Пропускаем системные поля
         system_fields = {"id", "action", "name", "slug", "description", "parent", "link", "count"}
+        ACF_PREFIX = "acf_"
 
         for field_name in row.index:
             # Пропускаем уже обработанные и системные поля
             if field_name in system_fields or field_name in payload:
                 continue
 
-            # Отправляем все остальные поля (кастомные мета-поля)
             value = row[field_name]
+
+            # ACF поля - группируем в отдельный объект
+            if field_name.startswith(ACF_PREFIX):
+                acf_key = field_name[len(ACF_PREFIX):]  # Убираем префикс acf_
+                if pd.notna(value) and str(value).strip() != "":
+                    acf_data[acf_key] = str(value).strip()
+                continue
+
+            # Остальные кастомные поля отправляем на верхнем уровне
             if pd.notna(value):
                 payload[field_name] = str(value).strip()
             else:
@@ -263,5 +273,10 @@ class TaxonomySyncAsync(BaseSync):
                 payload[field_name] = ""
 
             logger.debug(f"Custom field '{field_name}': {repr(payload[field_name])}")
+
+        # Добавляем ACF данные если есть
+        if acf_data:
+            payload["acf"] = acf_data
+            logger.debug(f"ACF fields: {list(acf_data.keys())}")
 
         return payload
