@@ -26,7 +26,8 @@ def normalize_taxonomy_name(taxonomy: str) -> str:
     # Маппинг единственного числа на множественное для стандартных таксономий
     normalization_map = {
         "category": "categories",
-        "tag": "tags"
+        "tag": "tags",
+        "post_tag": "tags"  # WordPress API использует post_tag, но endpoint - tags
     }
 
     return normalization_map.get(taxonomy, taxonomy)

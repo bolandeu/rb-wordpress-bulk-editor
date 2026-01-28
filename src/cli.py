@@ -574,12 +574,12 @@ async def update_options(wp_config: WordPressConfig, site_options: dict):
 
 @app.command()
 def fetch(
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу",
-        exists=True,
+        help="Путь к Excel файлу (если не указан, создается fetch.xlsx)",
+        exists=False,
         file_okay=True,
         dir_okay=False,
         resolve_path=True
@@ -622,6 +622,11 @@ def fetch(
         None,
         "--limit",
         help="Максимум записей на лист"
+    ),
+    exclude: Optional[str] = typer.Option(
+        None,
+        "--exclude",
+        help="Список типов для исключения через запятую (posts,category)"
     )
 ):
     """
@@ -631,10 +636,40 @@ def fetch(
     после последней непустой строки каждого листа.
     """
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch[/bold blue]\n")
+
+    # Определяем режим работы
+    if file is None:
+        file = Path.cwd() / "fetch.xlsx"
+        auto_mode = True
+        console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
+
+        # Проверяем, не существует ли уже файл
+        if file.exists():
+            if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
+                console.print("[red]Отменено пользователем[/red]")
+                raise typer.Exit(1)
+    else:
+        auto_mode = False
+        console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
+
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
     try:
-        # 1. Загружаем credentials (приоритет: CLI параметры → .env файл)
+        # 1. Настройка логирования
+        logs_folder = Path.cwd() / "logs"
+        logs_folder.mkdir(parents=True, exist_ok=True)
+
+        from .config import LoggingConfig
+        logging_config = LoggingConfig()
+
+        log_file = setup_logger(
+            logs_folder=logs_folder,
+            config=logging_config,
+            command_name="fetch"
+        )
+        logger.info(f"Лог-файл создан: {log_file}")
+
+        # 2. Загружаем credentials (приоритет: CLI параметры → .env файл)
         console.print("[yellow]Загрузка credentials...[/yellow]")
         domain, username, password = load_credentials_from_env(
             env_file=env_file,
@@ -644,22 +679,41 @@ def fetch(
         )
         console.print(f"[green]OK[/green] WordPress: {domain}\n")
 
-        # 2. Определяем листы для обработки
-        console.print("[yellow]Чтение структуры Excel файла...[/yellow]")
-        with ExcelReader(file) as reader:
-            sheets_by_type = reader.get_sheets_by_type()
-
+        # 3. Определяем листы для обработки
+        if auto_mode:
+            # В auto-mode определяем листы через discovery
             if sheets:
-                # Фильтруем листы если указано
+                # Если указаны конкретные листы
                 filter_list = [s.strip() for s in sheets.split(",")]
                 sheets_to_fetch = filter_list
+                console.print(f"[yellow]Листы для обработки:[/yellow] {', '.join(sheets_to_fetch)}\n")
             else:
-                # Все content и taxonomy листы
-                sheets_to_fetch = sheets_by_type["content"] + sheets_by_type["taxonomy"]
+                # Будут определены автоматически при discovery
+                sheets_to_fetch = []
+                console.print("[yellow]Листы будут определены автоматически[/yellow]\n")
+        else:
+            # Manual mode: читаем структуру из файла
+            console.print("[yellow]Чтение структуры Excel файла...[/yellow]")
+            with ExcelReader(file) as reader:
+                sheets_by_type = reader.get_sheets_by_type()
 
-            console.print(f"[green]OK[/green] Листы для обработки: {', '.join(sheets_to_fetch)}\n")
+                if sheets:
+                    # Фильтруем листы если указано
+                    filter_list = [s.strip() for s in sheets.split(",")]
+                    sheets_to_fetch = filter_list
+                else:
+                    # Все content и taxonomy листы
+                    sheets_to_fetch = sheets_by_type["content"] + sheets_by_type["taxonomy"]
 
-        # 3. Подключаемся к WordPress
+                console.print(f"[green]OK[/green] Листы для обработки: {', '.join(sheets_to_fetch)}\n")
+
+        # Применяем исключения если указаны
+        if exclude:
+            exclude_list = [s.strip() for s in exclude.split(",")]
+            sheets_to_fetch = [s for s in sheets_to_fetch if s not in exclude_list]
+            console.print(f"[yellow]Исключены:[/yellow] {', '.join(exclude_list)}\n")
+
+        # 4. Подключаемся к WordPress
         console.print("[yellow]Подключение к WordPress...[/yellow]")
 
         wp_config = WordPressConfig(
@@ -673,7 +727,9 @@ def fetch(
             excel_file=file,
             sheets=sheets_to_fetch,
             status=status,
-            limit=limit
+            limit=limit,
+            auto_mode=auto_mode,
+            exclude=exclude
         ))
 
         console.print(f"\n[bold green]SUCCESS! Данные добавлены в Excel![/bold green]\n")
@@ -692,7 +748,9 @@ async def fetch_and_append(
     excel_file: Path,
     sheets: List[str],
     status: str,
-    limit: Optional[int]
+    limit: Optional[int],
+    auto_mode: bool = False,
+    exclude: Optional[str] = None
 ):
     """
     Получить данные из WordPress и добавить в Excel.
@@ -700,6 +758,155 @@ async def fetch_and_append(
     async with WordPressClient(wp_config) as client:
         # Проверяем подключение
         await client.test_connection()
+
+        if auto_mode:
+            # === AUTO MODE: Создаём файл с нуля ===
+            from .wordpress.discovery import WordPressDiscovery
+            from .excel.creator import ExcelCreator
+            from .wordpress.posts import PostsEndpoint
+            from .wordpress.taxonomies import TaxonomiesEndpoint
+            from .mappers.response_mapper import ResponseMapper
+
+            discovery = WordPressDiscovery(client)
+
+            # 1. Обнаружение типов записей
+            logger.info("Обнаружение типов записей...")
+            all_post_types = await discovery.discover_post_types()
+
+            # 2. Обнаружение таксономий
+            logger.info("Обнаружение таксономий...")
+            all_taxonomies = await discovery.discover_taxonomies()
+
+            # 3. Если указан --sheets, фильтруем
+            if sheets:
+                all_post_types = [pt for pt in all_post_types if pt in sheets]
+                all_taxonomies = [t for t in all_taxonomies if t in sheets]
+
+            # 4. Если указан --exclude, исключаем
+            if exclude:
+                exclude_list = [s.strip() for s in exclude.split(",")]
+                all_post_types = [pt for pt in all_post_types if pt not in exclude_list]
+                all_taxonomies = [t for t in all_taxonomies if t not in exclude_list]
+                logger.info(f"Исключены: {', '.join(exclude_list)}")
+
+            # 5. Выгружаем данные и анализируем поля
+            logger.info("Выгрузка данных для анализа полей...")
+            sheets_data = {}  # {sheet_name: {"data": [...], "fields": [...], "type": "content/taxonomy"}}
+
+            # Выгружаем записи
+            for post_type in all_post_types:
+                logger.info(f"Выгрузка данных для '{post_type}'...")
+                posts_endpoint = PostsEndpoint(client, post_type)
+                posts = await posts_endpoint.get_all(status=status)
+
+                if posts:
+                    # Анализируем поля из реальных данных
+                    fields = await discovery.analyze_fields_from_data(posts, "content")
+                    sheets_data[post_type] = {
+                        "data": posts,
+                        "fields": fields,
+                        "type": "content"
+                    }
+                    logger.info(f"'{post_type}': выгружено {len(posts)} записей, {len(fields)} полей")
+                else:
+                    logger.warning(f"'{post_type}': нет данных, лист не будет создан")
+
+            # Выгружаем таксономии
+            for taxonomy in all_taxonomies:
+                logger.info(f"Выгрузка данных для таксономии '{taxonomy}'...")
+                # Нормализуем имя таксономии для API
+                normalized_taxonomy = normalize_taxonomy_name(taxonomy)
+                tax_endpoint = TaxonomiesEndpoint(client, normalized_taxonomy)
+                terms = await tax_endpoint.get_all()
+
+                if terms:
+                    # Анализируем поля из реальных данных
+                    fields = await discovery.analyze_fields_from_data(terms, "taxonomy")
+                    sheets_data[taxonomy] = {
+                        "data": terms,
+                        "fields": fields,
+                        "type": "taxonomy"
+                    }
+                    logger.info(f"'{taxonomy}': выгружено {len(terms)} терминов, {len(fields)} полей")
+                else:
+                    logger.warning(f"'{taxonomy}': нет данных, лист не будет создан")
+
+            # 6. Создаём Excel файл на основе реальных полей
+            logger.info(f"Создание Excel файла {excel_file}...")
+            sheets_fields = {name: meta["fields"] for name, meta in sheets_data.items()}
+            creator = ExcelCreator()
+            creator.create_file_with_fields(excel_file, sheets_fields)
+
+            # 7. Записываем данные сразу (без повторной выгрузки)
+            logger.info("Запись данных в Excel...")
+            from .excel.writer import ExcelWriter
+            excel_writer = ExcelWriter(excel_file)
+            excel_writer.load()
+
+            # Загружаем taxonomy cache для преобразования ID → названия
+            logger.info("Загрузка кэша таксономий для преобразования ID в названия...")
+            taxonomy_cache = {}
+
+            # Собираем список всех таксономий: стандартные + кастомные
+            all_taxonomies_for_cache = set()
+
+            # Добавляем стандартные таксономии (categories, tags)
+            all_taxonomies_for_cache.add("categories")
+            all_taxonomies_for_cache.add("tags")
+
+            # Добавляем таксономии из sheets_data (те что type=="taxonomy")
+            for sheet_name, sheet_meta in sheets_data.items():
+                if sheet_meta["type"] == "taxonomy":
+                    all_taxonomies_for_cache.add(sheet_name)
+
+            # Загружаем термины для каждой таксономии
+            for taxonomy in all_taxonomies_for_cache:
+                try:
+                    normalized_taxonomy = normalize_taxonomy_name(taxonomy)
+                    tax_endpoint = TaxonomiesEndpoint(client, normalized_taxonomy)
+                    terms = await tax_endpoint.get_all()
+
+                    # Формируем словарь {term_id: term_name}
+                    taxonomy_cache[taxonomy] = {
+                        term["id"]: term["name"]
+                        for term in terms
+                    }
+                    logger.debug(f"Загружено {len(terms)} терминов для таксономии '{taxonomy}'")
+                except Exception as e:
+                    logger.warning(f"Не удалось загрузить термины для '{taxonomy}': {e}")
+                    taxonomy_cache[taxonomy] = {}
+
+            logger.info(f"Кэш таксономий загружен: {len(taxonomy_cache)} таксономий")
+
+            # Подготавливаем mapper с заполненным taxonomy cache
+            mapper = ResponseMapper(taxonomy_cache=taxonomy_cache)
+
+            for sheet_name, sheet_meta in sheets_data.items():
+                logger.info(f"Запись данных в лист '{sheet_name}'...")
+
+                if sheet_meta["type"] == "content":
+                    # Преобразуем записи в формат Excel
+                    rows = [mapper.map_post_to_excel(post) for post in sheet_meta["data"]]
+                else:
+                    # Преобразуем термины в формат Excel
+                    rows = [mapper.map_term_to_excel(term) for term in sheet_meta["data"]]
+
+                # Записываем в Excel
+                excel_writer.replace_rows(sheet_name, rows)
+
+                if limit:
+                    rows_limited = rows[:limit]
+                    excel_writer.replace_rows(sheet_name, rows_limited)
+                    logger.info(f"Записано {len(rows_limited)} строк (лимит: {limit})")
+                else:
+                    excel_writer.replace_rows(sheet_name, rows)
+                    logger.info(f"Записано {len(rows)} строк")
+
+            excel_writer.save()
+            logger.info("✓ Данные успешно записаны в Excel")
+
+            # Завершаем функцию, т.к. данные уже записаны
+            return
 
         # Загружаем taxonomy cache для преобразования ID → названия
         logger.info("Загрузка кэша таксономий...")

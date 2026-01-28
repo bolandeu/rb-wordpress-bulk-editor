@@ -511,13 +511,24 @@
 
                         <div class="info-box">
                             <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
-                            Выгрузка контента из WordPress в Excel для редактирования или анализа.
+                            Выгрузка контента из WordPress в Excel для редактирования или анализа. Поддерживает два режима: ручной (с указанием файла) и автоматический (создание файла с нуля).
+                        </div>
+
+                        <h5 class="mt-4">Режимы работы:</h5>
+
+                        <div class="alert alert-info">
+                            <strong>🤖 Auto Mode (Автоматический):</strong> Если параметр <code>--file</code> не указан, команда автоматически создаст <code>fetch.xlsx</code> и выгрузит все доступные типы записей и таксономий с сайта. Структура полей определяется автоматически на основе реальных данных.
+                        </div>
+
+                        <div class="alert alert-secondary">
+                            <strong>📝 Manual Mode (Ручной):</strong> Если параметр <code>--file</code> указан, команда использует структуру существующего Excel файла для определения какие листы и поля выгружать.
                         </div>
 
                         <h5 class="mt-4">Параметры:</h5>
                         <div class="badge-section">
-                            <span class="param-badge param-required">--file</span> путь к Excel файлу
-                            <span class="param-badge param-optional">--sheets</span> список листов для заполнения
+                            <span class="param-badge param-optional">--file</span> путь к Excel файлу (если не указан, создается fetch.xlsx)
+                            <span class="param-badge param-optional">--sheets</span> список листов для выгрузки (posts,pages,category)
+                            <span class="param-badge param-optional">--exclude</span> список типов для исключения (posts,category)
                             <span class="param-badge param-optional">--status</span> фильтр по статусу (publish/draft/any)
                             <span class="param-badge param-optional">--limit</span> максимум записей на лист
                             <span class="param-badge param-optional">--domain</span> URL WordPress сайта
@@ -528,36 +539,115 @@
 
                         <div class="example-title">Примеры использования:</div>
 
+                        <div class="alert alert-success">
+                            <strong>🚀 Автоматический режим (рекомендуется для начала работы):</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --domain https://example.com --username admin --password "xxxx xxxx xxxx"</code>
+                            <div class="text-muted small mt-2">Создать fetch.xlsx с ВСЕМИ типами записей и таксономиями с сайта</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --sheets posts,category</code>
+                            <div class="text-muted small mt-2">Создать fetch.xlsx только с постами и категориями</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --status publish --limit 100</code>
+                            <div class="text-muted small mt-2">Только опубликованные записи, максимум 100 на лист</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --exclude post_tag,nav_menu</code>
+                            <div class="text-muted small mt-2">Выгрузить все типы кроме тегов и меню навигации</div>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <strong>🔧 Фильтрация с помощью --exclude:</strong>
+                            <p class="mb-2">Параметр <code>--exclude</code> позволяет исключить определенные типы записей или таксономии из выгрузки.</p>
+                            <ul class="mb-2">
+                                <li><strong>Работает в обоих режимах:</strong> auto-mode и manual mode</li>
+                                <li><strong>Формат:</strong> список через запятую без пробелов</li>
+                                <li><strong>Применяется после:</strong> --sheets (если указан)</li>
+                            </ul>
+                            <p class="mb-0"><strong>Полезно для:</strong></p>
+                            <ul class="mb-0">
+                                <li>Исключения служебных типов (nav_menu, post_format)</li>
+                                <li>Пропуска больших таблиц (например, теги если их много)</li>
+                                <li>Быстрой выгрузки без ненужных данных</li>
+                            </ul>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --exclude category,post_tag</code>
+                            <div class="text-muted small mt-2">Выгрузить все типы записей без таксономий</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli fetch --sheets posts,pages,category --exclude category</code>
+                            <div class="text-muted small mt-2">Комбинация: выбрать posts,pages,category, но исключить category (результат: posts,pages)</div>
+                        </div>
+
+                        <div class="alert alert-secondary mt-4">
+                            <strong>📝 Ручной режим (использование существующего файла):</strong>
+                        </div>
+
                         <div class="code-block">
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
                             <code>python -m src.cli fetch --file example.xlsx --status publish</code>
-                            <div class="text-muted small mt-2">Получить только опубликованные записи</div>
+                            <div class="text-muted small mt-2">Выгрузить данные в существующий файл, только опубликованные</div>
                         </div>
 
                         <div class="code-block">
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --file w.xlsx</code>
-                            <div class="text-muted small mt-2">Получить все данные (любой статус)</div>
-                        </div>
-
-                        <div class="code-block">
-                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                            <code>python -m src.cli fetch --file example.xlsx --sheets posts,pages --limit 50</code>
-                            <div class="text-muted small mt-2">Ограничить количество записей</div>
+                            <code>python -m src.cli fetch --file example.xlsx --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">Выгрузить только листы posts и pages</div>
                         </div>
 
                         <div class="success-box mt-4">
-                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <strong><i class="bi bi-check-circle me-2"></i>Что выгружается:</strong>
                             <ul class="mb-0">
-                                <li>Excel файл с данными из WordPress</li>
-                                <li>Все поля включая ACF, таксономии, SEO</li>
-                                <li>Готов к редактированию и обратной синхронизации</li>
+                                <li><strong>Типы записей:</strong> posts, pages, и все кастомные типы (кроме служебных)</li>
+                                <li><strong>Обязательные поля:</strong> id, date, modified, title, type, slug, link, parent, status</li>
+                                <li><strong>Дополнительные поля:</strong> content, excerpt, featured_media, image_url (если есть)</li>
+                                <li><strong>SEO поля:</strong> seo_title, seo_description, seo_meta_keywords, и т.д. (если плагин установлен)</li>
+                                <li><strong>Таксономии:</strong> categories, tags, и все кастомные таксономии (если связаны с типом)</li>
+                                <li><strong>ACF поля:</strong> все зарегистрированные ACF поля с префиксом acf_ (если плагин установлен)</li>
+                                <li><strong>Action:</strong> для всех записей устанавливается "skip" (не будет синхронизироваться обратно)</li>
+                            </ul>
+                        </div>
+
+                        <div class="warning-box mt-4">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Важно:</strong>
+                            <ul class="mb-0">
+                                <li>В auto-mode структура полей определяется анализом ВСЕХ записей - это гарантирует, что не пропустятся поля, которые заполнены только в некоторых записях</li>
+                                <li>Особенно важно для ACF полей и кастомных таксономий, которые могут быть заполнены выборочно</li>
+                                <li>Для таксономий обязательные поля: id, name, slug, link (остальные добавляются если присутствуют)</li>
+                                <li><strong>Порядок применения фильтров:</strong> 1) Discovery (обнаружение всех типов) → 2) --sheets (если указан) → 3) --exclude (если указан) → 4) Выгрузка</li>
+                                <li><strong>Нормализация имен:</strong> category → categories, post_tag → tags (для совместимости с WordPress REST API)</li>
                             </ul>
                         </div>
                     </div>
