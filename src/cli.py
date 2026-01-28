@@ -304,11 +304,19 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_
                 if excel_writer:
                     excel_writer.save()
 
-        # Вычисляем success rate
-        if stats["overall"]["total"] > 0:
+        # Вычисляем success rate (от обработанных, без skipped)
+        # Подсчитываем skipped из всех листов
+        total_skipped = sum(
+            sheet.get("skipped", 0) for sheet in stats["sheets"].values()
+        )
+        processed = stats["overall"]["total"] - total_skipped
+        if processed > 0:
             stats["overall"]["success_rate"] = (
-                stats["overall"]["successful"] / stats["overall"]["total"]
+                stats["overall"]["successful"] / processed
             ) * 100
+        elif stats["overall"]["total"] > 0:
+            # Все строки skipped — 100% success rate
+            stats["overall"]["success_rate"] = 100.0
 
         # Время завершения
         finished_at = datetime.now()
@@ -2294,11 +2302,19 @@ async def run_sync_async(
                 if excel_writer:
                     excel_writer.save()
 
-        # Вычисляем success rate
-        if stats["overall"]["total"] > 0:
+        # Вычисляем success rate (от обработанных, без skipped)
+        # Подсчитываем skipped из всех листов
+        total_skipped = sum(
+            sheet.get("skipped", 0) for sheet in stats["sheets"].values()
+        )
+        processed = stats["overall"]["total"] - total_skipped
+        if processed > 0:
             stats["overall"]["success_rate"] = (
-                stats["overall"]["successful"] / stats["overall"]["total"]
+                stats["overall"]["successful"] / processed
             ) * 100
+        elif stats["overall"]["total"] > 0:
+            # Все строки skipped — 100% success rate
+            stats["overall"]["success_rate"] = 100.0
 
         # Время завершения
         finished_at = datetime.now()

@@ -69,4 +69,6 @@ export/*.*
 
 credentials/*.*
 credentials/
-credentials
+
+
+.сsv
