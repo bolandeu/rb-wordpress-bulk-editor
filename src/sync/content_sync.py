@@ -303,7 +303,7 @@ class ContentSync:
                 logger.warning(f"Failed to upload media for post {post_id}: {e}")
                 saved_media_result = None
         
-        elif featured_media_in_excel:
+        elif featured_media_in_excel and not self.config.sync.skip_existing_media:
             # img_path не заполнен, но featured_media есть в Excel - прикрепляем существующую картинку
             media_id = int(row["featured_media"])
 

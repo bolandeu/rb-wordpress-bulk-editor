@@ -18,7 +18,7 @@ from .excel.writer import ExcelWriter
 from .excel.options import OptionsReader
 from .wordpress.client import WordPressClient
 from .wordpress.posts import PostsEndpoint
-from .wordpress.taxonomies import TaxonomyCache, normalize_taxonomy_name
+from .wordpress.taxonomies import TaxonomyCache, TaxonomiesEndpoint, normalize_taxonomy_name
 from .wordpress.options import OptionsEndpoint
 from .sync.content_sync import ContentSync
 from .sync.media_sync import MediaSync
@@ -111,6 +111,11 @@ def sync(
         "--delete-media",
         help="Удалять featured media при удалении записей (action=delete)"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update (ускоряет массовое редактирование)"
+    ),
     test_mode: bool = typer.Option(
         False,
         "--test-mode",
@@ -157,7 +162,8 @@ def sync(
                 concurrency=concurrency,
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
-                delete_featured_media=delete_media
+                delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media
             ),
             logging=LoggingConfig(
                 level="DEBUG" if verbose else "INFO"
@@ -763,9 +769,7 @@ async def fetch_and_append(
             # === AUTO MODE: Создаём файл с нуля ===
             from .wordpress.discovery import WordPressDiscovery
             from .excel.creator import ExcelCreator
-            from .wordpress.posts import PostsEndpoint
-            from .wordpress.taxonomies import TaxonomiesEndpoint
-            from .mappers.response_mapper import ResponseMapper
+            # PostsEndpoint, TaxonomiesEndpoint, ResponseMapper уже импортированы глобально
 
             discovery = WordPressDiscovery(client)
 
@@ -839,7 +843,7 @@ async def fetch_and_append(
 
             # 7. Записываем данные сразу (без повторной выгрузки)
             logger.info("Запись данных в Excel...")
-            from .excel.writer import ExcelWriter
+            # ExcelWriter уже импортирован глобально
             excel_writer = ExcelWriter(excel_file)
             excel_writer.load()
 
@@ -910,7 +914,7 @@ async def fetch_and_append(
 
         # Загружаем taxonomy cache для преобразования ID → названия
         logger.info("Загрузка кэша таксономий...")
-        from .wordpress.taxonomies import TaxonomiesEndpoint
+        # TaxonomiesEndpoint уже импортирован глобально
         from .mappers.field_detector import FieldDetector
 
         # Определяем все таксономии из листов для обработки
@@ -970,7 +974,7 @@ async def fetch_and_append(
 
             if is_taxonomy:
                 # Обрабатываем как таксономию
-                from .wordpress.taxonomies import TaxonomiesEndpoint
+                # TaxonomiesEndpoint уже импортирован глобально
 
                 # Нормализуем название таксономии для API endpoint
                 taxonomy_name = normalize_taxonomy_name(sheet_name)
@@ -1277,7 +1281,7 @@ async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
         wp_config: Конфигурация WordPress
         excel_file: Путь к Excel файлу
     """
-    from ..wordpress.media import MediaEndpoint
+    from .wordpress.media import MediaEndpoint
 
     async with WordPressClient(wp_config) as client:
         # Создаем endpoint
@@ -1468,8 +1472,8 @@ async def run_export_media(
     Returns:
         Количество экспортированных медиафайлов
     """
-    from ..wordpress.media import MediaEndpoint
-    from ..utils.media_exporter import MediaExporter
+    from .wordpress.media import MediaEndpoint
+    from .utils.media_exporter import MediaExporter
 
     async with WordPressClient(wp_config) as client:
         # Создаем endpoint и exporter
@@ -1784,6 +1788,11 @@ def sync_from_google(
         "--delete-media",
         help="Удалять featured media при удалении записей (action=delete)"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update (ускоряет массовое редактирование)"
+    ),
 ):
     """
     Скачать Google Sheets и синхронизировать с WordPress (пайплайн)
@@ -1880,7 +1889,8 @@ def sync_from_google(
                 concurrency=concurrency,
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
-                delete_featured_media=delete_media
+                delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media
             ),
             logging=LoggingConfig(
                 level="DEBUG" if verbose else "INFO"
@@ -1980,6 +1990,11 @@ def sync_google_bidirectional(
         "--delete-media",
         help="Удалять featured media при удалении записей (action=delete)"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update (ускоряет массовое редактирование)"
+    ),
 ):
     """
     Двусторонняя синхронизация: Google Sheets ↔ WordPress ↔ Google Sheets
@@ -2077,7 +2092,8 @@ def sync_google_bidirectional(
                 concurrency=concurrency,
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
-                delete_featured_media=delete_media
+                delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media
             ),
             logging=LoggingConfig(
                 level="DEBUG" if verbose else "INFO"
@@ -2975,6 +2991,11 @@ def async_sync(
         "--delete-media",
         help="Удалять featured media при удалении записей (action=delete)"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update (ускоряет массовое редактирование)"
+    ),
     test_mode: bool = typer.Option(
         False,
         "--test-mode",
@@ -3038,6 +3059,7 @@ def async_sync(
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media,
                 timeout=api_timeout or 30
             ),
             logging=LoggingConfig(
@@ -3148,6 +3170,11 @@ def async_sync_from_google(
         "--delete-media",
         help="Удалять media при delete"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update"
+    ),
 ):
     """
     🚀 Async Google Sheets → WordPress
@@ -3222,7 +3249,8 @@ def async_sync_from_google(
                 concurrency=concurrency_val,
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
-                delete_featured_media=delete_media
+                delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media
             ),
             logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
         )
@@ -3335,6 +3363,11 @@ def async_sync_google_bidirectional(
         "--delete-media",
         help="Удалять media при delete"
     ),
+    skip_existing_media: bool = typer.Option(
+        False,
+        "--skip-existing-media",
+        help="Не прикреплять существующие featured_media при update"
+    ),
 ):
     """
     🚀 Async Google Sheets ↔ WordPress ↔ Google Sheets
@@ -3399,7 +3432,8 @@ def async_sync_google_bidirectional(
                 concurrency=concurrency_val,
                 skip_media=skip_media,
                 update_excel=not no_update_excel,
-                delete_featured_media=delete_media
+                delete_featured_media=delete_media,
+                skip_existing_media=skip_existing_media
             ),
             logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
         )

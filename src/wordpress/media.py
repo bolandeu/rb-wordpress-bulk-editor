@@ -103,6 +103,7 @@ class MediaEndpoint:
                             )
                         
                         # Пробуем распарсить JSON
+                        result = None  # Инициализация для безопасности
                         try:
                             result = await response.json()
                             logger.debug(f"Response: {result.keys()}")
@@ -145,6 +146,10 @@ class MediaEndpoint:
                                     raise MediaUploadError(
                                         f"Failed to upload media: server returned invalid JSON. Response: {response_text[:500]}"
                                     )
+
+            # Проверяем что result был присвоен
+            if result is None:
+                raise MediaUploadError("Failed to upload media: result is None after processing response")
 
             media_id = result['id']
             logger.info(

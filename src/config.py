@@ -87,6 +87,10 @@ class SyncConfig(BaseModel):
         default=False,
         description="Удалять featured media при удалении записи"
     )
+    skip_existing_media: bool = Field(
+        default=False,
+        description="Не прикреплять существующие featured_media при update (когда img_path пустой)"
+    )
 
 
 class PathsConfig(BaseModel):
