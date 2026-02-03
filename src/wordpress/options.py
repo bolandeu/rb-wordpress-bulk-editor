@@ -19,6 +19,25 @@ class OptionsEndpoint:
         self.client = client
         self.endpoint = "/wp-json/siteoptions/v1/options"
 
+    async def get(self) -> Dict[str, Any]:
+        """
+        Получить настройки сайта из WordPress.
+
+        Returns:
+            Словарь с настройками {option_name: value}
+
+        Example:
+            >>> options = await endpoint.get()
+            >>> print(options["site_title"])
+        """
+        logger.info("Получение настроек сайта из WordPress")
+
+        result = await self.client.get(self.endpoint)
+
+        logger.info(f"Получено настроек: {len(result)}")
+        logger.debug(f"Опции: {result}")
+        return result
+
     async def update(self, options: Dict[str, Any]) -> Dict[str, Any]:
         """
         Обновить настройки сайта.

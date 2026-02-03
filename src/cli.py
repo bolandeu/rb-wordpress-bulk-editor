@@ -7,6 +7,7 @@ from typing import Optional, List, Dict
 import asyncio
 from datetime import datetime
 
+import pandas as pd
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
@@ -483,12 +484,12 @@ def validate(
 
 @app.command()
 def options(
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
         help="Путь к Excel файлу",
-        exists=True,
+        exists=False,
         file_okay=True,
         dir_okay=False,
         resolve_path=True
@@ -502,6 +503,11 @@ def options(
         dir_okay=False,
         resolve_path=True
     ),
+    fetch: bool = typer.Option(
+        False,
+        "--fetch",
+        help="Получить настройки из WordPress в Excel (вместо загрузки)"
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -510,59 +516,152 @@ def options(
     )
 ):
     """
-    Обновление настроек сайта WordPress из листа 'options'
+    Управление настройками сайта WordPress.
+
+    Без --fetch: обновление WordPress из Excel
+    С --fetch: выгрузка настроек из WordPress в Excel
     """
     console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
-    console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    try:
-        # 1. Загружаем credentials из .env
-        console.print("[yellow]Загрузка credentials из .env...[/yellow]")
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+    # Настройка логирования
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
 
-        # 2. Читаем опции
-        console.print("[yellow]Чтение настроек из листа 'options'...[/yellow]")
-        options_reader = OptionsReader(file)
-        site_options = options_reader.read()
+    from .config import LoggingConfig
+    logging_config = LoggingConfig()
 
-        if not site_options:
-            console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n")
-            return
+    command_name = "options_fetch" if fetch else "options"
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name=command_name
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
+    logger.info(f"Режим: {'FETCH (выгрузка)' if fetch else 'UPDATE (загрузка)'}")
 
-        console.print(f"[green]OK[/green] Найдено настроек: {len(site_options)}\n")
+    # Режим FETCH - выгрузка из WordPress в Excel
+    if fetch:
+        # Определяем файл
+        if file is None:
+            file = Path.cwd() / "options.xlsx"
+            console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
-        # Показываем что будет отправлено
-        console.print("[bold]Настройки для обновления:[/bold]")
-        for key, value in site_options.items():
-            console.print(f"  {key}: [cyan]{value}[/cyan]")
-        console.print()
+            # Проверяем существование
+            if file.exists():
+                if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
+                    console.print("[red]Отменено пользователем[/red]")
+                    raise typer.Exit(1)
+        else:
+            console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
 
-        if dry_run:
-            console.print("[yellow]DRY-RUN режим: изменения не будут применены[/yellow]\n")
-            console.print("[bold green]DRY-RUN завершен![/bold green]\n")
-            return
+        console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-        # 3. Подключаемся к WordPress и отправляем
-        console.print("[yellow]Отправка настроек в WordPress...[/yellow]")
+        try:
+            # 1. Загружаем credentials
+            console.print("[yellow]Загрузка credentials из .env...[/yellow]")
+            domain, username, password = load_credentials_from_env(env_file=env_file)
+            console.print(f"[green]OK[/green] WordPress: {domain}\n")
 
-        wp_config = WordPressConfig(
-            url=domain,
-            username=username,
-            password=password
-        )
+            # 2. Получаем настройки из WordPress
+            console.print("[yellow]Получение настроек из WordPress...[/yellow]")
 
-        asyncio.run(update_options(wp_config, site_options))
+            wp_config = WordPressConfig(
+                url=domain,
+                username=username,
+                password=password
+            )
 
-        console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
+            site_options = asyncio.run(fetch_options(wp_config))
 
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
+            if not site_options:
+                console.print("[yellow]WARNING: Нет настроек для выгрузки[/yellow]\n")
+                return
+
+            console.print(f"[green]OK[/green] Получено настроек: {len(site_options)}\n")
+
+            # Показываем что получено
+            console.print("[bold]Полученные настройки:[/bold]")
+            for key, value in site_options.items():
+                console.print(f"  {key}: [cyan]{value}[/cyan]")
+            console.print()
+
+            # 3. Записываем в Excel
+            console.print("[yellow]Запись настроек в Excel...[/yellow]")
+            from .excel.options import OptionsWriter
+            writer = OptionsWriter(file)
+            writer.write(site_options, mode="replace")
+
+            console.print(f"\n[bold green]SUCCESS! Настройки выгружены в {file}![/bold green]\n")
+
+        except WPBulkEditorError as e:
+            console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+            raise typer.Exit(code=1)
+        except Exception as e:
+            console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+            logger.exception("Неожиданная ошибка")
+            raise typer.Exit(code=1)
+
+    # Режим UPDATE - загрузка из Excel в WordPress
+    else:
+        if file is None:
+            console.print("[red]ERROR: Параметр --file обязателен для загрузки настроек[/red]\n")
+            raise typer.Exit(code=1)
+
+        if not file.exists():
+            console.print(f"[red]ERROR: Файл не найден: {file}[/red]\n")
+            raise typer.Exit(code=1)
+
+        console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+
+        try:
+            # 1. Загружаем credentials из .env
+            console.print("[yellow]Загрузка credentials из .env...[/yellow]")
+            domain, username, password = load_credentials_from_env(env_file=env_file)
+            console.print(f"[green]OK[/green] WordPress: {domain}\n")
+
+            # 2. Читаем опции
+            console.print("[yellow]Чтение настроек из листа 'options'...[/yellow]")
+            from .excel.options import OptionsReader
+            options_reader = OptionsReader(file)
+            site_options = options_reader.read()
+
+            if not site_options:
+                console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n")
+                return
+
+            console.print(f"[green]OK[/green] Найдено настроек: {len(site_options)}\n")
+
+            # Показываем что будет отправлено
+            console.print("[bold]Настройки для обновления:[/bold]")
+            for key, value in site_options.items():
+                console.print(f"  {key}: [cyan]{value}[/cyan]")
+            console.print()
+
+            if dry_run:
+                console.print("[yellow]DRY-RUN режим: изменения не будут применены[/yellow]\n")
+                console.print("[bold green]DRY-RUN завершен![/bold green]\n")
+                return
+
+            # 3. Подключаемся к WordPress и отправляем
+            console.print("[yellow]Отправка настроек в WordPress...[/yellow]")
+
+            wp_config = WordPressConfig(
+                url=domain,
+                username=username,
+                password=password
+            )
+
+            asyncio.run(update_options(wp_config, site_options))
+
+            console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
+
+        except WPBulkEditorError as e:
+            console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+            raise typer.Exit(code=1)
+        except Exception as e:
+            console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+            logger.exception("Неожиданная ошибка")
+            raise typer.Exit(code=1)
 
 
 async def update_options(wp_config: WordPressConfig, site_options: dict):
@@ -576,6 +675,22 @@ async def update_options(wp_config: WordPressConfig, site_options: dict):
         # Отправляем настройки
         options_endpoint = OptionsEndpoint(client)
         await options_endpoint.update(site_options)
+
+
+async def fetch_options(wp_config: WordPressConfig) -> dict:
+    """
+    Получение настроек из WordPress.
+
+    Returns:
+        Словарь с настройками {option_name: value}
+    """
+    async with WordPressClient(wp_config) as client:
+        # Проверяем подключение
+        await client.test_connection()
+
+        # Получаем настройки
+        options_endpoint = OptionsEndpoint(client)
+        return await options_endpoint.get()
 
 
 @app.command()

@@ -411,7 +411,7 @@
                                         <option value="async-google-bidirectional">async-google-bidirectional - 🚀 Async Google ↔ WP</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
                                         <option value="validate">validate - Валидация файла</option>
-                                        <option value="options">options - Обновление настроек</option>
+                                        <option value="options">options - Управление настройками (загрузка/выгрузка)</option>
                                     </select>
                                 </div>
                             </div>
@@ -491,6 +491,131 @@
                             </button>
                             <code>python -m src.cli sync --file w.xlsx --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx"</code>
                             <div class="text-muted small mt-2">С явным указанием credentials</div>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <strong><i class="bi bi-images me-2"></i>Работа с листом 'media' (библиотека медиафайлов):</strong>
+                            <p class="mb-2">Команда <code>sync</code> полностью поддерживает управление медиафайлами через лист 'media' в Excel.</p>
+                        </div>
+
+                        <div class="info-box">
+                            <strong>📁 Структура листа media:</strong>
+                            <ul class="mb-2">
+                                <li><code>action</code> - действие (add, update, delete, skip)</li>
+                                <li><code>id</code> - ID медиафайла в WordPress (для update/delete)</li>
+                                <li><code>img_path</code> - путь к файлу для загрузки (для add)</li>
+                                <li><code>title</code> - название медиафайла</li>
+                                <li><code>alt_text</code> - альтернативный текст (для SEO и доступности)</li>
+                                <li><code>caption</code> - подпись</li>
+                                <li><code>description</code> - описание</li>
+                            </ul>
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-upload me-2"></i>Загрузка новых файлов (action=add):</strong>
+                            <ul class="mb-0">
+                                <li>Укажите <code>img_path</code> - путь к локальному файлу или URL</li>
+                                <li>Локальные файлы ищутся от текущей папки или в <code>data/media/</code></li>
+                                <li>Поддерживаются изображения, видео, документы</li>
+                                <li>После загрузки автоматически заполнятся: id, link, source_url, mime_type</li>
+                                <li>Action изменится на "skip" чтобы избежать повторной загрузки</li>
+                            </ul>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file data.xlsx --sheets media</code>
+                            <div class="text-muted small mt-2">Синхронизация только медиафайлов</div>
+                        </div>
+
+                        <div class="success-box">
+                            <strong><i class="bi bi-pencil-square me-2"></i>Редактирование медиа (action=update):</strong>
+                            <ul class="mb-0">
+                                <li>Требуется <code>id</code> существующего медиафайла</li>
+                                <li>Можно изменить: title, alt_text, caption, description</li>
+                                <li>Сам файл НЕ заменяется (только метаданные)</li>
+                                <li>Полезно для массового обновления alt_text для SEO</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-danger">
+                            <strong><i class="bi bi-trash me-2"></i>Удаление медиа (action=delete):</strong>
+                            <ul class="mb-0">
+                                <li>Требуется <code>id</code> существующего медиафайла</li>
+                                <li>Удаляется полностью из WordPress (не в корзину)</li>
+                                <li><strong>ВНИМАНИЕ:</strong> Необратимая операция!</li>
+                                <li>Если файл используется в постах, там останутся битые ссылки</li>
+                            </ul>
+                        </div>
+
+                        <div class="example-title">Примеры работы с media:</div>
+
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>action</th>
+                                    <th>id</th>
+                                    <th>img_path</th>
+                                    <th>title</th>
+                                    <th>alt_text</th>
+                                    <th>Результат</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-success">add</span></td>
+                                    <td><em>пусто</em></td>
+                                    <td>images/photo.jpg</td>
+                                    <td>Фото продукта</td>
+                                    <td>Описание для alt</td>
+                                    <td>✅ Загрузит файл, заполнит id</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-success">add</span></td>
+                                    <td><em>пусто</em></td>
+                                    <td>https://example.com/image.png</td>
+                                    <td>Логотип</td>
+                                    <td></td>
+                                    <td>✅ Загрузит по URL</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-warning">update</span></td>
+                                    <td>1234</td>
+                                    <td><em>пусто</em></td>
+                                    <td>Новое название</td>
+                                    <td>Обновленный alt</td>
+                                    <td>✅ Обновит метаданные</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-danger">delete</span></td>
+                                    <td>1234</td>
+                                    <td><em>пусто</em></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td>🗑️ Удалит файл полностью</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-secondary">skip</span></td>
+                                    <td>1234</td>
+                                    <td></td>
+                                    <td>Текущее название</td>
+                                    <td></td>
+                                    <td>⏭️ Пропустит, ничего не делает</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="alert alert-success mt-4">
+                            <strong><i class="bi bi-terminal me-2"></i>Команды для работы с media:</strong>
+                            <pre class="mt-2 mb-0" style="font-size: 13px; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+# Синхронизация (загрузка, редактирование, удаление)
+python -m src.cli sync --file data.xlsx --sheets media
+python -m src.cli async --file data.xlsx --sheets media
+
+# Выгрузка списка медиа из WordPress
+python -m src.cli fetch-media --file export.xlsx</pre>
                         </div>
 
                         <div class="success-box mt-4">
@@ -1071,6 +1196,49 @@
                             <div class="text-muted small mt-2">Увеличить retry и timeout для медленного сервера</div>
                         </div>
 
+                        <div class="alert alert-info mt-4">
+                            <strong><i class="bi bi-images me-2"></i>Работа с листом 'media' (асинхронная):</strong>
+                            <p class="mb-0">Команда <code>async</code> полностью поддерживает управление медиафайлами через лист 'media'. Все операции (add, update, delete) выполняются параллельно с retry механизмом.</p>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async --file data.xlsx --sheets media</code>
+                            <div class="text-muted small mt-2">Асинхронная синхронизация медиафайлов (загрузка, редактирование, удаление)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async --file data.xlsx --sheets media --concurrency 3</code>
+                            <div class="text-muted small mt-2">Параллельная загрузка 3 файлов одновременно</div>
+                        </div>
+
+                        <div class="success-box">
+                            <strong><i class="bi bi-rocket me-2"></i>Преимущества async для медиа:</strong>
+                            <ul class="mb-0">
+                                <li><strong>Параллельная загрузка:</strong> Несколько файлов загружаются одновременно</li>
+                                <li><strong>Retry при ошибках:</strong> Автоматический повтор если загрузка упала</li>
+                                <li><strong>Увеличенный timeout:</strong> 120 секунд для больших файлов</li>
+                                <li><strong>Circuit breaker:</strong> Защита от перегрузки сервера</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-box">
+                            <strong>📝 Структура и операции:</strong>
+                            <p class="mb-1">Лист 'media' поддерживает все те же операции что и в sync команде:</p>
+                            <ul class="mb-0">
+                                <li><code>action=add</code> - загрузить новый файл (требует img_path)</li>
+                                <li><code>action=update</code> - обновить метаданные (требует id)</li>
+                                <li><code>action=delete</code> - удалить файл (требует id)</li>
+                                <li><code>action=skip</code> - пропустить строку</li>
+                            </ul>
+                            <p class="mt-2 mb-0">Подробнее см. раздел <strong>"Работа с листом 'media'"</strong> в команде <code>sync</code>.</p>
+                        </div>
+
                         <div class="warning-box">
                             <strong><i class="bi bi-gear me-2"></i>Настройка .env:</strong>
                             Асинхронные команды используют параметры с префиксом <code>WP_*</code>:
@@ -1373,17 +1541,24 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                     <!-- options -->
                     <div id="options" class="command-card">
                         <h2 class="command-title">options</h2>
-                        <p class="command-description">Обновление настроек WordPress сайта</p>
+                        <p class="command-description">Управление настройками WordPress сайта (двусторонняя синхронизация)</p>
 
                         <div class="info-box">
                             <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
-                            Массовое изменение настроек WordPress через лист options в Excel.
+                            Массовое изменение настроек WordPress через лист options в Excel.<br>
+                            <strong>Два режима работы:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>Загрузка (по умолчанию):</strong> Excel → WordPress</li>
+                                <li><strong>Выгрузка (--fetch):</strong> WordPress → Excel</li>
+                            </ul>
                         </div>
 
                         <h5 class="mt-4">Параметры:</h5>
                         <div class="badge-section">
-                            <span class="param-badge param-required">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--file</span> путь к Excel файлу
+                            <span class="param-badge param-optional">--fetch</span> выгрузить из WordPress
                             <span class="param-badge param-optional">--dry-run</span> показать без отправки
+                            <span class="param-badge param-optional">--env-file</span> путь к .env файлу
                         </div>
 
                         <div class="warning-box">
@@ -1393,12 +1568,36 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
 
                         <div class="example-title">Примеры использования:</div>
 
+                        <div class="alert alert-info">
+                            <strong>Режим ВЫГРУЗКИ (--fetch): WordPress → Excel</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli options --fetch</code>
+                            <div class="text-muted small mt-2">Создать файл options.xlsx с настройками из WordPress</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli options --fetch --file my_options.xlsx</code>
+                            <div class="text-muted small mt-2">Выгрузить настройки в указанный файл</div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <strong>Режим ЗАГРУЗКИ (по умолчанию): Excel → WordPress</strong>
+                        </div>
+
                         <div class="code-block">
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
                             <code>python -m src.cli options --file example.xlsx</code>
-                            <div class="text-muted small mt-2">Обновить настройки</div>
+                            <div class="text-muted small mt-2">Обновить настройки WordPress из Excel</div>
                         </div>
 
                         <div class="code-block">
@@ -1406,14 +1605,24 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                                 <i class="bi bi-clipboard"></i>
                             </button>
                             <code>python -m src.cli options --file example.xlsx --dry-run</code>
-                            <div class="text-muted small mt-2">Показать что будет отправлено</div>
+                            <div class="text-muted small mt-2">Показать что будет отправлено (без изменений)</div>
                         </div>
 
                         <div class="success-box mt-4">
                             <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
                             <ul class="mb-0">
-                                <li>Список обновленных настроек</li>
-                                <li>Результат каждой операции</li>
+                                <li><strong>Режим --fetch:</strong> Список полученных настроек и путь к созданному файлу</li>
+                                <li><strong>Режим загрузки:</strong> Список обновленных настроек и результат каждой операции</li>
+                            </ul>
+                        </div>
+
+                        <div class="info-box mt-4">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Примеры настроек WordPress:</strong>
+                            <ul class="mb-0">
+                                <li><code>site_title</code> - название сайта</li>
+                                <li><code>posts_per_page</code> - количество постов на странице</li>
+                                <li><code>timezone</code> - часовой пояс</li>
+                                <li><code>blogdescription</code> - описание сайта</li>
                             </ul>
                         </div>
                     </div>
@@ -1607,8 +1816,10 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
             },
             'options': {
                 params: [
-                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
-                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать без отправки' }
+                    { name: 'file', type: 'text', required: false, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'fetch', type: 'checkbox', required: false, description: 'Выгрузить настройки из WordPress в Excel' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать без отправки (только для загрузки)' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: '.env', description: 'Путь к .env файлу' }
                 ]
             }
         };

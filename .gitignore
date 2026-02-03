@@ -70,5 +70,4 @@ export/*.*
 credentials/*.*
 credentials/
 
-
-.сsv
+*.env

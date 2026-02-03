@@ -374,7 +374,12 @@ class MediaEndpoint:
                 page += 1
 
             except Exception as e:
-                logger.warning(f"Error fetching media page {page}: {e}")
+                # Ошибка "превышение страниц" - это нормальная ситуация при пагинации
+                error_msg = str(e)
+                if "превышает количество имеющихся страниц" in error_msg or "exceeds the number of pages" in error_msg.lower():
+                    logger.debug(f"Reached last page at page {page-1} (total {len(all_media)} files)")
+                else:
+                    logger.warning(f"Error fetching media page {page}: {e}")
                 break
 
         logger.info(f"Fetched {len(all_media)} media files")
