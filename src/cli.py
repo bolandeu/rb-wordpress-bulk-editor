@@ -466,6 +466,20 @@ def validate(
     """
     console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
+    # Настройка логирования
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
+
+    from .config import LoggingConfig
+    logging_config = LoggingConfig()
+
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name="validate"
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
+
     try:
         # Проверка credentials
         console.print("[yellow]Проверка credentials из .env...[/yellow]")
@@ -1650,6 +1664,20 @@ def download_google_sheet(
     console.print("\n[bold cyan]Google Sheets Downloader[/bold cyan]")
     console.print("=" * 60 + "\n")
 
+    # Настройка логирования
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
+
+    from .config import LoggingConfig
+    logging_config = LoggingConfig()
+
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name="download_google_sheet"
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
+
     try:
         import os
         from dotenv import load_dotenv
@@ -1770,22 +1798,23 @@ def upload_to_google_sheets(
     console.print("\n[bold cyan]Upload Excel → Google Sheets[/bold cyan]")
     console.print("=" * 60 + "\n")
 
+    # Настройка логирования
+    from .config import LoggingConfig
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
+    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
+
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name="upload_to_google_sheets"
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
+
     try:
         import os
         from dotenv import load_dotenv
         from .utils.google_sheets import GoogleSheetsClient
-
-        # Настройка логирования
-        if verbose:
-            from .config import LoggingConfig
-            logs_folder = Path("logs")
-            logs_folder.mkdir(parents=True, exist_ok=True)
-            logging_config = LoggingConfig(level="DEBUG")
-            setup_logger(
-                logs_folder=logs_folder,
-                config=logging_config,
-                command_name="upload_to_google_sheets"
-            )
 
         # Загружаем .env
         load_dotenv()
@@ -2851,6 +2880,20 @@ def counter(
         wp-bulk counter --domain https://example.com --type posts --output stats.csv
     """
     console.print(f"\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
+
+    # Настройка логирования
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
+
+    from .config import LoggingConfig
+    logging_config = LoggingConfig()
+
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name="counter"
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
 
     try:
         # 1. Загружаем credentials
