@@ -452,6 +452,7 @@
                             <span class="param-badge param-optional">--verbose</span> подробные логи
                             <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
                             <span class="param-badge param-optional">--skip-media</span> пропустить загрузку медиа
+                            <span class="param-badge param-optional">--skip-tax</span> пропустить обновление таксономий (категории, теги)
                             <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
                             <span class="param-badge param-optional">--domain</span> URL WordPress сайта
                             <span class="param-badge param-optional">--username</span> имя пользователя
@@ -491,6 +492,22 @@
                             </button>
                             <code>python -m src.cli sync --file w.xlsx --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx"</code>
                             <div class="text-muted small mt-2">С явным указанием credentials</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file data.xlsx --skip-tax</code>
+                            <div class="text-muted small mt-2">Обновить только поля контента, пропустив таксономии (ускоряет синхронизацию)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli sync --file data.xlsx --skip-media --skip-tax</code>
+                            <div class="text-muted small mt-2">Обновить только основные поля, без медиа и таксономий (максимальная скорость)</div>
                         </div>
 
                         <div class="alert alert-info mt-4">
@@ -1157,6 +1174,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <span class="param-badge param-optional">--max-retries</span> максимум повторов (default: 3)
                             <span class="param-badge param-optional">--circuit-breaker / --no-circuit-breaker</span> включить circuit breaker (default: on)
                             <span class="param-badge param-optional">--skip-media</span> пропустить загрузку медиа
+                            <span class="param-badge param-optional">--skip-tax</span> пропустить обновление таксономий (категории, теги)
                             <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
                             <span class="param-badge param-optional">--no-update-excel</span> не записывать ID обратно в Excel
                             <span class="param-badge param-optional">--test-mode</span> обработать только первые 3 строки
@@ -1194,6 +1212,22 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             </button>
                             <code>python -m src.cli async --file w.xlsx --max-retries 5 --api-timeout 60</code>
                             <div class="text-muted small mt-2">Увеличить retry и timeout для медленного сервера</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async --file data.xlsx --skip-tax</code>
+                            <div class="text-muted small mt-2">Обновить только поля контента, пропустив таксономии (ускоряет синхронизацию)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli async --file data.xlsx --skip-media --skip-tax</code>
+                            <div class="text-muted small mt-2">Максимальная скорость: обновление только основных полей</div>
                         </div>
 
                         <div class="alert alert-info mt-4">

@@ -426,6 +426,10 @@ class ContentSyncAsync(BaseSync):
         Returns:
             Dict {taxonomy_name: [term_ids]}
         """
+        # Если skip_tax=True, пропускаем обработку таксономий
+        if self.config.sync.skip_tax:
+            return {}
+
         taxonomy_fields = mapper.detector.get_taxonomy_fields()
         taxonomy_ids = {}
 

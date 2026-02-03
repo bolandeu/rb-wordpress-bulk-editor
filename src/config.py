@@ -79,6 +79,10 @@ class SyncConfig(BaseModel):
         default=False,
         description="Пропустить загрузку медиа"
     )
+    skip_tax: bool = Field(
+        default=False,
+        description="Пропустить обновление таксономий (категории, теги и т.д.)"
+    )
     update_excel: bool = Field(
         default=True,
         description="Записывать ID обратно в Excel"

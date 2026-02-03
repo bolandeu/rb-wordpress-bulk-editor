@@ -102,6 +102,11 @@ def sync(
         "--skip-media",
         help="Пропустить загрузку медиа"
     ),
+    skip_tax: bool = typer.Option(
+        False,
+        "--skip-tax",
+        help="Пропустить обновление таксономий (категории, теги)"
+    ),
     no_update_excel: bool = typer.Option(
         False,
         "--no-update-excel",
@@ -162,6 +167,7 @@ def sync(
                 dry_run=dry_run,
                 concurrency=concurrency,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media
@@ -1893,6 +1899,11 @@ def sync_from_google(
         "--skip-media",
         help="Пропустить загрузку медиа"
     ),
+    skip_tax: bool = typer.Option(
+        False,
+        "--skip-tax",
+        help="Пропустить обновление таксономий (категории, теги)"
+    ),
     no_update_excel: bool = typer.Option(
         False,
         "--no-update-excel",
@@ -2003,6 +2014,7 @@ def sync_from_google(
                 dry_run=dry_run,
                 concurrency=concurrency,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media
@@ -2089,6 +2101,11 @@ def sync_google_bidirectional(
         False,
         "--skip-media",
         help="Пропустить загрузку медиа"
+    ),
+    skip_tax: bool = typer.Option(
+        False,
+        "--skip-tax",
+        help="Пропустить обновление таксономий (категории, теги)"
     ),
     no_update_excel: bool = typer.Option(
         False,
@@ -2206,6 +2223,7 @@ def sync_google_bidirectional(
                 dry_run=dry_run,
                 concurrency=concurrency,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media
@@ -3095,6 +3113,11 @@ def async_sync(
         False,
         "--skip-media",
         help="Пропустить загрузку медиа"
+    ),
+    skip_tax: bool = typer.Option(
+        False,
+        "--skip-tax",
+        help="Пропустить обновление таксономий (категории, теги)"
     ),
     no_update_excel: bool = typer.Option(
         False,
