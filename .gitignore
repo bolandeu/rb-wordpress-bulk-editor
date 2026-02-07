@@ -71,3 +71,19 @@ credentials/*.*
 credentials/
 
 *.env
+
+.claude
+.calude/
+
+test*.*
+tests/
+tests/*
+tests
+
+*.jpg
+*.png
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.webp

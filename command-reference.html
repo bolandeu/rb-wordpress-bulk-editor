@@ -371,6 +371,9 @@
                             <a class="nav-link" href="#counter">counter</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="#llm">llm</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="#validate">validate</a>
                         </li>
                         <li class="nav-item">
@@ -410,6 +413,7 @@
                                         <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
                                         <option value="async-google-bidirectional">async-google-bidirectional - 🚀 Async Google ↔ WP</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
+                                        <option value="llm">llm - 🤖 Генерация контента через LLM API</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Управление настройками (загрузка/выгрузка)</option>
                                     </select>
@@ -1657,6 +1661,193 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                                 <li><code>posts_per_page</code> - количество постов на странице</li>
                                 <li><code>timezone</code> - часовой пояс</li>
                                 <li><code>blogdescription</code> - описание сайта</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- llm -->
+                    <div id="llm" class="command-card">
+                        <h2 class="command-title">llm</h2>
+                        <p class="command-description">🤖 Массовая генерация контента через LLM API (OpenAI-compatible)</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Автоматическая генерация контента в указанную колонку Excel с использованием LLM моделей (GPT, Claude, Grok и т.д.).
+                            Обрабатывает только строки где <code>action=update</code>.
+                        </div>
+
+                        <div class="success-box">
+                            <strong><i class="bi bi-lightning-charge me-2"></i>Возможности:</strong>
+                            <ul class="mb-0">
+                                <li><strong>Подстановка значений:</strong> Используйте [column_name] в промпте для подстановки данных из других колонок</li>
+                                <li><strong>Fallback между моделями:</strong> Указывайте несколько моделей через запятую для автоматического переключения</li>
+                                <li><strong>Retry механизм:</strong> 3 попытки для каждой модели с exponential backoff</li>
+                                <li><strong>Пост-обработка:</strong> Конвертация Markdown ↔ HTML, удаление тегов</li>
+                                <li><strong>Streaming:</strong> Обработка streaming ответов от API</li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-required">--column</span> колонка для записи результата
+                            <span class="param-badge param-optional">--model</span> модели через запятую (или LLM_MODELS из .env)
+                            <span class="param-badge param-optional">--file</span> путь к Excel файлу (default: export.xlsx)
+                            <span class="param-badge param-optional">--sheets</span> листы для обработки
+                            <span class="param-badge param-optional">--prompt</span> промпт (или LLM_PROMPT из .env)
+                            <span class="param-badge param-optional">--endpoint</span> LLM API URL (или LLM_ENDPOINT из .env)
+                            <span class="param-badge param-optional">--token</span> API токен (или LLM_TOKEN из .env)
+                            <span class="param-badge param-optional">--overwrite</span> перезаписывать существующие значения
+                            <span class="param-badge param-optional">--dry-run</span> тестовый режим без сохранения
+                            <span class="param-badge param-optional">--strip-tags</span> удалить HTML теги
+                            <span class="param-badge param-optional">--md-to-html</span> конвертировать Markdown в HTML
+                            <span class="param-badge param-optional">--html-to-md</span> конвертировать HTML в Markdown
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-gear me-2"></i>Настройка .env:</strong>
+                            <pre class="mt-2 mb-0" style="font-size: 12px;">LLM_ENDPOINT=http://localhost:8317/v1/chat/completions
+LLM_TOKEN=your-api-key-here
+LLM_MODELS=gemini-2.5-flash-lite,gpt-4,claude-3
+LLM_PROMPT=Напиши текст для [title]</pre>
+                            <div class="text-muted small mt-2">
+                                <strong>LLM_MODELS:</strong> Модели с fallback (через запятую). Если не указано, параметр --model становится обязательным.
+                            </div>
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column excerpt</code>
+                            <div class="text-muted small mt-2">Использует LLM_MODELS, LLM_PROMPT из .env (самый быстрый способ)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"</code>
+                            <div class="text-muted small mt-2">Генерация excerpt на основе title с явным указанием модели</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши услугу [title]: [excerpt]"</code>
+                            <div class="text-muted small mt-2">Fallback между моделями (если grok не ответит, попробует gpt-4, потом claude-3)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column content --model "gpt-4" --prompt "Напиши подробную статью про [title]" --md-to-html</code>
+                            <div class="text-muted small mt-2">Генерация с конвертацией Markdown в HTML</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column excerpt --model "gpt-4" --sheets posts,pages --overwrite</code>
+                            <div class="text-muted small mt-2">Обработка конкретных листов с перезаписью существующих значений</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>python -m src.cli llm --column description --model "gpt-4" --dry-run --verbose</code>
+                            <div class="text-muted small mt-2">Тестовый режим с подробными логами</div>
+                        </div>
+
+                        <div class="info-box mt-4">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Подстановка значений:</strong>
+                            <p class="mb-2">В промпте можно использовать любые колонки из Excel через [column_name]:</p>
+                            <ul class="mb-0">
+                                <li><code>[title]</code> - заголовок записи</li>
+                                <li><code>[excerpt]</code> - краткое описание</li>
+                                <li><code>[categories]</code> - категории</li>
+                                <li><code>[content]</code> - основной контент</li>
+                                <li>И любые другие колонки из вашего Excel</li>
+                            </ul>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-stars me-2"></i>Примеры промптов для SEO и контента:</strong>
+                            <p class="mb-2">Правильно составленные промпты помогут получить чистый результат без лишних оберток:</p>
+
+                            <div class="mb-3">
+                                <strong>Meta Description (120-155 символов):</strong>
+                                <div class="code-block mt-1">
+                                    <code>Напиши мета-описание 120-155 символов для услуги "[title]". Только текст описания, без кавычек и вступлений.</code>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <strong>Meta Keywords (через запятую):</strong>
+                                <div class="code-block mt-1">
+                                    <code>Напиши 5-7 ключевых слов для "[title]". Только список через запятую, без номеров и пояснений.</code>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <strong>SEO Title (50-60 символов):</strong>
+                                <div class="code-block mt-1">
+                                    <code>Напиши SEO заголовок 50-60 символов для "[title]". Только текст заголовка, без кавычек.</code>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <strong>Lead абзац (1-2 предложения):</strong>
+                                <div class="code-block mt-1">
+                                    <code>Напиши лид абзац 1-2 предложения для услуги: [title]. Только текст, без слов "Вот ответ" и подобных вступлений.</code>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <strong>Описание товара (2-3 абзаца):</strong>
+                                <div class="code-block mt-1">
+                                    <code>Напиши описание товара "[title]" из категории [categories]. 2-3 абзаца, простой текст без HTML и markdown.</code>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-light mt-3 mb-0">
+                                <small><strong>Совет:</strong> Добавляйте фразы "Только текст", "Без кавычек", "Без вступлений" - это помогает получить чистый результат без оберток типа "Вот ответ:", кавычек или HTML тегов.</small>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning mt-4">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Обработка ошибок:</strong>
+                            <ul class="mb-0">
+                                <li>Если все модели не смогли сгенерировать текст, в ячейку записывается <code>"error"</code></li>
+                                <li>Полный текст ошибки записывается в лог-файл <code>logs/llm_YYYYMMDD_HHMMSS.log</code></li>
+                                <li>Обработка продолжается для остальных строк</li>
+                            </ul>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Прогресс генерации в реальном времени</li>
+                                <li>Статистика: обработано / пропущено / ошибок</li>
+                                <li>Обновленный Excel файл с сгенерированным контентом</li>
+                                <li>Детальный лог всех операций</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <strong><i class="bi bi-robot me-2"></i>Совместимость:</strong>
+                            <p class="mb-0">Команда работает с любыми OpenAI-compatible API, включая:</p>
+                            <ul class="mb-2">
+                                <li>OpenAI GPT (gpt-4, gpt-3.5-turbo)</li>
+                                <li>Anthropic Claude (через прокси)</li>
+                                <li>X.AI Grok</li>
+                                <li>Локальные LLM (через LM Studio, Ollama и т.д.)</li>
+                                <li>Любые другие совместимые API</li>
                             </ul>
                         </div>
                     </div>

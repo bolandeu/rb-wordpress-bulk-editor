@@ -3079,6 +3079,355 @@ async def count_content_stats(
     console.print()
 
 
+@app.command()
+def llm(
+    column: str = typer.Option(
+        ...,
+        "--column",
+        "-c",
+        help="Колонка для генерации контента"
+    ),
+    file: Path = typer.Option(
+        Path("export.xlsx"),
+        "--file",
+        "-f",
+        help="Путь к Excel файлу",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Список листов через запятую (posts,pages)"
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="Модели через запятую (model1,model2,model3). Если не указано, используется LLM_MODELS из .env"
+    ),
+    prompt: Optional[str] = typer.Option(
+        None,
+        "--prompt",
+        "-p",
+        help="Промпт для генерации (используйте [column] для подстановки значений)"
+    ),
+    endpoint: Optional[str] = typer.Option(
+        None,
+        "--endpoint",
+        help="LLM API endpoint (по умолчанию из .env: LLM_ENDPOINT)"
+    ),
+    token: Optional[str] = typer.Option(
+        None,
+        "--token",
+        help="LLM API token (по умолчанию из .env: LLM_TOKEN)"
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Перезаписывать существующие значения в колонке"
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Режим тестирования без записи в Excel"
+    ),
+    strip_tags: bool = typer.Option(
+        False,
+        "--strip-tags",
+        help="Удалить HTML теги из результата"
+    ),
+    md_to_html: bool = typer.Option(
+        False,
+        "--md-to-html",
+        help="Конвертировать Markdown в HTML"
+    ),
+    html_to_md: bool = typer.Option(
+        False,
+        "--html-to-md",
+        help="Конвертировать HTML в Markdown"
+    ),
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Подробные логи"
+    )
+):
+    """
+    Массовая генерация контента через LLM API.
+
+    Обрабатывает строки где action=update и генерирует контент в указанную колонку.
+    Поддерживает подстановку значений из других колонок через [column_name].
+
+    Примеры:
+        # Генерация excerpt на основе title
+        llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"
+
+        # Несколько моделей с fallback
+        llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши [title]"
+
+        # С конвертацией Markdown в HTML
+        llm --column content --model "gpt-4" --prompt "Напиши статью про [title]" --md-to-html
+    """
+    console.print(f"\n[bold blue]WordPress Bulk Editor - LLM Generator[/bold blue]\n")
+
+    # Настройка логирования
+    logs_folder = Path.cwd() / "logs"
+    logs_folder.mkdir(parents=True, exist_ok=True)
+
+    from .config import LoggingConfig
+    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
+
+    log_file = setup_logger(
+        logs_folder=logs_folder,
+        config=logging_config,
+        command_name="llm"
+    )
+    logger.info(f"Лог-файл создан: {log_file}")
+
+    try:
+        # 1. Загружаем credentials для LLM
+        import os
+        from dotenv import load_dotenv
+
+        # Загружаем .env
+        if env_file:
+            load_dotenv(env_file)
+        else:
+            load_dotenv()
+
+        # Получаем endpoint, token, prompt и models
+        final_endpoint = endpoint or os.getenv("LLM_ENDPOINT")
+        final_token = token or os.getenv("LLM_TOKEN")
+        final_prompt = prompt or os.getenv("LLM_PROMPT")
+        final_models = model or os.getenv("LLM_MODELS")
+
+        if not final_endpoint:
+            console.print("[red]ERROR: LLM_ENDPOINT не указан (используйте --endpoint или .env)[/red]\n")
+            raise typer.Exit(code=1)
+
+        if not final_token:
+            console.print("[red]ERROR: LLM_TOKEN не указан (используйте --token или .env)[/red]\n")
+            raise typer.Exit(code=1)
+
+        if not final_prompt:
+            console.print("[red]ERROR: Промпт не указан (используйте --prompt или .env: LLM_PROMPT)[/red]\n")
+            raise typer.Exit(code=1)
+
+        if not final_models:
+            console.print("[red]ERROR: Модели не указаны (используйте --model или .env: LLM_MODELS)[/red]\n")
+            raise typer.Exit(code=1)
+
+        # 2. Парсим список моделей
+        models = [m.strip() for m in final_models.split(",") if m.strip()]
+        logger.info(f"Модели для генерации: {models}")
+
+        console.print(f"[green]✓[/green] LLM Endpoint: {final_endpoint}")
+        console.print(f"[green]✓[/green] Колонка: {column}")
+        console.print(f"[green]✓[/green] Модели: {', '.join(models)}")
+        console.print(f"[green]✓[/green] Промпт: {final_prompt[:100]}...")
+        if dry_run:
+            console.print(f"[yellow]⚠[/yellow] DRY-RUN режим: изменения не будут сохранены")
+        console.print()
+
+        # 3. Запускаем генерацию
+        asyncio.run(run_llm_generation(
+            file=file,
+            sheets=sheets,
+            column=column,
+            models=models,
+            prompt_template=final_prompt,
+            endpoint=final_endpoint,
+            token=final_token,
+            overwrite=overwrite,
+            dry_run=dry_run,
+            strip_tags=strip_tags,
+            md_to_html=md_to_html,
+            html_to_md=html_to_md,
+            log_file=log_file
+        ))
+
+    except Exception as e:
+        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
+        logger.exception("Ошибка при генерации через LLM")
+        raise typer.Exit(code=1)
+
+
+async def run_llm_generation(
+    file: Path,
+    sheets: Optional[str],
+    column: str,
+    models: List[str],
+    prompt_template: str,
+    endpoint: str,
+    token: str,
+    overwrite: bool,
+    dry_run: bool,
+    strip_tags: bool,
+    md_to_html: bool,
+    html_to_md: bool,
+    log_file: Path
+):
+    """
+    Основная логика генерации через LLM.
+    """
+    from .utils.llm_client import LLMClient
+    from .excel.reader import ExcelReader
+    from .excel.writer import ExcelWriter
+
+    # Создаем LLM клиент
+    llm_client = LLMClient(endpoint=endpoint, token=token)
+
+    console.print("[yellow]Чтение Excel файла...[/yellow]")
+
+    # Читаем Excel
+    reader = ExcelReader(file)
+    available_sheets = reader.get_sheet_names()
+
+    # Определяем какие листы обрабатывать
+    if sheets:
+        target_sheets = [s.strip() for s in sheets.split(",")]
+        # Проверяем существование
+        missing_sheets = [s for s in target_sheets if s not in available_sheets]
+        if missing_sheets:
+            console.print(f"[red]ERROR: Листы не найдены: {', '.join(missing_sheets)}[/red]\n")
+            raise typer.Exit(code=1)
+    else:
+        # Обрабатываем все листы
+        target_sheets = available_sheets
+
+    console.print(f"[green]✓[/green] Найдено листов для обработки: {len(target_sheets)}")
+    console.print(f"  Листы: {', '.join(target_sheets)}\n")
+
+    # Загружаем Excel writer (для временного файла)
+    writer = ExcelWriter(file)
+    writer.load()
+
+    total_processed = 0
+    total_skipped = 0
+    total_errors = 0
+
+    # Обрабатываем каждый лист
+    for sheet_name in target_sheets:
+        console.print(f"[bold cyan]Обработка листа: {sheet_name}[/bold cyan]")
+
+        # Читаем данные листа
+        df = pd.read_excel(file, sheet_name=sheet_name)
+
+        # Проверяем наличие нужных колонок
+        if "action" not in df.columns:
+            console.print(f"  [yellow]⚠ Пропущен (нет колонки 'action')[/yellow]\n")
+            continue
+
+        if column not in df.columns:
+            console.print(f"  [yellow]⚠ Пропущен (нет колонки '{column}')[/yellow]\n")
+            continue
+
+        # Фильтруем строки с action=update
+        update_rows = df[df["action"] == "update"]
+
+        if len(update_rows) == 0:
+            console.print(f"  [yellow]⚠ Нет строк с action=update[/yellow]\n")
+            continue
+
+        console.print(f"  Найдено строк с action=update: {len(update_rows)}")
+
+        # Обрабатываем каждую строку
+        for idx, row in update_rows.iterrows():
+            # Проверяем нужно ли генерировать
+            current_value = row.get(column, "")
+            if current_value and str(current_value).strip() and not overwrite:
+                console.print(f"  [{idx}] Пропущено (значение уже есть, используйте --overwrite)")
+                total_skipped += 1
+                continue
+
+            # Заменяем плейсхолдеры в промпте
+            row_dict = row.to_dict()
+            filled_prompt = llm_client.replace_placeholders(prompt_template, row_dict)
+
+            logger.info(f"[{sheet_name}:{idx}] Промпт: {filled_prompt[:100]}...")
+
+            try:
+                # Генерируем текст
+                console.print(f"  [{idx}] Генерация...")
+                generated_text = await llm_client.generate(
+                    prompt=filled_prompt,
+                    models=models,
+                    max_retries=3
+                )
+
+                # Пост-обработка
+                if strip_tags:
+                    generated_text = llm_client.strip_html_tags(generated_text)
+                    logger.debug(f"[{sheet_name}:{idx}] Применен strip_tags")
+
+                if md_to_html:
+                    generated_text = llm_client.markdown_to_html(generated_text)
+                    logger.debug(f"[{sheet_name}:{idx}] Применен md_to_html")
+
+                if html_to_md:
+                    generated_text = llm_client.html_to_markdown(generated_text)
+                    logger.debug(f"[{sheet_name}:{idx}] Применен html_to_md")
+
+                # Записываем результат
+                df.at[idx, column] = generated_text
+
+                # Меняем action на skip после успешной генерации
+                if 'action' in df.columns:
+                    df.at[idx, 'action'] = 'skip'
+                    logger.debug(f"[{sheet_name}:{idx}] Action изменен на 'skip'")
+
+                console.print(f"  [{idx}] ✓ Сгенерировано ({len(generated_text)} символов)")
+                logger.info(f"[{sheet_name}:{idx}] Успешно: {generated_text[:100]}...")
+                total_processed += 1
+
+            except Exception as e:
+                # Записываем ошибку в ячейку
+                error_msg = "error"
+                df.at[idx, column] = error_msg
+                console.print(f"  [{idx}] ✗ Ошибка: {str(e)[:80]}")
+                logger.error(f"[{sheet_name}:{idx}] Полная ошибка: {e}", exc_info=True)
+                total_errors += 1
+
+        # Обновляем лист в writer
+        if not dry_run:
+            writer.replace_rows(sheet_name, df.to_dict('records'))
+            logger.info(f"Лист '{sheet_name}' обновлен в памяти")
+
+        console.print()
+
+    # Сохраняем файл
+    if not dry_run:
+        console.print("[yellow]Сохранение изменений в Excel...[/yellow]")
+        writer.save()
+        console.print(f"[green]✓[/green] Файл сохранен: {file}\n")
+    else:
+        console.print("[yellow]DRY-RUN: изменения НЕ сохранены[/yellow]\n")
+
+    # Итоговая статистика
+    console.print("[bold]Итоги:[/bold]")
+    console.print(f"  Обработано: {total_processed}")
+    console.print(f"  Пропущено: {total_skipped}")
+    console.print(f"  Ошибок: {total_errors}")
+    console.print()
+
+    if total_errors > 0:
+        console.print(f"[yellow]⚠ Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")
+
+
 @app.command(name="async")
 def async_sync(
     file: Path = typer.Option(
