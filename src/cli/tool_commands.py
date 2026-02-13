@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
 from ..config import LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
 from ..wordpress.client import WordPressClient
@@ -24,6 +25,7 @@ import typer
 
 @app.command()
 def validate(
+    ctx: typer.Context,
     file: Path = typer.Option(
         ...,
         "--file",
@@ -43,10 +45,12 @@ def validate(
     """
     Валидация Excel файла без синхронизации
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
 
     logging_config = LoggingConfig()
@@ -82,6 +86,7 @@ def validate(
 
 @app.command()
 def options(
+    ctx: typer.Context,
     file: Optional[Path] = typer.Option(
         None,
         "--file",
@@ -119,10 +124,12 @@ def options(
     Без --fetch: обновление WordPress из Excel
     С --fetch: выгрузка настроек из WordPress в Excel
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
 
     logging_config = LoggingConfig()
@@ -279,6 +286,7 @@ async def _fetch_options(wp_config: WordPressConfig) -> dict:
 
 @app.command()
 def bulk_delete(
+    ctx: typer.Context,
     domain: Optional[str] = typer.Option(
         None,
         "--domain",
@@ -350,12 +358,14 @@ def bulk_delete(
         # Показать что будет удалено (dry-run)
         python -m src.cli bulk-delete --post-type posts --dry-run
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print("\n[bold red]Bulk Delete[/bold red]")
     console.print("=" * 60 + "\n")
 
     try:
         # Настройка логирования
-        logs_folder = Path("logs")
+        logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
 
         logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
@@ -493,6 +503,7 @@ async def _run_bulk_delete(
 
 @app.command()
 def counter(
+    ctx: typer.Context,
     domain: Optional[str] = typer.Option(
         None,
         "--domain",
@@ -557,10 +568,13 @@ def counter(
     Пример:
         wp-bulk counter --domain https://example.com --type posts --output stats.csv
     """
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "counter_output.csv")
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
 
     logging_config = LoggingConfig()
@@ -741,6 +755,7 @@ async def _count_content_stats(
 
 @app.command()
 def llm(
+    ctx: typer.Context,
     column: str = typer.Option(
         ...,
         "--column",
@@ -842,10 +857,12 @@ def llm(
         # С конвертацией Markdown в HTML
         llm --column content --model "gpt-4" --prompt "Напиши статью про [title]" --md-to-html
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - LLM Generator[/bold blue]\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
 
     logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")

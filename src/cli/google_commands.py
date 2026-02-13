@@ -12,6 +12,7 @@ import asyncio
 from loguru import logger
 
 from . import app, console
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..utils.logger import setup_logger
 from ..utils.auth import load_credentials_from_env, load_async_config_from_env
@@ -24,7 +25,7 @@ import typer
 # Helpers для загрузки Google Sheets параметров
 # ============================================================
 
-def _load_google_params(sheet_id: Optional[str], credentials: Optional[str]):
+def _load_google_params(sheet_id: Optional[str], credentials: Optional[str], env_file: Optional[Path] = None):
     """
     Загрузить параметры Google Sheets из CLI или .env.
 
@@ -34,7 +35,10 @@ def _load_google_params(sheet_id: Optional[str], credentials: Optional[str]):
     import os
     from dotenv import load_dotenv
 
-    load_dotenv()
+    if env_file:
+        load_dotenv(env_file)
+    else:
+        load_dotenv()
 
     final_sheet_id = sheet_id or os.getenv("GOOGLE_SHEET_ID")
     final_credentials = credentials or os.getenv("GOOGLE_SHEET_CREDENTIALS_PATH")
@@ -61,6 +65,7 @@ def _load_google_params(sheet_id: Optional[str], credentials: Optional[str]):
 
 @app.command()
 def download_google_sheet(
+    ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(
         None,
         "--sheet-id",
@@ -92,11 +97,14 @@ def download_google_sheet(
         # Скачать с явным указанием параметров
         python -m src.cli download-google-sheet --sheet-id "1B5gj1n..." --credentials "credentials/google.json" --output "my_file.xlsx"
     """
+    env_file = resolve_env_file(ctx, None)
+    output = resolve_output(ctx, output, "export.xlsx")
+
     console.print("\n[bold cyan]Google Sheets Downloader[/bold cyan]")
     console.print("=" * 60 + "\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
 
     logging_config = LoggingConfig()
@@ -112,7 +120,7 @@ def download_google_sheet(
         from ..utils.google_sheets import GoogleSheetsClient
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         console.print(f"[yellow]->[/yellow] Google Sheets ID: {final_sheet_id}")
@@ -147,6 +155,7 @@ def download_google_sheet(
 
 @app.command()
 def upload_to_google_sheets(
+    ctx: typer.Context,
     file: Path = typer.Option(
         ...,
         "--file",
@@ -201,11 +210,13 @@ def upload_to_google_sheets(
         # Загрузить только определенные листы
         python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print("\n[bold cyan]Upload Excel -> Google Sheets[/bold cyan]")
     console.print("=" * 60 + "\n")
 
     # Настройка логирования
-    logs_folder = Path.cwd() / "logs"
+    logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
     logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
 
@@ -220,7 +231,7 @@ def upload_to_google_sheets(
         from ..utils.google_sheets import GoogleSheetsClient
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         console.print(f"[yellow]->[/yellow] Excel файл: {file}")
@@ -263,6 +274,7 @@ def upload_to_google_sheets(
 
 @app.command()
 def sync_from_google(
+    ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(None, "--sheet-id", help="ID Google Sheets документа"),
     credentials: Optional[Path] = typer.Option(None, "--credentials", help="Путь к JSON файлу с credentials"),
     output: Path = typer.Option(Path("export.xlsx"), "--output", "-o", help="Путь для сохранения .xlsx файла"),
@@ -289,6 +301,10 @@ def sync_from_google(
         python -m src.cli sync-from-google
         python -m src.cli sync-from-google --sheets posts,pages
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "export.xlsx")
+
     console.print("\n[bold cyan]Google Sheets -> WordPress Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
@@ -300,7 +316,7 @@ def sync_from_google(
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         console.print(f"[yellow]->[/yellow] Google Sheets ID: {final_sheet_id}")
@@ -334,6 +350,7 @@ def sync_from_google(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency,
@@ -376,6 +393,7 @@ def sync_from_google(
 
 @app.command()
 def sync_google_bidirectional(
+    ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(None, "--sheet-id", help="ID Google Sheets документа"),
     credentials: Optional[Path] = typer.Option(None, "--credentials", help="Путь к JSON файлу с credentials"),
     output: Path = typer.Option(Path("export.xlsx"), "--output", "-o", help="Путь для сохранения .xlsx файла"),
@@ -407,6 +425,10 @@ def sync_google_bidirectional(
         python -m src.cli sync-google-bidirectional --sheets posts,pages
         python -m src.cli sync-google-bidirectional --no-upload-back
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "export.xlsx")
+
     console.print("\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
@@ -418,7 +440,7 @@ def sync_google_bidirectional(
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         console.print(f"[yellow]->[/yellow] Google Sheets ID: {final_sheet_id}")
@@ -452,6 +474,7 @@ def sync_google_bidirectional(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency,
@@ -523,6 +546,7 @@ def sync_google_bidirectional(
 
 @app.command(name="async-from-google")
 def async_sync_from_google(
+    ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(None, "--sheet-id", help="ID Google Sheets документа"),
     credentials: Optional[Path] = typer.Option(None, "--credentials", help="Путь к JSON файлу с credentials"),
     output: Path = typer.Option(Path("export.xlsx"), "--output", "-o", help="Путь для сохранения .xlsx файла"),
@@ -547,6 +571,10 @@ def async_sync_from_google(
     1. Скачать Google Sheets
     2. Async синхронизация с WordPress
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "export.xlsx")
+
     console.print(f"\n[bold cyan]Google Sheets -> WordPress (Async)[/bold cyan]\n")
 
     try:
@@ -557,7 +585,7 @@ def async_sync_from_google(
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         gs_client = GoogleSheetsClient(credentials_path)
@@ -587,6 +615,7 @@ def async_sync_from_google(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency_val,
@@ -631,6 +660,7 @@ def async_sync_from_google(
 
 @app.command(name="async-google-bidirectional")
 def async_sync_google_bidirectional(
+    ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(None, "--sheet-id", help="ID Google Sheets документа"),
     credentials: Optional[Path] = typer.Option(None, "--credentials", help="Путь к JSON файлу с credentials"),
     output: Path = typer.Option(Path("export.xlsx"), "--output", "-o", help="Путь для сохранения .xlsx файла"),
@@ -658,6 +688,10 @@ def async_sync_google_bidirectional(
     2. Async синхронизация с WordPress
     3. Загрузить обратно в Google Sheets
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "export.xlsx")
+
     console.print(f"\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets (Async)[/bold cyan]\n")
 
     try:
@@ -668,7 +702,7 @@ def async_sync_google_bidirectional(
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
 
         final_sheet_id, credentials_path = _load_google_params(
-            sheet_id, str(credentials) if credentials else None
+            sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
 
         gs_client = GoogleSheetsClient(credentials_path)
@@ -698,6 +732,7 @@ def async_sync_google_bidirectional(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency_val,

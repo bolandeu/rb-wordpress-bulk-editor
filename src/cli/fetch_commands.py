@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -26,6 +27,7 @@ import typer
 
 @app.command()
 def fetch(
+    ctx: typer.Context,
     file: Optional[Path] = typer.Option(
         None,
         "--file",
@@ -87,11 +89,14 @@ def fetch(
     Получает записи из WordPress и добавляет их в Excel файл
     после последней непустой строки каждого листа.
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch[/bold blue]\n")
 
     # Определяем режим работы
     if file is None:
-        file = Path.cwd() / "fetch.xlsx"
+        file = resolve_excel_file(ctx, None) or (proj.resolve_output("fetch.xlsx") if proj.active else Path.cwd() / "fetch.xlsx")
         auto_mode = True
         console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
@@ -107,7 +112,7 @@ def fetch(
 
     try:
         # 1. Настройка логирования
-        logs_folder = Path.cwd() / "logs"
+        logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
 
         logging_config = LoggingConfig()
@@ -432,6 +437,7 @@ async def fetch_and_append(
 
 @app.command()
 def fetch_media(
+    ctx: typer.Context,
     file: Path = typer.Option(
         ...,
         "--file",
@@ -461,6 +467,8 @@ def fetch_media(
     """
     Загрузить список медиафайлов из WordPress в Excel (лист media)
     """
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
@@ -477,7 +485,7 @@ def fetch_media(
 
         logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
 
-        logs_folder = Path("logs")
+        logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
         log_file = setup_logger(
             logs_folder=logs_folder,

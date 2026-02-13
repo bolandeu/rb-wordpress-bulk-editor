@@ -11,14 +11,43 @@ CLI интерфейс для WordPress Bulk Editor
 - tool_commands.py    - validate, options, bulk-delete, counter, llm
 """
 
+from typing import Optional
+
 import typer
 from rich.console import Console
+
+from .project import resolve_project
 
 app = typer.Typer(
     name="wp-bulk-editor",
     help="WordPress Bulk Editor - Excel <-> WordPress sync"
 )
 console = Console()
+
+
+@app.callback()
+def app_callback(
+    ctx: typer.Context,
+    project: Optional[str] = typer.Option(
+        None,
+        "--project", "-P",
+        help="Имя проекта (загружает .env и пути из projects/<name>/)",
+        envvar="WP_PROJECT",
+    ),
+):
+    """WordPress Bulk Editor - Excel <-> WordPress sync"""
+    try:
+        project_ctx = resolve_project(project)
+    except FileNotFoundError as e:
+        console.print(f"[bold red]ERROR: {e}[/bold red]")
+        raise typer.Exit(1)
+
+    ctx.ensure_object(dict)
+    ctx.obj = project_ctx
+
+    if project_ctx.active:
+        console.print(f"[dim]Проект: {project_ctx.name} ({project_ctx.root})[/dim]")
+
 
 # Регистрируем команды из подмодулей
 # Импорты размещены после создания app, чтобы подмодули могли импортировать app

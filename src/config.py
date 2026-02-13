@@ -114,6 +114,10 @@ class PathsConfig(BaseModel):
         default=Path("logs"),
         description="Папка для логов"
     )
+    project_root: Optional[Path] = Field(
+        default=None,
+        description="Корень проекта (при использовании --project)"
+    )
 
     @field_validator("excel_file")
     @classmethod
@@ -162,16 +166,24 @@ class AppConfig(BaseModel):
         wp_url: str,
         wp_username: str,
         wp_password: str,
+        project_root: Optional[Path] = None,
         **kwargs
     ) -> "AppConfig":
         """Создать конфигурацию из данных Excel"""
+        paths_kwargs = {"excel_file": excel_file}
+        if project_root:
+            paths_kwargs["media_folder"] = project_root / "media"
+            paths_kwargs["content_folder"] = project_root / "content"
+            paths_kwargs["logs_folder"] = project_root / "logs"
+            paths_kwargs["project_root"] = project_root
+
         return cls(
             wordpress=WordPressConfig(
                 url=wp_url,
                 username=wp_username,
                 password=wp_password
             ),
-            paths=PathsConfig(excel_file=excel_file),
+            paths=PathsConfig(**paths_kwargs),
             **kwargs
         )
 

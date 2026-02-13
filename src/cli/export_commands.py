@@ -9,6 +9,7 @@ import asyncio
 from loguru import logger
 
 from . import app, console
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
 from ..config import LoggingConfig, WordPressConfig, Settings
 from ..wordpress.client import WordPressClient
 from ..utils.logger import setup_logger
@@ -21,6 +22,7 @@ import typer
 
 @app.command()
 def export(
+    ctx: typer.Context,
     domain: Optional[str] = typer.Option(None, "--domain", "-d", help="WordPress domain"),
     username: Optional[str] = typer.Option(None, "--username", "-u", help="WordPress username"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="WordPress Application Password"),
@@ -37,8 +39,11 @@ def export(
     Находит все типы контента и экспортирует их в отдельные HTML файлы.
     Создает CSV индекс.
     """
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "exported_content")
+
     try:
-        logs_folder = Path("logs")
+        logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
 
         logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
@@ -102,6 +107,7 @@ async def export_content(
 
 @app.command()
 def export_media(
+    ctx: typer.Context,
     domain: Optional[str] = typer.Option(None, "--domain", help="URL WordPress сайта"),
     username: Optional[str] = typer.Option(None, "--username", help="Имя пользователя WordPress"),
     password: Optional[str] = typer.Option(None, "--password", help="Application Password"),
@@ -116,6 +122,9 @@ def export_media(
     """
     Экспортировать медиафайлы из WordPress в CSV (с файлами или без)
     """
+    env_file = resolve_env_file(ctx, env_file)
+    output = resolve_output(ctx, output, "export_media")
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Export Media[/bold blue]\n")
     console.print(f"Папка экспорта: [cyan]{output}[/cyan]\n")
 
@@ -129,7 +138,7 @@ def export_media(
         wp_config = WordPressConfig(url=domain, username=username, password=password)
         logging_config = LoggingConfig(level=("DEBUG" if verbose else "INFO"))
 
-        logs_folder = Path("logs")
+        logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
         log_file = setup_logger(logs_folder=logs_folder, config=logging_config, command_name="export_media")
 

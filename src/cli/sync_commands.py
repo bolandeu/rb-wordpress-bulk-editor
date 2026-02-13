@@ -11,6 +11,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .helpers import get_project, resolve_env_file
 from ..config import AppConfig, SyncConfig, PathsConfig, LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -30,6 +31,7 @@ import typer
 
 @app.command()
 def sync(
+    ctx: typer.Context,
     file: Path = typer.Option(
         ...,
         "--file",
@@ -120,6 +122,9 @@ def sync(
     """
     Синхронизация Excel -> WordPress
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
@@ -152,6 +157,7 @@ def sync(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency,
@@ -374,6 +380,7 @@ async def process_sheet(
 
 @app.command(name="async")
 def async_sync(
+    ctx: typer.Context,
     file: Path = typer.Option(
         ...,
         "--file",
@@ -485,6 +492,9 @@ def async_sync(
     - Circuit breaker для устойчивости
     - Настраиваемые таймауты
     """
+    proj = get_project(ctx)
+    env_file = resolve_env_file(ctx, env_file)
+
     console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
@@ -523,6 +533,7 @@ def async_sync(
             wp_url=domain,
             wp_username=username,
             wp_password=password,
+            project_root=proj.root,
             sync=SyncConfig(
                 dry_run=dry_run,
                 concurrency=concurrency_val,
