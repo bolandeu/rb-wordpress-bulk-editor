@@ -8,11 +8,7 @@ from loguru import logger
 from .client import WordPressClient
 from .posts import PostsEndpoint
 from .taxonomies import TaxonomiesEndpoint, normalize_taxonomy_name
-
-
-# Паттерны для фильтрации служебных типов
-SKIP_POST_TYPE_PATTERNS = ["wp_", "attachment", "nav_menu", "spectra", "revision"]
-SKIP_TAXONOMY_PATTERNS = ["nav_menu", "link_category", "post_format"]
+from ..constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY_PATTERNS
 
 
 class WordPressDiscovery:
@@ -20,12 +16,21 @@ class WordPressDiscovery:
     Сервис для обнаружения типов контента, таксономий и ACF полей.
     """
 
-    def __init__(self, client: WordPressClient):
+    def __init__(
+        self,
+        client: WordPressClient,
+        skip_post_type_patterns: Optional[List[str]] = None,
+        skip_taxonomy_patterns: Optional[List[str]] = None,
+    ):
         """
         Args:
             client: WordPress клиент
+            skip_post_type_patterns: Паттерны для пропуска типов записей (из .env)
+            skip_taxonomy_patterns: Паттерны для пропуска таксономий (из .env)
         """
         self.client = client
+        self.skip_post_type_patterns = skip_post_type_patterns or DEFAULT_SKIP_POST_TYPE_PATTERNS
+        self.skip_taxonomy_patterns = skip_taxonomy_patterns or DEFAULT_SKIP_TAXONOMY_PATTERNS
 
     async def discover_post_types(self) -> List[str]:
         """
@@ -43,7 +48,7 @@ class WordPressDiscovery:
             post_types = []
             for type_key, type_data in response.items():
                 # Пропускаем служебные типы по паттернам
-                should_skip = any(pattern in type_key for pattern in SKIP_POST_TYPE_PATTERNS)
+                should_skip = any(pattern in type_key for pattern in self.skip_post_type_patterns)
 
                 if should_skip:
                     logger.debug(f"Пропускаем тип записи: {type_key} (служебный тип)")
@@ -82,7 +87,7 @@ class WordPressDiscovery:
             taxonomies = []
             for tax_key, tax_data in response.items():
                 # Пропускаем служебные таксономии по паттернам
-                should_skip = any(pattern in tax_key for pattern in SKIP_TAXONOMY_PATTERNS)
+                should_skip = any(pattern in tax_key for pattern in self.skip_taxonomy_patterns)
 
                 if should_skip:
                     logger.debug(f"Пропускаем таксономию: {tax_key} (служебная таксономия)")

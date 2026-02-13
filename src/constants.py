@@ -25,6 +25,12 @@ SYSTEM_SHEETS = {"options", "media"}
 # Стандартные таксономии WordPress
 STANDARD_TAXONOMIES = {"categories", "tags", "category", "tag"}
 
+# Паттерны для фильтрации служебных типов записей (по умолчанию)
+DEFAULT_SKIP_POST_TYPE_PATTERNS = ["wp_", "attachment", "nav_menu", "spectra", "revision"]
+
+# Паттерны для фильтрации служебных таксономий (по умолчанию)
+DEFAULT_SKIP_TAXONOMY_PATTERNS = ["nav_menu", "link_category", "post_format"]
+
 # Разделитель таксономий в Excel
 TAXONOMY_DELIMITER = "; "
 

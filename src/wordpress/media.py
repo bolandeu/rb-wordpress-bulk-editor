@@ -2,10 +2,11 @@
 Загрузка медиафайлов в WordPress
 """
 
+import base64
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import httpx
-import aiohttp
 import mimetypes
 from loguru import logger
 
@@ -19,6 +20,83 @@ class MediaEndpoint:
     def __init__(self, client: WordPressClient):
         self.client = client
         self.endpoint = "/wp-json/wp/v2/media"
+
+    def _build_upload_headers(self, filename: str, mime_type: str) -> Dict[str, str]:
+        """Собрать заголовки для загрузки файла (авторизация + Content-Disposition)."""
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": mime_type,
+        }
+        if self.client.config.username and self.client.config.password:
+            auth_string = f"{self.client.config.username}:{self.client.config.password}"
+            auth_b64 = base64.b64encode(auth_string.encode("utf-8")).decode("ascii")
+            headers["Authorization"] = f"Basic {auth_b64}"
+        return headers
+
+    def _parse_upload_response(self, response: httpx.Response, fallback_filename: str = "") -> Dict[str, Any]:
+        """
+        Парсинг ответа WordPress на загрузку файла.
+        Обрабатывает: нормальный JSON, JSON после PHP warnings, ID из заголовков.
+        """
+        # 1. Пробуем нормальный JSON
+        try:
+            result = response.json()
+            logger.debug(f"Response: {result.keys()}")
+            return result
+        except Exception as json_error:
+            logger.warning(f"Failed to parse JSON response: {json_error}")
+
+        response_text = response.text
+        logger.debug(f"Response text (first 500 chars): {response_text[:500]}")
+
+        # 2. ID из заголовка X-WP-Upload-Attachment-ID
+        media_id = response.headers.get("X-WP-Upload-Attachment-ID")
+        if media_id:
+            logger.info(f"Extracted media ID from header: {media_id}")
+            return {
+                "id": int(media_id),
+                "source_url": f"{self.client.config.url.rstrip('/')}/wp-content/uploads/{fallback_filename}",
+            }
+
+        # 3. Ищем JSON в тексте ответа после PHP warnings
+        for line in response_text.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                try:
+                    result = json.loads(stripped)
+                    logger.info("Extracted JSON from response after warnings")
+                    return result
+                except json.JSONDecodeError:
+                    continue
+
+        raise MediaUploadError(
+            f"Failed to upload media: server returned non-JSON response and no ID in headers. "
+            f"Response: {response_text[:500]}"
+        )
+
+    async def _upload_data(self, file_data: bytes, filename: str, mime_type: str) -> Dict[str, Any]:
+        """Отправить бинарные данные в WordPress Media API через httpx."""
+        url = f"{self.client.config.url.rstrip('/')}{self.endpoint}"
+        headers = self._build_upload_headers(filename, mime_type)
+
+        logger.debug(f"Sending POST request to {url}")
+        logger.debug(f"Headers: {headers}")
+
+        async with httpx.AsyncClient(
+            verify=self.client.config.verify_ssl,
+            timeout=120.0,
+        ) as http_client:
+            response = await http_client.post(url, content=file_data, headers=headers)
+
+        logger.debug(f"Response status: {response.status_code}")
+        logger.debug(f"Response headers: {dict(response.headers)}")
+
+        if response.status_code >= 400:
+            raise MediaUploadError(
+                f"WordPress API error ({response.status_code}): {response.text[:500]}"
+            )
+
+        return self._parse_upload_response(response, fallback_filename=filename)
 
     async def upload_file(
         self,
@@ -48,128 +126,30 @@ class MediaEndpoint:
         logger.debug(f"Uploading media file: {file_path}")
 
         try:
-            # Проверяем размер файла
             file_size = file_path.stat().st_size
             logger.debug(f"File size: {file_size} bytes ({file_size / 1024:.2f} KB)")
 
-            # Открываем файл
-            with open(file_path, "rb") as f:
-                file_data = f.read()
-
-            # Определяем MIME type
+            file_data = file_path.read_bytes()
             mime_type = self._get_mime_type(file_path)
             logger.debug(f"MIME type: {mime_type}, Filename: {file_path.name}")
 
-            # Данные для загрузки
-            files = {
-                "file": (file_path.name, file_data, mime_type)
-            }
+            result = await self._upload_data(file_data, file_path.name, mime_type)
 
-            # Загружаем файл через aiohttp по аналогии с requests
-            # Файл передается напрямую, не через multipart/form-data
-            logger.debug(f"Uploading file via aiohttp (direct data transfer)")
-            
-            # Авторизация
-            auth = aiohttp.BasicAuth(self.client.config.username, self.client.config.password) if self.client.config.username and self.client.config.password else None
-            
-            # Настройка SSL
-            ssl_context = None if self.client.config.verify_ssl else False
-            
-            # Заголовки
-            headers = {
-                "Content-Disposition": f'attachment; filename="{file_path.name}"',
-                "Content-Type": mime_type,
-            }
-            
-            # URL для запроса
-            url = f"{self.client.config.url.rstrip('/')}{self.endpoint}"
-            
-            async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(ssl=ssl_context),
-                timeout=aiohttp.ClientTimeout(total=120.0)  # Увеличенный таймаут для больших файлов
-            ) as session:
-                # Открываем файл для чтения
-                with open(file_path, "rb") as f:
-                    logger.debug(f"Sending POST request to {url}")
-                    logger.debug(f"Headers: {headers}")
-                    async with session.post(url, data=f, headers=headers, auth=auth) as response:
-                        logger.debug(f"Response status: {response.status}")
-                        logger.debug(f"Response headers: {dict(response.headers)}")
-                        
-                        if response.status >= 400:
-                            error_text = await response.text()
-                            raise MediaUploadError(
-                                f"WordPress API error ({response.status}): {error_text[:500]}"
-                            )
-                        
-                        # Пробуем распарсить JSON
-                        result = None  # Инициализация для безопасности
-                        try:
-                            result = await response.json()
-                            logger.debug(f"Response: {result.keys()}")
-                        except Exception as json_error:
-                            # Если JSON не парсится, пробуем извлечь ID из заголовков
-                            logger.warning(f"Failed to parse JSON response: {json_error}")
-                            response_text = await response.text()
-                            logger.debug(f"Response text (first 500 chars): {response_text[:500]}")
-                            
-                            # Извлекаем ID из заголовка X-WP-Upload-Attachment-ID
-                            media_id = response.headers.get('X-WP-Upload-Attachment-ID')
-                            if media_id:
-                                logger.info(f"Extracted media ID from header: {media_id}")
-                                result = {
-                                    'id': int(media_id),
-                                    'source_url': f"{self.client.config.url.rstrip('/')}/wp-content/uploads/{file_path.name}"
-                                }
-                            else:
-                                # Пробуем извлечь ID из текста ответа (если там JSON с warnings)
-                                import json
-                                try:
-                                    # Ищем JSON в ответе после warnings
-                                    lines = response_text.split('\n')
-                                    json_str = None
-                                    for line in lines:
-                                        stripped = line.strip()
-                                        if stripped.startswith('{') or stripped.startswith('['):
-                                            # Нашли JSON
-                                            json_str = stripped
-                                            break
-                                    
-                                    if json_str:
-                                        result = json.loads(json_str)
-                                        logger.info(f"Extracted JSON from response after warnings")
-                                    else:
-                                        raise MediaUploadError(
-                                            f"Failed to upload media: server returned non-JSON response and no ID in headers or body"
-                                        )
-                                except json.JSONDecodeError:
-                                    raise MediaUploadError(
-                                        f"Failed to upload media: server returned invalid JSON. Response: {response_text[:500]}"
-                                    )
-
-            # Проверяем что result был присвоен
-            if result is None:
-                raise MediaUploadError("Failed to upload media: result is None after processing response")
-
-            media_id = result['id']
+            media_id = result["id"]
             logger.info(
                 f"Uploaded media (file only): {file_path.name} -> ID={media_id} "
                 f"URL={result.get('source_url', 'N/A')}"
             )
 
-            # Затем обновляем метаданные отдельным запросом
             if title or alt_text or caption:
                 logger.debug(f"Updating metadata for media ID={media_id}")
-                await self.update(
-                    media_id,
-                    title=title,
-                    alt_text=alt_text,
-                    caption=caption
-                )
+                await self.update(media_id, title=title, alt_text=alt_text, caption=caption)
                 logger.debug(f"Updated metadata for media ID={media_id}")
 
             return result
 
+        except MediaUploadError:
+            raise
         except Exception as e:
             logger.error(f"Failed to upload media {file_path}: {e}")
             raise MediaUploadError(f"Ошибка загрузки медиафайла: {e}")
@@ -208,87 +188,27 @@ class MediaEndpoint:
             if not filename:
                 filename = "downloaded_file"
 
-            # MIME type из заголовков или угадываем
+            # MIME type из заголовков
             mime_type = response.headers.get("content-type", "application/octet-stream")
 
-            # Загружаем файл через aiohttp по аналогии с upload_file
-            logger.debug(f"Uploading downloaded file via aiohttp")
-            
-            # Авторизация
-            auth = aiohttp.BasicAuth(self.client.config.username, self.client.config.password) if self.client.config.username and self.client.config.password else None
-            
-            # Настройка SSL
-            ssl_context = None if self.client.config.verify_ssl else False
-            
-            # Заголовки
-            headers = {
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Type": mime_type,
-            }
-            
-            # URL для запроса
-            upload_url = f"{self.client.config.url.rstrip('/')}{self.endpoint}"
-            
-            async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(ssl=ssl_context),
-                timeout=aiohttp.ClientTimeout(total=120.0)
-            ) as session:
-                # Передаем данные напрямую (не через multipart/form-data)
-                from io import BytesIO
-                data = BytesIO(file_data)
-                
-                logger.debug(f"Sending POST request to {upload_url}")
-                async with session.post(upload_url, data=data, headers=headers, auth=auth) as response:
-                    logger.debug(f"Response status: {response.status}")
-                    
-                    if response.status >= 400:
-                        error_text = await response.text()
-                        raise MediaUploadError(
-                            f"WordPress API error ({response.status}): {error_text[:500]}"
-                        )
-                    
-                    # Пробуем распарсить JSON
-                    try:
-                        result = await response.json()
-                        logger.debug(f"Response: {result.keys()}")
-                    except Exception as json_error:
-                        # Если JSON не парсится, пробуем извлечь ID из заголовков
-                        logger.warning(f"Failed to parse JSON response: {json_error}")
-                        response_text = await response.text()
-                        logger.debug(f"Response text (first 200 chars): {response_text[:200]}")
-                        
-                        # Извлекаем ID из заголовка X-WP-Upload-Attachment-ID
-                        media_id = response.headers.get('X-WP-Upload-Attachment-ID')
-                        if media_id:
-                            logger.info(f"Extracted media ID from header: {media_id}")
-                            result = {
-                                'id': int(media_id),
-                                'source_url': f"{self.client.config.url.rstrip('/')}/wp-content/uploads/{filename}"
-                            }
-                        else:
-                            raise MediaUploadError(
-                                f"Failed to upload media: server returned non-JSON response and no ID in headers"
-                            )
+            result = await self._upload_data(file_data, filename, mime_type)
 
-            media_id = result['id']
+            media_id = result["id"]
             logger.info(
                 f"Uploaded media from URL (file only): {url} -> ID={media_id} "
                 f"URL={result.get('source_url', 'N/A')}"
             )
 
-            # Затем обновляем метаданные отдельным запросом
             if title or alt_text:
-                await self.update(
-                    media_id,
-                    title=title,
-                    alt_text=alt_text
-                )
+                await self.update(media_id, title=title, alt_text=alt_text)
 
             return result
 
         except httpx.HTTPError as e:
             logger.error(f"Failed to download media from {url}: {e}")
             raise MediaUploadError(f"Ошибка скачивания медиафайла: {e}")
+        except MediaUploadError:
+            raise
         except Exception as e:
             logger.error(f"Failed to upload media from URL {url}: {e}")
             raise MediaUploadError(f"Ошибка загрузки медиафайла: {e}")

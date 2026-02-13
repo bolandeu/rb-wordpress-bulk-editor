@@ -87,3 +87,6 @@ tests
 *.bmp
 *.svg
 *.webp
+
+projects/
+docs/

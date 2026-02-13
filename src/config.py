@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,6 +17,8 @@ from .constants import (
     DEFAULT_RETRY_DELAY,
     DEFAULT_CIRCUIT_BREAKER_THRESHOLD,
     DEFAULT_CIRCUIT_BREAKER_RECOVERY,
+    DEFAULT_SKIP_POST_TYPE_PATTERNS,
+    DEFAULT_SKIP_TAXONOMY_PATTERNS,
 )
 
 
@@ -202,3 +204,19 @@ class Settings(BaseSettings):
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_retention: str = "30 days"
+
+    # Паттерны для фильтрации служебных типов (через запятую в .env)
+    skip_post_type_patterns: str = ""
+    skip_taxonomy_patterns: str = ""
+
+    def get_skip_post_type_patterns(self) -> List[str]:
+        """Список паттернов для пропуска типов записей."""
+        if self.skip_post_type_patterns:
+            return [s.strip() for s in self.skip_post_type_patterns.split(",") if s.strip()]
+        return list(DEFAULT_SKIP_POST_TYPE_PATTERNS)
+
+    def get_skip_taxonomy_patterns(self) -> List[str]:
+        """Список паттернов для пропуска таксономий."""
+        if self.skip_taxonomy_patterns:
+            return [s.strip() for s in self.skip_taxonomy_patterns.split(",") if s.strip()]
+        return list(DEFAULT_SKIP_TAXONOMY_PATTERNS)

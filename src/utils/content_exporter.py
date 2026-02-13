@@ -12,23 +12,27 @@ import httpx
 import mimetypes
 
 from ..wordpress.client import WordPressClient
+from ..constants import DEFAULT_SKIP_POST_TYPE_PATTERNS
 
 
 class ContentExporter:
     """Экспорт контента из WordPress в файлы с организацией по типам."""
 
-    def __init__(self, wp_client: WordPressClient, export_folder: Path, concurrency: int = 10):
+    def __init__(self, wp_client: WordPressClient, export_folder: Path, concurrency: int = 10,
+                 skip_post_type_patterns: list = None):
         """
         Args:
             wp_client: WordPress клиент
             export_folder: Папка для экспорта
             concurrency: Максимум параллельных загрузок (по умолчанию 10)
+            skip_post_type_patterns: Паттерны для пропуска типов записей (из .env)
         """
         self.wp_client = wp_client
         self.export_folder = export_folder
         self.concurrency = concurrency
         self.csv_data = []
         self._semaphore = asyncio.Semaphore(concurrency)
+        self.skip_post_type_patterns = skip_post_type_patterns or DEFAULT_SKIP_POST_TYPE_PATTERNS
 
     async def discover_post_types(self) -> List[str]:
         """
@@ -43,13 +47,10 @@ class ContentExporter:
             # WordPress REST API endpoint для получения типов контента
             response = await self.wp_client.get("/wp-json/wp/v2/types")
 
-            # Паттерны для пропуска
-            skip_patterns = ["wp_", "attachment", "nav_menu", "spectra"]
-
             post_types = []
             for type_key, type_data in response.items():
                 # Пропускаем служебные типы по паттернам
-                should_skip = any(pattern in type_key for pattern in skip_patterns)
+                should_skip = any(pattern in type_key for pattern in self.skip_post_type_patterns)
 
                 if should_skip:
                     logger.debug(f"Skipping post type: {type_key} (matches skip pattern)")
