@@ -4,7 +4,8 @@ LLM Client для массовой генерации контента чере�
 
 import re
 import asyncio
-from typing import Dict, Any, List, Optional
+import base64
+from typing import Dict, Any, List, Optional, Tuple
 import requests
 from loguru import logger
 import markdown
@@ -96,6 +97,140 @@ class LLMClient:
             f"Все модели ({', '.join(models)}) не смогли сгенерировать текст. "
             f"Последняя ошибка: {last_error}"
         )
+
+    async def generate_image(
+        self,
+        prompt: str,
+        models: List[str],
+        max_retries: int = 3
+    ) -> Tuple[bytes, str]:
+        """
+        Генерировать изображение с fallback между моделями.
+
+        Args:
+            prompt: Промпт для генерации изображения
+            models: Список моделей (будут пробоваться по очереди)
+            max_retries: Количество попыток для каждой модели
+
+        Returns:
+            Tuple (image_bytes, extension) - байты изображения и расширение (png/jpg)
+
+        Raises:
+            LLMError: Если все модели и попытки исчерпаны
+        """
+        last_error = None
+
+        for model_idx, model in enumerate(models):
+            logger.info(f"[IMG] Пробуем модель {model} ({model_idx + 1}/{len(models)})")
+
+            for attempt in range(max_retries):
+                try:
+                    logger.debug(f"[IMG] Попытка {attempt + 1}/{max_retries} для модели {model}")
+
+                    result = await asyncio.to_thread(self._call_image_api_sync, prompt, model)
+
+                    logger.info(f"[IMG] Модель {model} успешно сгенерировала изображение (попытка {attempt + 1})")
+                    return result
+
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"[IMG] Модель {model}, попытка {attempt + 1}/{max_retries}: {e}")
+
+                    if attempt < max_retries - 1:
+                        delay = 2 ** attempt
+                        logger.debug(f"[IMG] Ждем {delay}s перед повтором...")
+                        await asyncio.sleep(delay)
+
+            logger.error(f"[IMG] Модель {model} не смогла сгенерировать изображение после {max_retries} попыток")
+
+        raise LLMError(
+            f"Все модели ({', '.join(models)}) не смогли сгенерировать изображение. "
+            f"Последняя ошибка: {last_error}"
+        )
+
+    def _call_image_api_sync(self, prompt: str, model: str) -> Tuple[bytes, str]:
+        """
+        Синхронный вызов LLM API для генерации изображения.
+
+        Формат ответа: choices[0].message.images[0].image_url.url
+        содержит data:image/png;base64,...
+
+        Returns:
+            Tuple (image_bytes, extension)
+        """
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "stream": False
+        }
+
+        try:
+            session = requests.Session()
+            session.trust_env = False
+
+            response = session.post(
+                self.endpoint,
+                headers=headers,
+                json=payload,
+                timeout=(10, 300)  # Генерация изображений может занять больше времени
+            )
+
+            if response.status_code != 200:
+                error_text = response.text
+                logger.error(f"[IMG] API returned error {response.status_code}: {error_text}")
+                raise LLMError(f"API error {response.status_code}: {error_text[:500]}")
+
+            result = response.json()
+
+            # Парсим ответ: choices[0].message.images[0].image_url.url
+            if "choices" not in result or len(result["choices"]) == 0:
+                raise LLMError(f"[IMG] Неожиданный формат ответа: {str(result)[:200]}")
+
+            message = result["choices"][0].get("message", {})
+
+            # Проверяем наличие images
+            if "images" in message and len(message["images"]) > 0:
+                image_obj = message["images"][0]
+
+                if "image_url" in image_obj and "url" in image_obj["image_url"]:
+                    data_url = image_obj["image_url"]["url"]
+
+                    if not data_url.startswith("data:image/"):
+                        raise LLMError(f"[IMG] Неизвестный формат URL: {data_url[:60]}")
+
+                    # Определяем расширение из MIME типа
+                    # data:image/png;base64,... или data:image/jpeg;base64,...
+                    mime_part = data_url.split(";")[0]  # data:image/png
+                    img_format = mime_part.split("/")[-1]  # png
+                    ext = "jpg" if img_format == "jpeg" else img_format
+
+                    if ";base64," not in data_url:
+                        raise LLMError("[IMG] Не найден маркер ;base64, в URL")
+
+                    _, b64_data = data_url.split(";base64,", 1)
+                    image_bytes = base64.b64decode(b64_data)
+
+                    logger.info(f"[IMG] Декодировано изображение: {len(image_bytes)} bytes, формат: {ext}")
+                    return image_bytes, ext
+
+            raise LLMError(f"[IMG] В ответе нет изображения. Ключи message: {list(message.keys())}")
+
+        except requests.exceptions.Timeout as e:
+            raise LLMError(f"[IMG] Timeout при запросе: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            raise LLMError(f"[IMG] Network error: {str(e)}")
+        except LLMError:
+            raise
+        except Exception as e:
+            logger.exception("[IMG] Full traceback:")
+            raise LLMError(f"[IMG] Unexpected error: {type(e).__name__} - {str(e)}")
 
     async def _call_api(self, prompt: str, model: str) -> str:
         """

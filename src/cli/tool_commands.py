@@ -886,8 +886,14 @@ def llm(
 
         final_endpoint = endpoint or os.getenv("LLM_ENDPOINT")
         final_token = token or os.getenv("LLM_TOKEN")
-        final_prompt = prompt or os.getenv("LLM_PROMPT")
-        final_models = model or os.getenv("LLM_MODELS")
+
+        # Для img_path: приоритет LLM_IMG_PROMPT/LLM_IMG_MODELS, потом LLM_PROMPT/LLM_MODELS
+        if column == "img_path":
+            final_prompt = prompt or os.getenv("LLM_IMG_PROMPT") or os.getenv("LLM_PROMPT")
+            final_models = model or os.getenv("LLM_IMG_MODELS") or os.getenv("LLM_MODELS")
+        else:
+            final_prompt = prompt or os.getenv("LLM_PROMPT")
+            final_models = model or os.getenv("LLM_MODELS")
 
         if not final_endpoint:
             console.print("[red]ERROR: LLM_ENDPOINT не указан (используйте --endpoint или .env)[/red]\n")
@@ -898,11 +904,13 @@ def llm(
             raise typer.Exit(code=1)
 
         if not final_prompt:
-            console.print("[red]ERROR: Промпт не указан (используйте --prompt или .env: LLM_PROMPT)[/red]\n")
+            env_hint = "LLM_IMG_PROMPT или LLM_PROMPT" if column == "img_path" else "LLM_PROMPT"
+            console.print(f"[red]ERROR: Промпт не указан (используйте --prompt или .env: {env_hint})[/red]\n")
             raise typer.Exit(code=1)
 
         if not final_models:
-            console.print("[red]ERROR: Модели не указаны (используйте --model или .env: LLM_MODELS)[/red]\n")
+            env_hint = "LLM_IMG_MODELS или LLM_MODELS" if column == "img_path" else "LLM_MODELS"
+            console.print(f"[red]ERROR: Модели не указаны (используйте --model или .env: {env_hint})[/red]\n")
             raise typer.Exit(code=1)
 
         # 2. Парсим список моделей
@@ -916,6 +924,11 @@ def llm(
         if dry_run:
             console.print(f"[yellow]DRY-RUN режим: изменения не будут сохранены[/yellow]")
         console.print()
+
+        # 3. Определяем папки для файлов (content_path / img_path)
+        proj = get_project(ctx)
+        content_folder = proj.content_folder
+        media_folder = proj.media_folder
 
         # 3. Запускаем генерацию
         asyncio.run(_run_llm_generation(
@@ -931,7 +944,9 @@ def llm(
             strip_tags=strip_tags,
             md_to_html=md_to_html,
             html_to_md=html_to_md,
-            log_file=log_file
+            log_file=log_file,
+            content_folder=content_folder,
+            media_folder=media_folder
         ))
 
     except Exception as e:
@@ -953,7 +968,9 @@ async def _run_llm_generation(
     strip_tags: bool,
     md_to_html: bool,
     html_to_md: bool,
-    log_file: Path
+    log_file: Path,
+    content_folder: Path = Path("data/content"),
+    media_folder: Path = Path("data/media")
 ):
     """Основная логика генерации через LLM."""
     from ..utils.llm_client import LLMClient
@@ -961,6 +978,20 @@ async def _run_llm_generation(
     from ..excel.writer import ExcelWriter
 
     llm_client = LLMClient(endpoint=endpoint, token=token)
+
+    # Определяем режим работы по имени колонки
+    is_content_path = (column == "content_path")
+    is_img_path = (column == "img_path")
+
+    if is_content_path:
+        content_folder.mkdir(parents=True, exist_ok=True)
+        console.print(f"[yellow]Режим:[/yellow] content_path (текст -> файл -> путь в Excel)")
+        console.print(f"[yellow]Папка контента:[/yellow] {content_folder}")
+    elif is_img_path:
+        media_folder.mkdir(parents=True, exist_ok=True)
+        console.print(f"[yellow]Режим:[/yellow] img_path (изображение -> файл -> путь в Excel)")
+        console.print(f"[yellow]Папка медиа:[/yellow] {media_folder}")
+    console.print()
 
     console.print("[yellow]Чтение Excel файла...[/yellow]")
 
@@ -1017,37 +1048,110 @@ async def _run_llm_generation(
             row_dict = row.to_dict()
             filled_prompt = llm_client.replace_placeholders(prompt_template, row_dict)
 
+            # Получаем ID записи для именования файлов
+            row_id = row_dict.get("id", "")
+            if not row_id or (isinstance(row_id, float) and str(row_id) == 'nan'):
+                row_id = f"row_{idx}"
+            else:
+                row_id = str(int(row_id)) if isinstance(row_id, float) else str(row_id)
+
             logger.info(f"[{sheet_name}:{idx}] Промпт: {filled_prompt[:100]}...")
 
             try:
-                console.print(f"  [{idx}] Генерация...")
-                generated_text = await llm_client.generate(
-                    prompt=filled_prompt,
-                    models=models,
-                    max_retries=3
-                )
+                # === Режим img_path: генерация изображения ===
+                if is_img_path:
+                    console.print(f"  [{idx}] Генерация изображения (ID={row_id})...")
+                    image_bytes, ext = await llm_client.generate_image(
+                        prompt=filled_prompt,
+                        models=models,
+                        max_retries=3
+                    )
 
-                if strip_tags:
-                    generated_text = llm_client.strip_html_tags(generated_text)
-                    logger.debug(f"[{sheet_name}:{idx}] Применен strip_tags")
+                    filename = f"{row_id}.{ext}"
+                    filepath = media_folder / filename
+                    if not dry_run:
+                        filepath.write_bytes(image_bytes)
+                        logger.info(f"[{sheet_name}:{idx}] Изображение сохранено: {filepath} ({len(image_bytes)} bytes)")
 
-                if md_to_html:
-                    generated_text = llm_client.markdown_to_html(generated_text)
-                    logger.debug(f"[{sheet_name}:{idx}] Применен md_to_html")
+                    # Записываем относительный путь в Excel
+                    relative_path = f"{media_folder.name}/{filename}"
+                    df.at[idx, column] = relative_path
 
-                if html_to_md:
-                    generated_text = llm_client.html_to_markdown(generated_text)
-                    logger.debug(f"[{sheet_name}:{idx}] Применен html_to_md")
+                    if 'action' in df.columns:
+                        df.at[idx, 'action'] = 'skip'
 
-                df.at[idx, column] = generated_text
+                    console.print(f"  [{idx}] OK Изображение ({len(image_bytes)} bytes) -> {relative_path}")
+                    total_processed += 1
 
-                if 'action' in df.columns:
-                    df.at[idx, 'action'] = 'skip'
-                    logger.debug(f"[{sheet_name}:{idx}] Action изменен на 'skip'")
+                # === Режим content_path: генерация текста в файл ===
+                elif is_content_path:
+                    console.print(f"  [{idx}] Генерация контента (ID={row_id})...")
+                    generated_text = await llm_client.generate(
+                        prompt=filled_prompt,
+                        models=models,
+                        max_retries=3
+                    )
 
-                console.print(f"  [{idx}] OK Сгенерировано ({len(generated_text)} символов)")
-                logger.info(f"[{sheet_name}:{idx}] Успешно: {generated_text[:100]}...")
-                total_processed += 1
+                    # Применяем постобработку к тексту
+                    if strip_tags:
+                        generated_text = llm_client.strip_html_tags(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен strip_tags")
+
+                    if md_to_html:
+                        generated_text = llm_client.markdown_to_html(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен md_to_html")
+
+                    if html_to_md:
+                        generated_text = llm_client.html_to_markdown(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен html_to_md")
+
+                    # Сохраняем текст в файл
+                    filename = f"{row_id}.html"
+                    filepath = content_folder / filename
+                    if not dry_run:
+                        filepath.write_text(generated_text, encoding="utf-8")
+                        logger.info(f"[{sheet_name}:{idx}] Контент сохранен: {filepath} ({len(generated_text)} символов)")
+
+                    # Записываем относительный путь в Excel
+                    relative_path = f"{content_folder.name}/{filename}"
+                    df.at[idx, column] = relative_path
+
+                    if 'action' in df.columns:
+                        df.at[idx, 'action'] = 'skip'
+
+                    console.print(f"  [{idx}] OK Контент ({len(generated_text)} символов) -> {relative_path}")
+                    total_processed += 1
+
+                # === Обычный режим: текст в колонку ===
+                else:
+                    console.print(f"  [{idx}] Генерация...")
+                    generated_text = await llm_client.generate(
+                        prompt=filled_prompt,
+                        models=models,
+                        max_retries=3
+                    )
+
+                    if strip_tags:
+                        generated_text = llm_client.strip_html_tags(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен strip_tags")
+
+                    if md_to_html:
+                        generated_text = llm_client.markdown_to_html(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен md_to_html")
+
+                    if html_to_md:
+                        generated_text = llm_client.html_to_markdown(generated_text)
+                        logger.debug(f"[{sheet_name}:{idx}] Применен html_to_md")
+
+                    df.at[idx, column] = generated_text
+
+                    if 'action' in df.columns:
+                        df.at[idx, 'action'] = 'skip'
+                        logger.debug(f"[{sheet_name}:{idx}] Action изменен на 'skip'")
+
+                    console.print(f"  [{idx}] OK Сгенерировано ({len(generated_text)} символов)")
+                    logger.info(f"[{sheet_name}:{idx}] Успешно: {generated_text[:100]}...")
+                    total_processed += 1
 
             except Exception as e:
                 error_msg = "error"
@@ -1074,6 +1178,9 @@ async def _run_llm_generation(
     console.print(f"  Пропущено: {total_skipped}")
     console.print(f"  Ошибок: {total_errors}")
     console.print()
+
+    if total_errors > 0:
+        console.print(f"[yellow]Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")
 
     if total_errors > 0:
         console.print(f"[yellow]Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")

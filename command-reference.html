@@ -293,6 +293,16 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#projects">
+                            <i class="bi bi-folder me-1"></i>Проекты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#workflows">
+                            <i class="bi bi-diagram-3 me-1"></i>Процессы
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#commands">
                             <i class="bi bi-book me-1"></i>Команды
                         </a>
@@ -312,6 +322,27 @@
                             <a class="nav-link" href="#constructor">
                                 <i class="bi bi-tools me-2"></i>Конструктор команд
                             </a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">НАЧАЛО РАБОТЫ</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#wp-bulk">wp-bulk</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#projects">Проекты (--project)</a>
+                        </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">РАБОЧИЕ ПРОЦЕССЫ</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#workflow-update">Обновление контента</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#workflow-fetch">Выгрузка контента</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#workflow-media">Работа с медиа</a>
                         </li>
                         <li class="nav-item mt-3">
                             <h6 class="px-3 text-muted small">ОСНОВНЫЕ КОМАНДЫ</h6>
@@ -396,6 +427,11 @@
 
                         <div class="constructor-form">
                             <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">Проект (опционально)</label>
+                                    <input type="text" class="form-control" id="projectInput" placeholder="например: ost, tzm">
+                                    <small class="text-white-50">Папка из projects/</small>
+                                </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Команда</label>
                                     <select class="form-select" id="commandSelect">
@@ -413,7 +449,8 @@
                                         <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
                                         <option value="async-google-bidirectional">async-google-bidirectional - 🚀 Async Google ↔ WP</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
-                                        <option value="llm">llm - 🤖 Генерация контента через LLM API</option>
+                                        <option value="counter">counter - Подсчет слов и символов</option>
+                                        <option value="llm">llm - Генерация контента через LLM API</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Управление настройками (загрузка/выгрузка)</option>
                                     </select>
@@ -428,6 +465,761 @@
                                 </button>
                                 <pre id="constructedCommand">Выберите команду для начала</pre>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- wp-bulk -->
+                <section id="wp-bulk" class="content-section">
+                    <div class="command-card" style="border-left: 4px solid var(--primary-color);">
+                        <h2 class="command-title">wp-bulk — Формат вызова команд</h2>
+                        <p class="command-description">Единая точка входа для всех команд WordPress Bulk Editor</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Общий формат:</strong>
+                            <p class="mb-0">Все команды вызываются через единый CLI:</p>
+                        </div>
+
+                        <div class="code-block">
+                            <code>wp-bulk [ГЛОБАЛЬНЫЕ ОПЦИИ] КОМАНДА [ПАРАМЕТРЫ КОМАНДЫ]</code>
+                        </div>
+
+                        <h5 class="mt-4">Глобальные опции:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--project, -P</span> имя проекта из папки <code>projects/</code>
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Важно:</strong>
+                            Глобальные опции (<code>--project</code>) указываются <strong>ДО</strong> имени команды, а параметры команды — <strong>ПОСЛЕ</strong>.
+                        </div>
+
+                        <div class="example-title">Примеры вызова:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk sync --file example.xlsx</code>
+                            <div class="text-muted small mt-2">Без проекта — используется глобальный .env из корня репозитория</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P mysite sync --file example.xlsx</code>
+                            <div class="text-muted small mt-2">С проектом — используется projects/mysite/.env и пути проекта</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk --project ost fetch</code>
+                            <div class="text-muted small mt-2">Полная форма флага --project</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Доступные команды:</strong>
+                            <div class="row mt-2">
+                                <div class="col-md-4">
+                                    <strong>Синхронизация:</strong>
+                                    <ul class="mb-2">
+                                        <li><a href="#sync">sync</a></li>
+                                        <li><a href="#async">async</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Получение данных:</strong>
+                                    <ul class="mb-2">
+                                        <li><a href="#fetch">fetch</a></li>
+                                        <li><a href="#fetch-media">fetch-media</a></li>
+                                        <li><a href="#export">export</a></li>
+                                        <li><a href="#export-media">export-media</a></li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Google Sheets:</strong>
+                                    <ul class="mb-2">
+                                        <li><a href="#download-google-sheet">download-google-sheet</a></li>
+                                        <li><a href="#upload-to-google-sheets">upload-to-google-sheets</a></li>
+                                        <li><a href="#sync-from-google">sync-from-google</a></li>
+                                        <li><a href="#sync-google-bidirectional">sync-google-bidirectional</a></li>
+                                        <li><a href="#async-from-google">async-from-google</a></li>
+                                        <li><a href="#async-google-bidirectional">async-google-bidirectional</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Утилиты:</strong>
+                                    <ul class="mb-0">
+                                        <li><a href="#validate">validate</a></li>
+                                        <li><a href="#options">options</a></li>
+                                        <li><a href="#bulk-delete">bulk-delete</a></li>
+                                        <li><a href="#counter">counter</a></li>
+                                        <li><a href="#llm">llm</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Проекты -->
+                <section id="projects" class="content-section">
+                    <div class="command-card" style="border-left: 4px solid var(--success-color);">
+                        <h2 class="command-title">Работа с проектами (--project / -P)</h2>
+                        <p class="command-description">Управление несколькими WordPress сайтами из одной установки</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Система проектов позволяет работать с несколькими WordPress сайтами, храня конфигурацию, данные и логи каждого сайта в изолированной папке <code>projects/&lt;name&gt;/</code>.
+                        </div>
+
+                        <h5 class="mt-4">Структура папки проекта:</h5>
+                        <div class="code-block">
+<code>projects/
+├── mysite/                    # Проект "mysite"
+│   ├── .env                   # Credentials и настройки этого сайта
+│   ├── mysite.xlsx            # Excel файл (авто-обнаружение)
+│   ├── media/                 # Медиафайлы проекта
+│   ├── content/               # Экспортированный контент
+│   └── logs/                  # Логи операций
+├── blog/                      # Проект "blog"
+│   ├── .env
+│   ├── data.xlsx
+│   ├── media/
+│   ├── content/
+│   └── logs/
+└── ...</code>
+                        </div>
+
+                        <h5 class="mt-4">Создание нового проекта:</h5>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>mkdir projects/mysite</code>
+                            <div class="text-muted small mt-2">1. Создайте папку проекта</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>cp .env.example projects/mysite/.env</code>
+                            <div class="text-muted small mt-2">2. Скопируйте шаблон .env и заполните credentials</div>
+                        </div>
+
+                        <h5 class="mt-4">Три способа указать проект:</h5>
+
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Способ</th>
+                                    <th>Пример</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-primary">Флаг -P</span></td>
+                                    <td><code>wp-bulk -P mysite sync</code></td>
+                                    <td>Короткая форма (рекомендуется)</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-primary">Флаг --project</span></td>
+                                    <td><code>wp-bulk --project mysite sync</code></td>
+                                    <td>Полная форма</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-secondary">Переменная окружения</span></td>
+                                    <td><code>set WP_PROJECT=mysite</code></td>
+                                    <td>Через переменную окружения WP_PROJECT</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Что меняется при работе с проектом:</h5>
+
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Ресурс</th>
+                                    <th>Без проекта</th>
+                                    <th>С проектом (-P mysite)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>.env файл</strong></td>
+                                    <td><code>.env</code> (корень)</td>
+                                    <td><code>projects/mysite/.env</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Excel файл</strong></td>
+                                    <td>Указывается через <code>--file</code></td>
+                                    <td>Авто-обнаружение в <code>projects/mysite/</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Логи</strong></td>
+                                    <td><code>logs/</code></td>
+                                    <td><code>projects/mysite/logs/</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Медиа</strong></td>
+                                    <td><code>data/media/</code></td>
+                                    <td><code>projects/mysite/media/</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Контент</strong></td>
+                                    <td><code>data/content/</code></td>
+                                    <td><code>projects/mysite/content/</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Export output</strong></td>
+                                    <td>Указывается через <code>--output</code></td>
+                                    <td><code>projects/mysite/exported_content/</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="success-box">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Авто-обнаружение Excel файла (только для fetch):</strong>
+                            <ul class="mb-0">
+                                <li>Команда <code>fetch</code> без <code>--file</code> автоматически ищет .xlsx в папке проекта</li>
+                                <li>Если в папке один .xlsx файл — он используется автоматически</li>
+                                <li>Если файлов несколько — приоритет у файла с именем проекта (например <code>mysite.xlsx</code>)</li>
+                                <li>Если файл не найден — создается <code>fetch.xlsx</code> в папке проекта</li>
+                            </ul>
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Важно:</strong>
+                            Команды <code>sync</code>, <code>async</code>, <code>validate</code>, <code>fetch-media</code>, <code>llm</code> <strong>всегда требуют</strong> параметр <code>--file</code>. Проект влияет на расположение .env, логов, медиа и output — но не подставляет файл автоматически для этих команд.
+                        </div>
+
+                        <div class="example-title">Примеры работы с проектами:</div>
+
+                        <div class="alert alert-info">
+                            <strong><i class="bi bi-arrow-down-circle me-2"></i>Выгрузка данных (fetch автоматически найдет/создаст файл):</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost fetch</code>
+                            <div class="text-muted small mt-2">Авто-режим: создаст projects/ost/fetch.xlsx с данными сайта</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost fetch --sheets posts,pages --status publish</code>
+                            <div class="text-muted small mt-2">Выгрузить только опубликованные посты и страницы</div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <strong><i class="bi bi-arrow-up-circle me-2"></i>Синхронизация (--file обязателен):</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost sync --file projects/ost/fetch.xlsx</code>
+                            <div class="text-muted small mt-2">Синхронизация: .env из проекта, логи в projects/ost/logs/</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost async --file projects/ost/ost.xlsx --sheets posts --concurrency 10</code>
+                            <div class="text-muted small mt-2">Async синхронизация постов проекта "ost"</div>
+                        </div>
+
+                        <div class="alert alert-success mt-3">
+                            <strong><i class="bi bi-download me-2"></i>Экспорт (output авто-направляется в папку проекта):</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost export</code>
+                            <div class="text-muted small mt-2">Экспорт в projects/ost/exported_content/ (авто-определение output)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost export-media</code>
+                            <div class="text-muted small mt-2">Экспорт медиа в projects/ost/export_media/</div>
+                        </div>
+
+                        <div class="alert alert-primary mt-3">
+                            <strong><i class="bi bi-tools me-2"></i>Утилиты:</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost llm --file projects/ost/ost.xlsx --column excerpt</code>
+                            <div class="text-muted small mt-2">LLM генерация: LLM_ENDPOINT, LLM_TOKEN берутся из projects/ost/.env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P tzm bulk-delete --post-type posts --status draft --dry-run</code>
+                            <div class="text-muted small mt-2">Показать черновики постов проекта "tzm" (--file не нужен)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost counter --type posts --output stats.csv</code>
+                            <div class="text-muted small mt-2">Подсчет слов: CSV сохранится в projects/ost/counter_output.csv</div>
+                        </div>
+
+                        <div class="info-box mt-4">
+                            <strong><i class="bi bi-file-earmark-text me-2"></i>Пример .env файла проекта:</strong>
+                            <pre class="mt-2 mb-0" style="font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+# projects/mysite/.env
+WP_URL=https://mysite.com
+WP_USERNAME=admin
+WP_PASSWORD=xxxx xxxx xxxx xxxx
+
+# Google Sheets (опционально)
+GOOGLE_SHEET_ID=1B5gj1nxzVhQ...
+GOOGLE_SHEET_CREDENTIALS_PATH=credentials/google.json
+
+# LLM (опционально)
+LLM_ENDPOINT=http://localhost:8317/v1/chat/completions
+LLM_TOKEN=your-api-key
+LLM_MODELS=gpt-4,claude-3
+LLM_PROMPT=Напиши текст для [title]</pre>
+                        </div>
+
+                        <div class="warning-box mt-4">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Приоритет настроек:</strong>
+                            <ol class="mb-0">
+                                <li>Параметры командной строки (<code>--domain</code>, <code>--file</code>, <code>--env-file</code>) — наивысший приоритет</li>
+                                <li>.env файл проекта (<code>projects/&lt;name&gt;/.env</code>)</li>
+                                <li>Глобальный .env файл (корень репозитория)</li>
+                            </ol>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Рабочие процессы -->
+                <section id="workflows" class="content-section">
+                    <h1 class="mb-5">
+                        <i class="bi bi-diagram-3 me-3"></i>Рабочие процессы
+                    </h1>
+
+                    <!-- Workflow: Обновление контента -->
+                    <div id="workflow-update" class="command-card" style="border-left: 4px solid var(--warning-color);">
+                        <h2 class="command-title">Обновление контента (Excel → WordPress)</h2>
+                        <p class="command-description">Как массово создавать, обновлять и удалять записи WordPress из Excel</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Принцип работы:</strong>
+                            Действие для каждой строки определяется колонкой <code>action</code> в Excel. Поддерживаются листы типов контента (posts, pages, кастомные), таксономий (categories, tags) и медиафайлов (media).
+                        </div>
+
+                        <h5 class="mt-4">Поддерживаемые значения action:</h5>
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>action</th>
+                                    <th>Описание</th>
+                                    <th>Обязательные поля</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-success">add</span></td>
+                                    <td>Создать новую запись в WordPress</td>
+                                    <td>title (id будет заполнен автоматически)</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-warning text-dark">update</span></td>
+                                    <td>Обновить существующую запись</td>
+                                    <td>id</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-danger">delete</span></td>
+                                    <td>Удалить запись из WordPress</td>
+                                    <td>id</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-secondary">skip</span></td>
+                                    <td>Пропустить строку (ничего не делать)</td>
+                                    <td>—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Пошаговый процесс:</h5>
+
+                        <div class="alert alert-info">
+                            <strong>Шаг 1.</strong> Выгрузите данные из WordPress (или создайте Excel файл вручную):
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch</code>
+                            <div class="text-muted small mt-2">Создаст fetch.xlsx со всеми записями сайта (action=skip у всех строк)</div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <strong>Шаг 2.</strong> Отредактируйте Excel файл:
+                            <ul class="mb-0 mt-2">
+                                <li>Установите <code>action=update</code> для строк, которые нужно обновить</li>
+                                <li>Добавьте новые строки с <code>action=add</code> для создания</li>
+                                <li>Установите <code>action=delete</code> для удаления</li>
+                                <li>Оставьте <code>action=skip</code> для строк без изменений</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-success mt-3">
+                            <strong>Шаг 3.</strong> Запустите синхронизацию:
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk sync --file fetch.xlsx</code>
+                            <div class="text-muted small mt-2">Синхронный режим. Для больших объемов используйте <code>async</code></div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk async --file fetch.xlsx --concurrency 10</code>
+                            <div class="text-muted small mt-2">Асинхронный режим: быстрее, с retry и circuit breaker</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Что произойдет после синхронизации:</strong>
+                            <ul class="mb-0">
+                                <li>Новым записям (action=add) будет присвоен <code>id</code> и записан обратно в Excel</li>
+                                <li>Action изменится на <code>skip</code> чтобы при повторном запуске не дублировать</li>
+                                <li>Обновленные записи получат актуальные метаданные (link, slug и т.д.)</li>
+                                <li>Удаленные записи будут помечены как обработанные</li>
+                                <li>Логи сохранятся в папке <code>logs/</code></li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">С использованием проекта:</h5>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk -P ost fetch</code>
+                            <div class="text-muted small mt-2">1. Выгрузить данные сайта "ost" → projects/ost/fetch.xlsx</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk -P ost async --file projects/ost/fetch.xlsx --sheets posts</code>
+                            <div class="text-muted small mt-2">2. Синхронизировать только посты проекта "ost"</div>
+                        </div>
+
+                        <div class="warning-box mt-4">
+                            <strong><i class="bi bi-shield-check me-2"></i>Безопасность:</strong>
+                            <ul class="mb-0">
+                                <li>Используйте <code>--dry-run</code> для предварительной проверки (никакие изменения не применятся)</li>
+                                <li>Используйте <code>--test-mode --sheets posts</code> для обработки только первых 3 строк</li>
+                                <li>Используйте <code>--skip-media</code> и <code>--skip-tax</code> для ускорения, если нужно обновить только текст</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Workflow: Выгрузка контента -->
+                    <div id="workflow-fetch" class="command-card" style="border-left: 4px solid var(--primary-color);">
+                        <h2 class="command-title">Выгрузка контента (WordPress → файлы)</h2>
+                        <p class="command-description">Как получить данные из WordPress в Excel или файлы</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Две стратегии выгрузки:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>fetch</strong> — в Excel файл (для дальнейшего редактирования и синхронизации обратно)</li>
+                                <li><strong>export</strong> — в HTML файлы + CSV индекс (для архивации или миграции)</li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">Стратегия 1: fetch (WordPress → Excel)</h5>
+
+                        <div class="alert alert-info">
+                            <strong>Auto Mode</strong> (без <code>--file</code>): автоматически обнаруживает все типы записей и таксономий, создает новый файл с оптимальной структурой полей.
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch</code>
+                            <div class="text-muted small mt-2">Создать fetch.xlsx со ВСЕМИ данными сайта</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch --sheets posts,pages --status publish --limit 100</code>
+                            <div class="text-muted small mt-2">Только опубликованные посты и страницы, максимум 100</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch --exclude post_tag,nav_menu</code>
+                            <div class="text-muted small mt-2">Все кроме тегов и меню навигации</div>
+                        </div>
+
+                        <div class="alert alert-secondary mt-3">
+                            <strong>Manual Mode</strong> (с <code>--file</code>): использует структуру существующего Excel файла — удобно для повторных выгрузок.
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch --file data.xlsx --sheets posts,pages</code>
+                            <div class="text-muted small mt-2">Обновить данные в существующем файле</div>
+                        </div>
+
+                        <h5 class="mt-4">Стратегия 2: export (WordPress → HTML файлы)</h5>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk export --output "backup/mysite"</code>
+                            <div class="text-muted small mt-2">HTML файлы + index.csv (группировка по типам: posts/, pages/)</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk export-media --output "backup/media" --concurrency 20</code>
+                            <div class="text-muted small mt-2">Скачать все медиафайлы с параллельной загрузкой</div>
+                        </div>
+
+                        <h5 class="mt-4">Что выгружается в fetch (автоматический режим):</h5>
+                        <div class="success-box">
+                            <ul class="mb-0">
+                                <li><strong>Типы записей:</strong> posts, pages и все кастомные типы (кроме служебных)</li>
+                                <li><strong>Обязательные поля:</strong> id, date, modified, title, type, slug, link, parent, status</li>
+                                <li><strong>Дополнительные поля:</strong> content, excerpt, featured_media, image_url</li>
+                                <li><strong>SEO поля:</strong> seo_title, seo_description, seo_meta_keywords (если SEO плагин установлен)</li>
+                                <li><strong>ACF поля:</strong> все зарегистрированные ACF поля с префиксом acf_ (если плагин установлен)</li>
+                                <li><strong>Таксономии:</strong> categories, tags, кастомные таксономии</li>
+                                <li><strong>Action:</strong> у всех записей устанавливается "skip"</li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">С использованием проекта:</h5>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk -P ost fetch</code>
+                            <div class="text-muted small mt-2">Авто-режим: создаст projects/ost/fetch.xlsx</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk -P ost export</code>
+                            <div class="text-muted small mt-2">HTML экспорт в projects/ost/exported_content/</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk -P ost export-media</code>
+                            <div class="text-muted small mt-2">Медиа экспорт в projects/ost/export_media/</div>
+                        </div>
+                    </div>
+
+                    <!-- Workflow: Работа с медиа -->
+                    <div id="workflow-media" class="command-card" style="border-left: 4px solid var(--danger-color);">
+                        <h2 class="command-title">Работа с медиафайлами</h2>
+                        <p class="command-description">Загрузка, редактирование, удаление и экспорт медиафайлов WordPress</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Медиа в WordPress Bulk Editor:</strong>
+                            Управление медиафайлами происходит через лист <code>media</code> в Excel. Это отдельный тип листа, который поддерживает загрузку, обновление метаданных и удаление файлов из библиотеки WordPress.
+                        </div>
+
+                        <h5 class="mt-4">Команды для работы с медиа:</h5>
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Команда</th>
+                                    <th>Направление</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>fetch-media</code></td>
+                                    <td>WordPress → Excel</td>
+                                    <td>Выгрузить список медиафайлов в лист <code>media</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>sync --sheets media</code></td>
+                                    <td>Excel → WordPress</td>
+                                    <td>Загрузить/обновить/удалить медиафайлы (синхронный)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>async --sheets media</code></td>
+                                    <td>Excel → WordPress</td>
+                                    <td>То же, но параллельно с retry (рекомендуется)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>export-media</code></td>
+                                    <td>WordPress → файлы</td>
+                                    <td>Скачать все медиафайлы на диск + CSV индекс</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Структура листа media:</h5>
+                        <table class="table table-bordered mt-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Колонка</th>
+                                    <th>Описание</th>
+                                    <th>add</th>
+                                    <th>update</th>
+                                    <th>delete</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>action</code></td>
+                                    <td>Действие</td>
+                                    <td>add</td>
+                                    <td>update</td>
+                                    <td>delete</td>
+                                </tr>
+                                <tr>
+                                    <td><code>id</code></td>
+                                    <td>ID медиафайла в WordPress</td>
+                                    <td><em>пусто</em> (заполнится)</td>
+                                    <td>обязательно</td>
+                                    <td>обязательно</td>
+                                </tr>
+                                <tr>
+                                    <td><code>img_path</code></td>
+                                    <td>Путь к файлу или URL</td>
+                                    <td>обязательно</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                </tr>
+                                <tr>
+                                    <td><code>title</code></td>
+                                    <td>Название</td>
+                                    <td>опционально</td>
+                                    <td>редактируемое</td>
+                                    <td>—</td>
+                                </tr>
+                                <tr>
+                                    <td><code>alt_text</code></td>
+                                    <td>Альтернативный текст (SEO)</td>
+                                    <td>опционально</td>
+                                    <td>редактируемое</td>
+                                    <td>—</td>
+                                </tr>
+                                <tr>
+                                    <td><code>caption</code></td>
+                                    <td>Подпись</td>
+                                    <td>опционально</td>
+                                    <td>редактируемое</td>
+                                    <td>—</td>
+                                </tr>
+                                <tr>
+                                    <td><code>description</code></td>
+                                    <td>Описание</td>
+                                    <td>опционально</td>
+                                    <td>редактируемое</td>
+                                    <td>—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Полный процесс работы с медиа:</h5>
+
+                        <div class="alert alert-info">
+                            <strong>1. Получить список текущих медиафайлов:</strong>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk fetch-media --file data.xlsx</code>
+                            <div class="text-muted small mt-2">Создаст лист media со всеми файлами библиотеки (action=skip)</div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <strong>2. Отредактировать Excel:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Добавить строки с <code>action=add</code> и <code>img_path</code> для загрузки новых файлов</li>
+                                <li>Установить <code>action=update</code> и изменить <code>alt_text</code>, <code>title</code> и т.д. для массового SEO обновления</li>
+                                <li>Установить <code>action=delete</code> для удаления ненужных файлов</li>
+                            </ul>
+                        </div>
+
+                        <div class="alert alert-success mt-3">
+                            <strong>3. Синхронизировать:</strong>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk async --file data.xlsx --sheets media --concurrency 3</code>
+                            <div class="text-muted small mt-2">Параллельная обработка (3 файла одновременно) с retry</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk sync --file data.xlsx --sheets media</code>
+                            <div class="text-muted small mt-2">Синхронный режим (последовательная обработка)</div>
+                        </div>
+
+                        <h5 class="mt-4">Загрузка файлов (action=add):</h5>
+                        <div class="info-box">
+                            <strong>Поддерживаемые источники для <code>img_path</code>:</strong>
+                            <ul class="mb-0">
+                                <li><strong>Локальный файл:</strong> <code>images/photo.jpg</code> — ищется от текущей папки или из <code>data/media/</code> (или <code>projects/&lt;name&gt;/media/</code> при использовании проекта)</li>
+                                <li><strong>URL:</strong> <code>https://example.com/image.png</code> — файл скачивается и загружается</li>
+                                <li><strong>Поддерживаемые форматы:</strong> изображения (jpg, png, gif, webp), видео, документы</li>
+                            </ul>
+                        </div>
+
+                        <div class="success-box mt-3">
+                            <strong>После загрузки (action=add) автоматически заполнятся:</strong>
+                            <ul class="mb-0">
+                                <li><code>id</code> — присвоенный WordPress ID</li>
+                                <li><code>link</code>, <code>source_url</code> — URL файла на сайте</li>
+                                <li><code>mime_type</code> — тип файла</li>
+                                <li><code>action</code> → изменится на <code>skip</code></li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">Featured image (обложка записи):</h5>
+                        <div class="info-box">
+                            <strong>Привязка медиа к записям:</strong>
+                            <p class="mb-2">Чтобы установить обложку записи, используйте колонку <code>featured_media</code> в листе контента (posts, pages):</p>
+                            <ul class="mb-0">
+                                <li>Укажите <code>featured_media = ID медиафайла</code> (числовой ID из WordPress)</li>
+                                <li>Или используйте <code>image_url = URL изображения</code> — файл будет загружен и привязан автоматически</li>
+                                <li>Флаг <code>--delete-media</code> удалит обложку при <code>action=delete</code> записи</li>
+                                <li>Флаг <code>--skip-existing-media</code> ускоряет массовое обновление, не перезаписывая существующие обложки</li>
+                            </ul>
+                        </div>
+
+                        <h5 class="mt-4">Экспорт медиа (скачивание файлов):</h5>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk export-media --output "backup/media" --concurrency 20</code>
+                            <div class="text-muted small mt-2">Скачать все файлы + media_index.csv с метаданными</div>
+                        </div>
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)"><i class="bi bi-clipboard"></i></button>
+                            <code>wp-bulk export-media --no-download-files</code>
+                            <div class="text-muted small mt-2">Только CSV индекс без скачивания файлов</div>
+                        </div>
+
+                        <div class="alert alert-danger mt-4">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Удаление медиа (action=delete):</strong>
+                            <ul class="mb-0">
+                                <li>Удаление <strong>необратимо</strong> — файл полностью удаляется из WordPress (не в корзину)</li>
+                                <li>Если файл используется в записях — останутся битые ссылки</li>
+                                <li>Рекомендуется сначала проверить через <code>--dry-run</code></li>
+                            </ul>
                         </div>
                     </div>
                 </section>
@@ -457,7 +1249,10 @@
                             <span class="param-badge param-optional">--concurrency</span> параллельные запросы (default: 5)
                             <span class="param-badge param-optional">--skip-media</span> пропустить загрузку медиа
                             <span class="param-badge param-optional">--skip-tax</span> пропустить обновление таксономий (категории, теги)
+                            <span class="param-badge param-optional">--skip-existing-media</span> не прикреплять существующие featured_media при update (ускоряет массовое редактирование)
                             <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
+                            <span class="param-badge param-optional">--no-update-excel</span> не записывать ID обратно в Excel
+                            <span class="param-badge param-optional">--test-mode</span> обработать только первые 3 строки (требует --sheets с одним листом)
                             <span class="param-badge param-optional">--domain</span> URL WordPress сайта
                             <span class="param-badge param-optional">--username</span> имя пользователя
                             <span class="param-badge param-optional">--password</span> Application Password
@@ -470,7 +1265,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file example.xlsx</code>
+                            <code>wp-bulk sync --file example.xlsx</code>
                             <div class="text-muted small mt-2">Полная синхронизация всех листов</div>
                         </div>
 
@@ -478,7 +1273,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file w.xlsx --sheets posts,pages</code>
+                            <code>wp-bulk sync --file w.xlsx --sheets posts,pages</code>
                             <div class="text-muted small mt-2">Синхронизация только определенных листов</div>
                         </div>
 
@@ -486,7 +1281,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file data.xlsx --sheets posts --dry-run --verbose</code>
+                            <code>wp-bulk sync --file data.xlsx --sheets posts --dry-run --verbose</code>
                             <div class="text-muted small mt-2">Тестовый режим с подробными логами</div>
                         </div>
 
@@ -494,7 +1289,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file w.xlsx --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx"</code>
+                            <code>wp-bulk sync --file w.xlsx --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx"</code>
                             <div class="text-muted small mt-2">С явным указанием credentials</div>
                         </div>
 
@@ -502,7 +1297,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file data.xlsx --skip-tax</code>
+                            <code>wp-bulk sync --file data.xlsx --skip-tax</code>
                             <div class="text-muted small mt-2">Обновить только поля контента, пропустив таксономии (ускоряет синхронизацию)</div>
                         </div>
 
@@ -510,8 +1305,28 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file data.xlsx --skip-media --skip-tax</code>
+                            <code>wp-bulk sync --file data.xlsx --skip-media --skip-tax</code>
                             <div class="text-muted small mt-2">Обновить только основные поля, без медиа и таксономий (максимальная скорость)</div>
+                        </div>
+
+                        <div class="alert alert-success mt-4">
+                            <strong><i class="bi bi-folder me-2"></i>С использованием проекта:</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost sync --file projects/ost/data.xlsx</code>
+                            <div class="text-muted small mt-2">Проект "ost": .env из projects/ost/.env, логи в projects/ost/logs/, медиа из projects/ost/media/</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost sync --file projects/ost/data.xlsx --sheets posts --dry-run</code>
+                            <div class="text-muted small mt-2">Тестовый режим для проекта "ost", только лист posts</div>
                         </div>
 
                         <div class="alert alert-info mt-4">
@@ -547,7 +1362,7 @@
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync --file data.xlsx --sheets media</code>
+                            <code>wp-bulk sync --file data.xlsx --sheets media</code>
                             <div class="text-muted small mt-2">Синхронизация только медиафайлов</div>
                         </div>
 
@@ -632,11 +1447,11 @@
                             <strong><i class="bi bi-terminal me-2"></i>Команды для работы с media:</strong>
                             <pre class="mt-2 mb-0" style="font-size: 13px; background: #f8f9fa; padding: 10px; border-radius: 5px;">
 # Синхронизация (загрузка, редактирование, удаление)
-python -m src.cli sync --file data.xlsx --sheets media
-python -m src.cli async --file data.xlsx --sheets media
+wp-bulk sync --file data.xlsx --sheets media
+wp-bulk async --file data.xlsx --sheets media
 
 # Выгрузка списка медиа из WordPress
-python -m src.cli fetch-media --file export.xlsx</pre>
+wp-bulk fetch-media --file export.xlsx</pre>
                         </div>
 
                         <div class="success-box mt-4">
@@ -693,7 +1508,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --domain https://example.com --username admin --password "xxxx xxxx xxxx"</code>
+                            <code>wp-bulk fetch --domain https://example.com --username admin --password "xxxx xxxx xxxx"</code>
                             <div class="text-muted small mt-2">Создать fetch.xlsx с ВСЕМИ типами записей и таксономиями с сайта</div>
                         </div>
 
@@ -701,7 +1516,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --sheets posts,category</code>
+                            <code>wp-bulk fetch --sheets posts,category</code>
                             <div class="text-muted small mt-2">Создать fetch.xlsx только с постами и категориями</div>
                         </div>
 
@@ -709,7 +1524,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --status publish --limit 100</code>
+                            <code>wp-bulk fetch --status publish --limit 100</code>
                             <div class="text-muted small mt-2">Только опубликованные записи, максимум 100 на лист</div>
                         </div>
 
@@ -717,7 +1532,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --exclude post_tag,nav_menu</code>
+                            <code>wp-bulk fetch --exclude post_tag,nav_menu</code>
                             <div class="text-muted small mt-2">Выгрузить все типы кроме тегов и меню навигации</div>
                         </div>
 
@@ -741,7 +1556,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --exclude category,post_tag</code>
+                            <code>wp-bulk fetch --exclude category,post_tag</code>
                             <div class="text-muted small mt-2">Выгрузить все типы записей без таксономий</div>
                         </div>
 
@@ -749,8 +1564,36 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --sheets posts,pages,category --exclude category</code>
+                            <code>wp-bulk fetch --sheets posts,pages,category --exclude category</code>
                             <div class="text-muted small mt-2">Комбинация: выбрать posts,pages,category, но исключить category (результат: posts,pages)</div>
+                        </div>
+
+                        <div class="alert alert-success mt-4">
+                            <strong><i class="bi bi-folder me-2"></i>С использованием проекта (fetch поддерживает авто-обнаружение файла):</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost fetch</code>
+                            <div class="text-muted small mt-2">Авто-режим: создаст projects/ost/fetch.xlsx со ВСЕМИ типами записей. Credentials из projects/ost/.env</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost fetch --sheets posts,pages --status publish</code>
+                            <div class="text-muted small mt-2">Только опубликованные посты и страницы, файл — в projects/ost/</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost fetch --file projects/ost/custom.xlsx</code>
+                            <div class="text-muted small mt-2">Ручной режим: выгрузить данные в конкретный файл проекта</div>
                         </div>
 
                         <div class="alert alert-secondary mt-4">
@@ -761,7 +1604,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --file example.xlsx --status publish</code>
+                            <code>wp-bulk fetch --file example.xlsx --status publish</code>
                             <div class="text-muted small mt-2">Выгрузить данные в существующий файл, только опубликованные</div>
                         </div>
 
@@ -769,7 +1612,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch --file example.xlsx --sheets posts,pages</code>
+                            <code>wp-bulk fetch --file example.xlsx --sheets posts,pages</code>
                             <div class="text-muted small mt-2">Выгрузить только листы posts и pages</div>
                         </div>
 
@@ -825,7 +1668,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli export --output "export/mysite" --concurrency 10</code>
+                            <code>wp-bulk export --output "export/mysite" --concurrency 10</code>
                             <div class="text-muted small mt-2">Экспорт с использованием .env</div>
                         </div>
 
@@ -833,7 +1676,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli export --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx" --output "export/mysite"</code>
+                            <code>wp-bulk export --domain https://example.com --username admin --password "xxxx xxxx xxxx xxxx" --output "export/mysite"</code>
                             <div class="text-muted small mt-2">С явными credentials</div>
                         </div>
 
@@ -873,7 +1716,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli export-media --output "export/media" --concurrency 20</code>
+                            <code>wp-bulk export-media --output "export/media" --concurrency 20</code>
                             <div class="text-muted small mt-2">Скачать все медиафайлы</div>
                         </div>
 
@@ -881,7 +1724,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli export-media --no-download-files --output media_list</code>
+                            <code>wp-bulk export-media --no-download-files --output media_list</code>
                             <div class="text-muted small mt-2">Только метаданные (без скачивания)</div>
                         </div>
 
@@ -915,7 +1758,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli fetch-media --file example.xlsx</code>
+                            <code>wp-bulk fetch-media --file example.xlsx</code>
                             <div class="text-muted small mt-2">Получить список всех медиафайлов</div>
                         </div>
 
@@ -956,7 +1799,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli download-google-sheet</code>
+                            <code>wp-bulk download-google-sheet</code>
                             <div class="text-muted small mt-2">Используя настройки из .env</div>
                         </div>
 
@@ -964,7 +1807,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli download-google-sheet --sheet-id "1B5gj1nxzVhQ..." --credentials "credentials/google.json" --output "my_file.xlsx"</code>
+                            <code>wp-bulk download-google-sheet --sheet-id "1B5gj1nxzVhQ..." --credentials "credentials/google.json" --output "my_file.xlsx"</code>
                             <div class="text-muted small mt-2">С явным указанием параметров</div>
                         </div>
 
@@ -1001,7 +1844,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli upload-to-google-sheets --file export.xlsx</code>
+                            <code>wp-bulk upload-to-google-sheets --file export.xlsx</code>
                             <div class="text-muted small mt-2">Загрузить весь файл (используя .env)</div>
                         </div>
 
@@ -1009,7 +1852,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages</code>
+                            <code>wp-bulk upload-to-google-sheets --file export.xlsx --sheets posts,pages</code>
                             <div class="text-muted small mt-2">Только определенные листы</div>
                         </div>
 
@@ -1047,7 +1890,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-from-google</code>
+                            <code>wp-bulk sync-from-google</code>
                             <div class="text-muted small mt-2">Используя настройки из .env</div>
                         </div>
 
@@ -1055,7 +1898,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-from-google --sheet-id "1B5gj1n..." --sheets posts,pages</code>
+                            <code>wp-bulk sync-from-google --sheet-id "1B5gj1n..." --sheets posts,pages</code>
                             <div class="text-muted small mt-2">С фильтром листов</div>
                         </div>
 
@@ -1063,7 +1906,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-from-google --dry-run --verbose</code>
+                            <code>wp-bulk sync-from-google --dry-run --verbose</code>
                             <div class="text-muted small mt-2">Тестовый режим</div>
                         </div>
 
@@ -1104,7 +1947,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-google-bidirectional</code>
+                            <code>wp-bulk sync-google-bidirectional</code>
                             <div class="text-muted small mt-2">Полный цикл (используя .env)</div>
                         </div>
 
@@ -1112,7 +1955,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages</code>
+                            <code>wp-bulk sync-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages</code>
                             <div class="text-muted small mt-2">С фильтром листов</div>
                         </div>
 
@@ -1120,7 +1963,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-google-bidirectional --no-upload-back</code>
+                            <code>wp-bulk sync-google-bidirectional --no-upload-back</code>
                             <div class="text-muted small mt-2">Без загрузки обратно (только Google → WP)</div>
                         </div>
 
@@ -1128,7 +1971,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli sync-google-bidirectional --output "data/my_project.xlsx"</code>
+                            <code>wp-bulk sync-google-bidirectional --output "data/my_project.xlsx"</code>
                             <div class="text-muted small mt-2">Указать другой путь к локальному файлу</div>
                         </div>
 
@@ -1190,7 +2033,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file example.xlsx</code>
+                            <code>wp-bulk async --file example.xlsx</code>
                             <div class="text-muted small mt-2">Полная асинхронная синхронизация всех листов</div>
                         </div>
 
@@ -1198,7 +2041,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file w.xlsx --sheets posts --concurrency 10</code>
+                            <code>wp-bulk async --file w.xlsx --sheets posts --concurrency 10</code>
                             <div class="text-muted small mt-2">Увеличенная concurrency для быстрых серверов</div>
                         </div>
 
@@ -1206,7 +2049,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file data.xlsx --test-mode --verbose</code>
+                            <code>wp-bulk async --file data.xlsx --test-mode --verbose</code>
                             <div class="text-muted small mt-2">Тестовый режим: обработать первые 3 строки с логами</div>
                         </div>
 
@@ -1214,7 +2057,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file w.xlsx --max-retries 5 --api-timeout 60</code>
+                            <code>wp-bulk async --file w.xlsx --max-retries 5 --api-timeout 60</code>
                             <div class="text-muted small mt-2">Увеличить retry и timeout для медленного сервера</div>
                         </div>
 
@@ -1222,7 +2065,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file data.xlsx --skip-tax</code>
+                            <code>wp-bulk async --file data.xlsx --skip-tax</code>
                             <div class="text-muted small mt-2">Обновить только поля контента, пропустив таксономии (ускоряет синхронизацию)</div>
                         </div>
 
@@ -1230,8 +2073,28 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file data.xlsx --skip-media --skip-tax</code>
+                            <code>wp-bulk async --file data.xlsx --skip-media --skip-tax</code>
                             <div class="text-muted small mt-2">Максимальная скорость: обновление только основных полей</div>
+                        </div>
+
+                        <div class="alert alert-success mt-4">
+                            <strong><i class="bi bi-folder me-2"></i>С использованием проекта:</strong>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P ost async --file projects/ost/data.xlsx</code>
+                            <div class="text-muted small mt-2">Проект "ost": .env, логи и пути медиа из projects/ost/</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P tzm async --file projects/tzm/tzm.xlsx --sheets posts --concurrency 10 --verbose</code>
+                            <div class="text-muted small mt-2">Проект "tzm": синхронизация постов с 10 параллельными запросами</div>
                         </div>
 
                         <div class="alert alert-info mt-4">
@@ -1243,7 +2106,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file data.xlsx --sheets media</code>
+                            <code>wp-bulk async --file data.xlsx --sheets media</code>
                             <div class="text-muted small mt-2">Асинхронная синхронизация медиафайлов (загрузка, редактирование, удаление)</div>
                         </div>
 
@@ -1251,7 +2114,7 @@ python -m src.cli fetch-media --file export.xlsx</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async --file data.xlsx --sheets media --concurrency 3</code>
+                            <code>wp-bulk async --file data.xlsx --sheets media --concurrency 3</code>
                             <div class="text-muted small mt-2">Параллельная загрузка 3 файлов одновременно</div>
                         </div>
 
@@ -1323,7 +2186,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-from-google</code>
+                            <code>wp-bulk async-from-google</code>
                             <div class="text-muted small mt-2">Используя настройки из .env</div>
                         </div>
 
@@ -1331,7 +2194,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-from-google --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <code>wp-bulk async-from-google --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
                             <div class="text-muted small mt-2">С фильтром листов и увеличенной concurrency</div>
                         </div>
 
@@ -1378,7 +2241,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-google-bidirectional</code>
+                            <code>wp-bulk async-google-bidirectional</code>
                             <div class="text-muted small mt-2">Полный асинхронный цикл (используя .env)</div>
                         </div>
 
@@ -1386,7 +2249,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
+                            <code>wp-bulk async-google-bidirectional --sheet-id "1B5gj1n..." --sheets posts,pages --concurrency 10</code>
                             <div class="text-muted small mt-2">С фильтром листов и высокой concurrency</div>
                         </div>
 
@@ -1394,7 +2257,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli async-google-bidirectional --no-upload-back</code>
+                            <code>wp-bulk async-google-bidirectional --no-upload-back</code>
                             <div class="text-muted small mt-2">Без загрузки обратно (только Google → WP)</div>
                         </div>
 
@@ -1442,7 +2305,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli bulk-delete --post-type posts --status draft</code>
+                            <code>wp-bulk bulk-delete --post-type posts --status draft</code>
                             <div class="text-muted small mt-2">Удалить все черновики постов в корзину</div>
                         </div>
 
@@ -1450,7 +2313,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli bulk-delete --post-type service --force --delete-media</code>
+                            <code>wp-bulk bulk-delete --post-type service --force --delete-media</code>
                             <div class="text-muted small mt-2">Полное удаление с медиафайлами</div>
                         </div>
 
@@ -1458,7 +2321,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli bulk-delete --post-type posts --dry-run</code>
+                            <code>wp-bulk bulk-delete --post-type posts --dry-run</code>
                             <div class="text-muted small mt-2">Показать что будет удалено (без удаления)</div>
                         </div>
 
@@ -1502,7 +2365,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli counter --type posts --output stats.csv</code>
+                            <code>wp-bulk counter --type posts --output stats.csv</code>
                             <div class="text-muted small mt-2">Подсчет слов/символов для всех опубликованных постов</div>
                         </div>
 
@@ -1510,7 +2373,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli counter --type pages --status any --limit 100</code>
+                            <code>wp-bulk counter --type pages --status any --limit 100</code>
                             <div class="text-muted small mt-2">Статистика для первых 100 страниц любого статуса</div>
                         </div>
 
@@ -1518,7 +2381,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli counter --type service --output service_stats.csv</code>
+                            <code>wp-bulk counter --type service --output service_stats.csv</code>
                             <div class="text-muted small mt-2">Статистика для кастомного типа "service"</div>
                         </div>
 
@@ -1562,7 +2425,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli validate --file example.xlsx</code>
+                            <code>wp-bulk validate --file example.xlsx</code>
                             <div class="text-muted small mt-2">Проверить структуру файла</div>
                         </div>
 
@@ -1614,7 +2477,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli options --fetch</code>
+                            <code>wp-bulk options --fetch</code>
                             <div class="text-muted small mt-2">Создать файл options.xlsx с настройками из WordPress</div>
                         </div>
 
@@ -1622,7 +2485,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli options --fetch --file my_options.xlsx</code>
+                            <code>wp-bulk options --fetch --file my_options.xlsx</code>
                             <div class="text-muted small mt-2">Выгрузить настройки в указанный файл</div>
                         </div>
 
@@ -1634,7 +2497,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli options --file example.xlsx</code>
+                            <code>wp-bulk options --file example.xlsx</code>
                             <div class="text-muted small mt-2">Обновить настройки WordPress из Excel</div>
                         </div>
 
@@ -1642,7 +2505,7 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli options --file example.xlsx --dry-run</code>
+                            <code>wp-bulk options --file example.xlsx --dry-run</code>
                             <div class="text-muted small mt-2">Показать что будет отправлено (без изменений)</div>
                         </div>
 
@@ -1720,7 +2583,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column excerpt</code>
+                            <code>wp-bulk llm --column excerpt</code>
                             <div class="text-muted small mt-2">Использует LLM_MODELS, LLM_PROMPT из .env (самый быстрый способ)</div>
                         </div>
 
@@ -1728,7 +2591,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"</code>
+                            <code>wp-bulk llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"</code>
                             <div class="text-muted small mt-2">Генерация excerpt на основе title с явным указанием модели</div>
                         </div>
 
@@ -1736,7 +2599,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши услугу [title]: [excerpt]"</code>
+                            <code>wp-bulk llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши услугу [title]: [excerpt]"</code>
                             <div class="text-muted small mt-2">Fallback между моделями (если grok не ответит, попробует gpt-4, потом claude-3)</div>
                         </div>
 
@@ -1744,7 +2607,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column content --model "gpt-4" --prompt "Напиши подробную статью про [title]" --md-to-html</code>
+                            <code>wp-bulk llm --column content --model "gpt-4" --prompt "Напиши подробную статью про [title]" --md-to-html</code>
                             <div class="text-muted small mt-2">Генерация с конвертацией Markdown в HTML</div>
                         </div>
 
@@ -1752,7 +2615,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column excerpt --model "gpt-4" --sheets posts,pages --overwrite</code>
+                            <code>wp-bulk llm --column excerpt --model "gpt-4" --sheets posts,pages --overwrite</code>
                             <div class="text-muted small mt-2">Обработка конкретных листов с перезаписью существующих значений</div>
                         </div>
 
@@ -1760,7 +2623,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <code>python -m src.cli llm --column description --model "gpt-4" --dry-run --verbose</code>
+                            <code>wp-bulk llm --column description --model "gpt-4" --dry-run --verbose</code>
                             <div class="text-muted small mt-2">Тестовый режим с подробными логами</div>
                         </div>
 
@@ -1848,6 +2711,91 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                                 <li>X.AI Grok</li>
                                 <li>Локальные LLM (через LM Studio, Ollama и т.д.)</li>
                                 <li>Любые другие совместимые API</li>
+                            </ul>
+                        </div>
+
+                        <!-- content_path и img_path -->
+                        <h5 class="mt-4" id="llm-file-modes"><i class="bi bi-file-earmark-arrow-down me-2"></i>Режимы записи в файл</h5>
+
+                        <div class="info-box mt-3">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Автоматическое определение режима:</strong>
+                            <p class="mb-2">Команда <code>llm</code> автоматически определяет режим работы по имени колонки <code>--column</code>:</p>
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Колонка</th>
+                                        <th>Режим</th>
+                                        <th>Результат</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>content_path</code></td>
+                                        <td>Генерация текста в файл</td>
+                                        <td>Файл <code>content/{id}.html</code>, путь в Excel</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>img_path</code></td>
+                                        <td>Генерация изображения</td>
+                                        <td>Файл <code>media/{id}.png</code>, путь в Excel</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Любая другая</td>
+                                        <td>Обычный режим</td>
+                                        <td>Текст записывается прямо в колонку</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="success-box mt-3">
+                            <strong><i class="bi bi-file-text me-2"></i>content_path — генерация текста в файл</strong>
+                            <p class="mb-2">Когда <code>--column content_path</code>, LLM генерирует текст, сохраняет в файл, а в Excel записывается относительный путь к файлу.</p>
+                            <ul class="mb-2">
+                                <li>Файл сохраняется как <code>content/{id}.html</code> (ID записи из колонки <code>id</code>)</li>
+                                <li>Постобработка (<code>--md-to-html</code>, <code>--strip-tags</code>, <code>--html-to-md</code>) применяется к тексту перед сохранением</li>
+                                <li>С проектом: <code>projects/&lt;name&gt;/content/{id}.html</code></li>
+                                <li>Без проекта: <code>data/content/{id}.html</code></li>
+                            </ul>
+<pre class="code-block"><code># Генерация контента в файлы
+wp-bulk llm --column content_path --file data.xlsx \
+  --prompt "Напиши подробную статью про [title]" --md-to-html
+
+# С проектом — файлы в projects/mysite/content/
+wp-bulk -P mysite llm --column content_path --file data.xlsx \
+  --prompt "Напиши описание [title]" --md-to-html</code></pre>
+                            <p class="mb-0"><strong>Результат в Excel:</strong> <code>content/123.html</code>, <code>content/456.html</code>, ...</p>
+                        </div>
+
+                        <div class="success-box mt-3">
+                            <strong><i class="bi bi-image me-2"></i>img_path — генерация изображений</strong>
+                            <p class="mb-2">Когда <code>--column img_path</code>, LLM генерирует изображение, сохраняет в файл, а в Excel записывается путь.</p>
+                            <ul class="mb-2">
+                                <li>Используются модели для генерации изображений (например, <code>gemini-3-pro-image-preview</code>)</li>
+                                <li>Формат ответа API: <code>choices[0].message.images[0].image_url.url</code> (data:image/png;base64,...)</li>
+                                <li>Файл сохраняется как <code>media/{id}.png</code></li>
+                                <li>С проектом: <code>projects/&lt;name&gt;/media/{id}.png</code></li>
+                                <li>Без проекта: <code>data/media/{id}.png</code></li>
+                            </ul>
+<pre class="code-block"><code># Генерация изображений
+wp-bulk llm --column img_path --file data.xlsx \
+  --model "gemini-3-pro-image-preview" \
+  --prompt "A photorealistic image of [title], aspect ratio 1.91:1, professional lighting, no text"
+
+# С проектом
+wp-bulk -P mysite llm --column img_path --file data.xlsx \
+  --model "gemini-3-pro-image-preview" \
+  --prompt "Photorealistic [title], 16:9 aspect ratio, ultra detailed"</code></pre>
+                            <p class="mb-0"><strong>Результат в Excel:</strong> <code>media/123.png</code>, <code>media/456.png</code>, ...</p>
+                        </div>
+
+                        <div class="warning-box mt-3">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Важно для img_path:</strong>
+                            <ul class="mb-0">
+                                <li>Используйте модели для генерации изображений через <code>--model</code> (не текстовые модели)</li>
+                                <li>Таймаут для генерации изображений увеличен до 300 секунд</li>
+                                <li>Промпт на английском языке дает лучшие результаты</li>
+                                <li>Указывайте aspect ratio в промпте для контроля пропорций</li>
                             </ul>
                         </div>
                     </div>
@@ -2039,6 +2987,36 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                     { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' }
                 ]
             },
+            'counter': {
+                params: [
+                    { name: 'type', type: 'text', required: false, placeholder: 'posts', description: 'Тип контента (posts, pages, custom)' },
+                    { name: 'status', type: 'select', required: false, options: ['publish', 'draft', 'any'], description: 'Фильтр по статусу' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'counter_output.csv', description: 'Путь к выходному CSV файлу' },
+                    { name: 'limit', type: 'number', required: false, placeholder: '100', description: 'Максимум записей' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
+                    { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
+                    { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
+                    { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' }
+                ]
+            },
+            'llm': {
+                params: [
+                    { name: 'column', type: 'text', required: true, placeholder: 'excerpt', description: 'Колонка для записи результата' },
+                    { name: 'file', type: 'text', required: false, placeholder: 'export.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов' },
+                    { name: 'model', type: 'text', required: false, placeholder: 'gpt-4,claude-3', description: 'Модели через запятую (или LLM_MODELS из .env)' },
+                    { name: 'prompt', type: 'text', required: false, placeholder: 'Напиши текст для [title]', description: 'Промпт (или LLM_PROMPT из .env)' },
+                    { name: 'endpoint', type: 'text', required: false, placeholder: 'http://localhost:8317/v1/chat/completions', description: 'LLM API URL' },
+                    { name: 'token', type: 'text', required: false, placeholder: 'your-api-key', description: 'API токен' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'overwrite', type: 'checkbox', required: false, description: 'Перезаписывать существующие значения' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Тестовый режим без сохранения' },
+                    { name: 'strip-tags', type: 'checkbox', required: false, description: 'Удалить HTML теги' },
+                    { name: 'md-to-html', type: 'checkbox', required: false, description: 'Markdown → HTML' },
+                    { name: 'html-to-md', type: 'checkbox', required: false, description: 'HTML → Markdown' }
+                ]
+            },
             'options': {
                 params: [
                     { name: 'file', type: 'text', required: false, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
@@ -2105,9 +3083,13 @@ LLM_PROMPT=Напиши текст для [title]</pre>
             updateConstructedCommand();
         });
 
+        // Обработчик ввода проекта
+        document.getElementById('projectInput').addEventListener('input', updateConstructedCommand);
+
         // Обновление сконструированной команды
         function updateConstructedCommand() {
             const command = document.getElementById('commandSelect').value;
+            const project = document.getElementById('projectInput').value.trim();
             const output = document.getElementById('constructedCommand');
 
             if (!command) {
@@ -2115,7 +3097,11 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                 return;
             }
 
-            let cmd = `python -m src.cli ${command}`;
+            let cmd = `wp-bulk`;
+            if (project) {
+                cmd += ` -P ${project}`;
+            }
+            cmd += ` ${command}`;
 
             document.querySelectorAll('.param-input').forEach(input => {
                 const paramName = input.dataset.param;
