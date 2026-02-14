@@ -410,6 +410,18 @@
                         <li class="nav-item">
                             <a class="nav-link" href="#options">options</a>
                         </li>
+                        <li class="nav-item mt-3">
+                            <h6 class="px-3 text-muted small">ОБРАБОТКА ИЗОБРАЖЕНИЙ</h6>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#image-crop">image-crop</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#image-compress">image-compress</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#image-convert">image-convert</a>
+                        </li>
                     </ul>
                 </div>
             </nav>
@@ -453,6 +465,9 @@
                                         <option value="llm">llm - Генерация контента через LLM API</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Управление настройками (загрузка/выгрузка)</option>
+                                        <option value="image-crop">image-crop - Обрезка изображений</option>
+                                        <option value="image-compress">image-compress - Сжатие изображений</option>
+                                        <option value="image-convert">image-convert - Конвертация изображений</option>
                                     </select>
                                 </div>
                             </div>
@@ -2800,6 +2815,330 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                         </div>
                     </div>
 
+                    <!-- ─── ОБРАБОТКА ИЗОБРАЖЕНИЙ ─── -->
+
+                    <!-- image-crop -->
+                    <div id="image-crop" class="command-card">
+                        <h2 class="command-title">image-crop</h2>
+                        <p class="command-description">Обрезка изображений под размер или соотношение сторон</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Массовая обрезка изображений из папки проекта <code>media/</code> (или указанной директории).
+                            Поддерживает обрезку по точным размерам, по соотношению сторон, и пять стратегий позиционирования.
+                            Автоматически исправляет ориентацию фотографий с телефона (EXIF).
+                            Опционально: градиентный overlay (затемнение снизу) и водяной знак (текст или картинка).
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--input / -i</span> папка с изображениями (по умолчанию: <code>media/</code> проекта)
+                            <span class="param-badge param-optional">--output / -o</span> папка для результатов (по умолчанию: <code>media/cropped/</code>)
+                            <span class="param-badge param-optional">--width / -W</span> ширина в пикселях
+                            <span class="param-badge param-optional">--height / -H</span> высота в пикселях
+                            <span class="param-badge param-optional">--aspect-ratio / -a</span> соотношение сторон (16:9, 4:3, 1:1)
+                            <span class="param-badge param-optional">--strategy / -s</span> стратегия обрезки: center, top, bottom, left, right (по умолчанию: center)
+                            <span class="param-badge param-optional">--gradient</span> затемняющий градиент снизу, opacity 0.0-1.0 (по умолчанию: 0 — выключен)
+                            <span class="param-badge param-optional">--gradient-height</span> высота градиента, доля 0.0-1.0 (по умолчанию: 0.5)
+                            <span class="param-badge param-optional">--watermark-text / --wt</span> текст водяного знака
+                            <span class="param-badge param-optional">--watermark-image / --wi</span> картинка водяного знака (путь к файлу)
+                            <span class="param-badge param-optional">--watermark-position / --wp</span> позиция: center, bottom-right, bottom-left, top-right, top-left, bottom-center (по умолчанию: bottom-right)
+                            <span class="param-badge param-optional">--watermark-opacity / --wo</span> прозрачность водяного знака, 0.0-1.0 (по умолчанию: 0.3)
+                            <span class="param-badge param-optional">--watermark-size / --ws</span> размер шрифта текстового водяного знака (авто ~4% ширины)
+                            <span class="param-badge param-optional">--watermark-color / --wc</span> цвет текста #RRGGBB (по умолчанию: #FFFFFF)
+                            <span class="param-badge param-optional">--watermark-scale</span> масштаб картинки-водяного знака, доля от ширины (по умолчанию: 0.2)
+                            <span class="param-badge param-optional">--glob / -g</span> паттерн файлов (по умолчанию: <code>*.{jpg,jpeg,png,webp}</code>)
+                            <span class="param-badge param-optional">--recursive / -r</span> искать в подпапках
+                            <span class="param-badge param-optional">--overwrite</span> перезаписать существующие файлы
+                            <span class="param-badge param-optional">--dry-run / -d</span> показать что будет сделано без обработки
+                            <span class="param-badge param-optional">--verbose / -v</span> подробный вывод
+                        </div>
+
+                        <div class="warning-box">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Требования:</strong>
+                            Необходимо указать <code>--aspect-ratio</code> или оба параметра <code>--width</code> и <code>--height</code>.
+                            При указании aspect-ratio без размеров — обрезает до нужного соотношения, сохраняя максимальную площадь.
+                            При указании aspect-ratio + width — высота вычисляется автоматически.
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost --aspect-ratio 16:9</code>
+                            <div class="text-muted small mt-2">Обрезать все изображения проекта под 16:9 (максимальная площадь)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop --input ./photos --width 800 --height 600</code>
+                            <div class="text-muted small mt-2">Обрезать до точного размера 800x600</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 1:1 --strategy top</code>
+                            <div class="text-muted small mt-2">Квадратная обрезка с привязкой к верху (для портретов)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 16:9 --dry-run</code>
+                            <div class="text-muted small mt-2">Показать какие файлы будут обработаны (без изменений)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 9:16 --strategy left</code>
+                            <div class="text-muted small mt-2">Обрезка от левого края (стратегия left)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 16:9 --gradient 0.5</code>
+                            <div class="text-muted small mt-2">Обрезка + затемняющий градиент снизу (50% opacity)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 16:9 --wt "© MySite" --wp bottom-right</code>
+                            <div class="text-muted small mt-2">Обрезка + текстовый водяной знак в правом нижнем углу</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 16:9 --gradient 0.4 --wt "© MySite" --wp center --wo 0.5</code>
+                            <div class="text-muted small mt-2">Обрезка + градиент + водяной знак по центру</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-crop -P ost -a 16:9 --wi logo.png --wp bottom-right --watermark-scale 0.15</code>
+                            <div class="text-muted small mt-2">Обрезка + картинка-водяной знак (логотип)</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Rich прогресс-бар с процентом и ETA</li>
+                                <li>Итоговая таблица: всего, обработано, пропущено, ошибки</li>
+                                <li>Размер входных/выходных файлов и процент экономии</li>
+                                <li>Результаты сохраняются в <code>media/cropped/</code></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- image-compress -->
+                    <div id="image-compress" class="command-card">
+                        <h2 class="command-title">image-compress</h2>
+                        <p class="command-description">Сжатие изображений для веба</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Массовое сжатие изображений с контролем качества и максимальных размеров.
+                            Автоматически подбирает оптимальные параметры для каждого формата (JPEG, PNG, WebP).
+                            Поддерживает пропорциональное уменьшение через <code>--max-width</code> / <code>--max-height</code>.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--input / -i</span> папка с изображениями (по умолчанию: <code>media/</code> проекта)
+                            <span class="param-badge param-optional">--output / -o</span> папка для результатов (по умолчанию: <code>media/compressed/</code>)
+                            <span class="param-badge param-optional">--quality / -q</span> качество JPEG/WebP, 1-100 (по умолчанию: 80)
+                            <span class="param-badge param-optional">--max-width</span> максимальная ширина (пропорциональное уменьшение)
+                            <span class="param-badge param-optional">--max-height</span> максимальная высота (пропорциональное уменьшение)
+                            <span class="param-badge param-optional">--strip-metadata / --keep-metadata</span> удалить EXIF (по умолчанию: удалять)
+                            <span class="param-badge param-optional">--glob / -g</span> паттерн файлов (по умолчанию: <code>*.{jpg,jpeg,png,webp}</code>)
+                            <span class="param-badge param-optional">--recursive / -r</span> искать в подпапках
+                            <span class="param-badge param-optional">--overwrite</span> перезаписать существующие файлы
+                            <span class="param-badge param-optional">--dry-run / -d</span> показать что будет сделано без обработки
+                            <span class="param-badge param-optional">--verbose / -v</span> подробный вывод
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-compress -P ost --quality 80</code>
+                            <div class="text-muted small mt-2">Сжать все изображения проекта с качеством 80%</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-compress --input ./photos -q 75 --max-width 1920</code>
+                            <div class="text-muted small mt-2">Сжать до 75% качества и уменьшить до 1920px по ширине</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-compress -P ost -q 60 --max-width 1200 --max-height 800</code>
+                            <div class="text-muted small mt-2">Агрессивное сжатие с ограничением по обоим измерениям</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-compress -P ost --keep-metadata --quality 90</code>
+                            <div class="text-muted small mt-2">Лёгкое сжатие с сохранением EXIF метаданных</div>
+                        </div>
+
+                        <div class="info-box mt-4">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Особенности форматов:</strong>
+                            <ul class="mb-0">
+                                <li><strong>JPEG:</strong> RGBA изображения автоматически конвертируются в RGB (белый фон)</li>
+                                <li><strong>PNG:</strong> используется <code>optimize=True</code>, параметр quality не применяется</li>
+                                <li><strong>WebP:</strong> полная поддержка quality + optimize</li>
+                            </ul>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Rich прогресс-бар с процентом и ETA</li>
+                                <li>Итоговая таблица: всего, обработано, пропущено, ошибки</li>
+                                <li>Размер входных/выходных файлов, сэкономлено MB и %</li>
+                                <li>Результаты сохраняются в <code>media/compressed/</code></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- image-convert -->
+                    <div id="image-convert" class="command-card">
+                        <h2 class="command-title">image-convert</h2>
+                        <p class="command-description">Конвертация изображений в другой формат (по умолчанию WebP)</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Массовая конвертация изображений между форматами. По умолчанию конвертирует в WebP —
+                            современный формат с лучшим сжатием для веба. Автоматически обрабатывает прозрачность
+                            (RGBA &rarr; RGB с белым фоном для JPEG).
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--input / -i</span> папка с изображениями (по умолчанию: <code>media/</code> проекта)
+                            <span class="param-badge param-optional">--output / -o</span> папка для результатов (по умолчанию: <code>media/webp/</code>)
+                            <span class="param-badge param-optional">--format / -f</span> целевой формат: webp, jpg, png (по умолчанию: webp)
+                            <span class="param-badge param-optional">--quality / -q</span> качество для lossy форматов, 1-100 (по умолчанию: 85)
+                            <span class="param-badge param-optional">--strip-metadata / --keep-metadata</span> удалить EXIF (по умолчанию: удалять)
+                            <span class="param-badge param-optional">--glob / -g</span> паттерн файлов (по умолчанию: <code>*.{jpg,jpeg,png,gif,bmp,tiff}</code>)
+                            <span class="param-badge param-optional">--recursive / -r</span> искать в подпапках
+                            <span class="param-badge param-optional">--overwrite</span> перезаписать существующие файлы
+                            <span class="param-badge param-optional">--dry-run / -d</span> показать что будет сделано без обработки
+                            <span class="param-badge param-optional">--verbose / -v</span> подробный вывод
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-convert -P ost --format webp</code>
+                            <div class="text-muted small mt-2">Конвертировать все изображения проекта в WebP</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-convert --input ./photos -f webp -q 85</code>
+                            <div class="text-muted small mt-2">Конвертировать фотографии в WebP с качеством 85%</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-convert -P ost -f jpg -q 90 --glob "*.png"</code>
+                            <div class="text-muted small mt-2">Конвертировать только PNG файлы в JPEG</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk image-convert -P ost --format webp --dry-run</code>
+                            <div class="text-muted small mt-2">Показать какие файлы будут конвертированы (входное имя &rarr; выходное)</div>
+                        </div>
+
+                        <div class="info-box mt-4">
+                            <strong><i class="bi bi-lightbulb me-2"></i>Поддерживаемые форматы:</strong>
+                            <table class="table table-sm table-bordered mb-0 mt-2">
+                                <thead>
+                                    <tr>
+                                        <th>Целевой формат</th>
+                                        <th>Расширение</th>
+                                        <th>Особенности</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>webp</code></td>
+                                        <td>.webp</td>
+                                        <td>Лучшее сжатие, поддержка прозрачности, рекомендуется для веба</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>jpg</code></td>
+                                        <td>.jpg</td>
+                                        <td>Широкая совместимость, RGBA автоконвертация в RGB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>png</code></td>
+                                        <td>.png</td>
+                                        <td>Без потерь, поддержка прозрачности, больший размер файла</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Rich прогресс-бар с процентом и ETA</li>
+                                <li>В dry-run показывает маппинг: <code>photo.jpg &rarr; photo.webp</code></li>
+                                <li>Итоговая таблица: всего, обработано, пропущено, ошибки</li>
+                                <li>Размер входных/выходных файлов и процент экономии</li>
+                                <li>Результаты сохраняются в <code>media/&lt;format&gt;/</code></li>
+                            </ul>
+                        </div>
+
+                        <div class="warning-box mt-4">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Обработка ошибок:</strong>
+                            <ul class="mb-0">
+                                <li>Повреждённые/нечитаемые файлы пропускаются с записью в лог</li>
+                                <li>Существующие файлы (без <code>--overwrite</code>) пропускаются молча</li>
+                                <li>Пустая папка / нет совпадений по паттерну — предупреждение и выход</li>
+                                <li>Несуществующая папка — ошибка с exit code 1</li>
+                            </ul>
+                        </div>
+                    </div>
+
                 </section>
 
                 <!-- Футер -->
@@ -3023,6 +3362,59 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'fetch', type: 'checkbox', required: false, description: 'Выгрузить настройки из WordPress в Excel' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать без отправки (только для загрузки)' },
                     { name: 'env-file', type: 'text', required: false, placeholder: '.env', description: 'Путь к .env файлу' }
+                ]
+            },
+            'image-crop': {
+                params: [
+                    { name: 'input', type: 'text', required: false, placeholder: './media', description: 'Папка с изображениями' },
+                    { name: 'output', type: 'text', required: false, placeholder: './media/cropped', description: 'Папка для результатов' },
+                    { name: 'width', type: 'number', required: false, placeholder: '800', description: 'Ширина в пикселях' },
+                    { name: 'height', type: 'number', required: false, placeholder: '600', description: 'Высота в пикселях' },
+                    { name: 'aspect-ratio', type: 'text', required: false, placeholder: '16:9', description: 'Соотношение сторон (16:9, 4:3, 1:1)' },
+                    { name: 'strategy', type: 'select', required: false, options: ['center', 'top', 'bottom', 'left', 'right'], description: 'Стратегия обрезки' },
+                    { name: 'gradient', type: 'text', required: false, placeholder: '0.5', description: 'Градиент снизу (opacity 0.0-1.0)' },
+                    { name: 'gradient-height', type: 'text', required: false, placeholder: '0.5', description: 'Высота градиента (доля 0.0-1.0)' },
+                    { name: 'watermark-text', type: 'text', required: false, placeholder: '© MySite', description: 'Текст водяного знака' },
+                    { name: 'watermark-image', type: 'text', required: false, placeholder: 'logo.png', description: 'Картинка водяного знака (путь)' },
+                    { name: 'watermark-position', type: 'select', required: false, options: ['bottom-right', 'bottom-left', 'bottom-center', 'top-right', 'top-left', 'center'], description: 'Позиция водяного знака' },
+                    { name: 'watermark-opacity', type: 'text', required: false, placeholder: '0.3', description: 'Прозрачность водяного знака (0.0-1.0)' },
+                    { name: 'watermark-size', type: 'number', required: false, placeholder: '', description: 'Размер шрифта (авто если пусто)' },
+                    { name: 'watermark-color', type: 'text', required: false, placeholder: '#FFFFFF', description: 'Цвет текста (#RRGGBB)' },
+                    { name: 'watermark-scale', type: 'text', required: false, placeholder: '0.2', description: 'Масштаб картинки-водяного знака' },
+                    { name: 'glob', type: 'text', required: false, placeholder: '*.{jpg,jpeg,png,webp}', description: 'Паттерн файлов' },
+                    { name: 'recursive', type: 'checkbox', required: false, description: 'Искать в подпапках' },
+                    { name: 'overwrite', type: 'checkbox', required: false, description: 'Перезаписать существующие' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет сделано' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробный вывод' }
+                ]
+            },
+            'image-compress': {
+                params: [
+                    { name: 'input', type: 'text', required: false, placeholder: './media', description: 'Папка с изображениями' },
+                    { name: 'output', type: 'text', required: false, placeholder: './media/compressed', description: 'Папка для результатов' },
+                    { name: 'quality', type: 'number', required: false, placeholder: '80', description: 'Качество JPEG/WebP (1-100)' },
+                    { name: 'max-width', type: 'number', required: false, placeholder: '1920', description: 'Максимальная ширина (пропорционально)' },
+                    { name: 'max-height', type: 'number', required: false, placeholder: '1080', description: 'Максимальная высота (пропорционально)' },
+                    { name: 'strip-metadata', type: 'checkbox', required: false, description: 'Удалить EXIF метаданные' },
+                    { name: 'glob', type: 'text', required: false, placeholder: '*.{jpg,jpeg,png,webp}', description: 'Паттерн файлов' },
+                    { name: 'recursive', type: 'checkbox', required: false, description: 'Искать в подпапках' },
+                    { name: 'overwrite', type: 'checkbox', required: false, description: 'Перезаписать существующие' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет сделано' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробный вывод' }
+                ]
+            },
+            'image-convert': {
+                params: [
+                    { name: 'input', type: 'text', required: false, placeholder: './media', description: 'Папка с изображениями' },
+                    { name: 'output', type: 'text', required: false, placeholder: './media/webp', description: 'Папка для результатов' },
+                    { name: 'format', type: 'select', required: false, options: ['webp', 'jpg', 'png'], description: 'Целевой формат' },
+                    { name: 'quality', type: 'number', required: false, placeholder: '85', description: 'Качество для lossy форматов (1-100)' },
+                    { name: 'strip-metadata', type: 'checkbox', required: false, description: 'Удалить EXIF метаданные' },
+                    { name: 'glob', type: 'text', required: false, placeholder: '*.{jpg,jpeg,png,gif,bmp,tiff}', description: 'Паттерн файлов' },
+                    { name: 'recursive', type: 'checkbox', required: false, description: 'Искать в подпапках' },
+                    { name: 'overwrite', type: 'checkbox', required: false, description: 'Перезаписать существующие' },
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет сделано' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробный вывод' }
                 ]
             }
         };

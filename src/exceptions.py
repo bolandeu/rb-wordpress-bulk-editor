@@ -66,3 +66,8 @@ class ValidationError(WPBulkEditorError):
 class MediaUploadError(WordPressError):
     """Ошибка загрузки медиафайла"""
     pass
+
+
+class ImageProcessingError(WPBulkEditorError):
+    """Ошибка обработки изображения"""
+    pass

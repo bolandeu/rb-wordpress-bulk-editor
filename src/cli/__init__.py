@@ -9,6 +9,7 @@ CLI интерфейс для WordPress Bulk Editor
                         sync-from-google, sync-google-bidirectional,
                         async-from-google, async-google-bidirectional
 - tool_commands.py    - validate, options, bulk-delete, counter, llm
+- image_commands.py   - image-crop, image-compress, image-convert
 """
 
 from typing import Optional
@@ -56,6 +57,7 @@ from . import fetch_commands  # noqa: E402, F401
 from . import export_commands  # noqa: E402, F401
 from . import google_commands  # noqa: E402, F401
 from . import tool_commands  # noqa: E402, F401
+from . import image_commands  # noqa: E402, F401
 
 
 def main():
