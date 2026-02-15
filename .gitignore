@@ -41,10 +41,8 @@ logs/
 *.log
 
 # Excel files with credentials (IMPORTANT!)
-example.xlsx
+*.xls
 *.xlsx
-!data/templates/*.xlsx
-data
 *.csv
 
 # Environment variables
@@ -59,19 +57,8 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 
-# Data files
-data/media/*
-!data/media/.gitkeep
-
-export
-export/
-export/*.*
-
-credentials/*.*
-credentials/
 
 *.env
-
 .claude
 .calude/
 
@@ -88,6 +75,17 @@ tests
 *.svg
 *.webp
 
-projects/
-docs/
 wp_bulk_editor.egg-info
+
+docs/todo.md
+
+# Data files
+data/**
+!data/**/
+!data/**/.gitkeep
+
+credentials/*
+!credentials/.gitkeep
+
+projects/*
+!projects/.gitkeep
