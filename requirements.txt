@@ -1,7 +1,8 @@
-# Core dependencies (с гибкими версиями для лучшей совместимости)
+# Core dependencies
 pandas
 openpyxl
 httpx
+requests
 typer
 rich
 loguru
@@ -10,18 +11,14 @@ loguru
 pydantic
 pydantic-settings
 python-dotenv
-PyYAML
 
 # Media handling
 Pillow
 
-# Utilities
-tenacity
-python-slugify
-
 # Content processing
 markdown
 beautifulsoup4
+python-slugify
 
 # Google Sheets integration
 google-api-python-client

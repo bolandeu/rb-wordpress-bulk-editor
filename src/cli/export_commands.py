@@ -10,12 +10,10 @@ from loguru import logger
 
 from . import app, console
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
+from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from ..config import LoggingConfig, WordPressConfig, Settings
 from ..wordpress.client import WordPressClient
-from ..utils.logger import setup_logger
-from ..utils.auth import load_credentials_from_env
 from ..utils.content_exporter import ContentExporter
-from ..exceptions import WPBulkEditorError
 
 import typer
 
@@ -42,23 +40,17 @@ def export(
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "exported_content")
 
-    try:
-        logs_folder = resolve_logs_folder(ctx)
-        logs_folder.mkdir(parents=True, exist_ok=True)
-
-        logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-        log_file = setup_logger(logs_folder=logs_folder, config=logging_config, command_name="export")
+    with handle_command_errors():
+        log_file = setup_command_logging(ctx, "export", verbose)
 
         console.print("\n[bold cyan]WordPress Content Exporter[/bold cyan]")
         console.print("=" * 60 + "\n")
 
-        console.print(f"[yellow]->[/yellow] Загрузка credentials...")
-        domain, username, password = load_credentials_from_env(
-            env_file=env_file, domain_override=domain,
-            username_override=username, password_override=password
+        domain, username, password = load_and_print_credentials(
+            env_file=env_file, domain=domain,
+            username=username, password=password,
         )
 
-        console.print(f"[green]OK[/green] WordPress: {domain}")
         console.print(f"[yellow]->[/yellow] Папка экспорта: {output}")
         console.print(f"[yellow]->[/yellow] Параллельных загрузок: {concurrency}")
         if include_media:
@@ -80,14 +72,6 @@ def export(
         console.print(f"\n[bold]Всего экспортировано:[/bold] [green]{total}[/green] записей")
         console.print(f"[bold]CSV индекс:[/bold] {output / 'index.csv'}")
         console.print(f"\n[dim]Логи: {log_file}[/dim]")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]X Ошибка:[/bold red] {e}")
-        raise typer.Exit(1)
-    except Exception as e:
-        console.print(f"\n[bold red]X Неожиданная ошибка:[/bold red] {e}")
-        logger.exception("Критическая ошибка")
-        raise typer.Exit(1)
 
 
 async def export_content(
@@ -128,21 +112,15 @@ def export_media(
     console.print(f"\n[bold blue]WordPress Bulk Editor - Export Media[/bold blue]\n")
     console.print(f"Папка экспорта: [cyan]{output}[/cyan]\n")
 
-    try:
-        console.print("[yellow]Загрузка credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(
-            env_file=env_file, domain_override=domain,
-            username_override=username, password_override=password
+    with handle_command_errors():
+        domain, username, password = load_and_print_credentials(
+            env_file=env_file, domain=domain,
+            username=username, password=password,
         )
 
         wp_config = WordPressConfig(url=domain, username=username, password=password)
-        logging_config = LoggingConfig(level=("DEBUG" if verbose else "INFO"))
+        log_file = setup_command_logging(ctx, "export_media", verbose)
 
-        logs_folder = resolve_logs_folder(ctx)
-        logs_folder.mkdir(parents=True, exist_ok=True)
-        log_file = setup_logger(logs_folder=logs_folder, config=logging_config, command_name="export_media")
-
-        console.print(f"[green]WordPress:[/green] {domain}")
         console.print(f"[green]Скачивание файлов:[/green] {'Да' if download_files else 'Нет'}")
         console.print(f"[green]Параллельность:[/green] {concurrency}\n")
 
@@ -152,14 +130,6 @@ def export_media(
         console.print(f"Экспортировано: [cyan]{count}[/cyan] медиафайлов")
         console.print(f"CSV индекс: [cyan]{output / 'media_index.csv'}[/cyan]")
         console.print(f"\n[dim]Логи: {log_file}[/dim]")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]X Ошибка:[/bold red] {e}")
-        raise typer.Exit(1)
-    except Exception as e:
-        console.print(f"\n[bold red]X Неожиданная ошибка:[/bold red] {e}")
-        logger.exception("Критическая ошибка")
-        raise typer.Exit(1)
 
 
 async def run_export_media(

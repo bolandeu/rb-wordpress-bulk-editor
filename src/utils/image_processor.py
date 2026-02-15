@@ -263,12 +263,19 @@ class ImageProcessor:
         Collect image files from a directory.
         Expands brace patterns (*.{jpg,png}) into multiple globs.
         """
+        # Защита от path traversal в glob pattern
+        if ".." in glob_pattern:
+            raise ValueError(f"Unsafe glob pattern (contains '..'): {glob_pattern}")
+
         patterns = self._expand_brace_pattern(glob_pattern)
         glob_fn = input_dir.rglob if recursive else input_dir.glob
 
+        resolved_input = input_dir.resolve()
         files: set[Path] = set()
         for pattern in patterns:
-            files.update(f for f in glob_fn(pattern) if f.is_file())
+            for f in glob_fn(pattern):
+                if f.is_file() and f.resolve().is_relative_to(resolved_input):
+                    files.update({f})
 
         return sorted(files)
 
@@ -307,6 +314,8 @@ class ImageProcessor:
                 return int(height * ar_w / ar_h), height
             else:
                 # Crop to aspect ratio preserving maximum area
+                if orig_h == 0 or ar_h == 0:
+                    raise ValueError(f"Image height or aspect ratio height cannot be zero")
                 if orig_w / orig_h > ar_w / ar_h:
                     target_h = orig_h
                     target_w = int(orig_h * ar_w / ar_h)

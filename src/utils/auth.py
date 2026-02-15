@@ -45,9 +45,9 @@ def load_credentials_from_env(
         load_dotenv(override=True)
 
     # Получаем значения (приоритет у CLI параметров)
-    domain = domain_override or os.getenv("WP_DOMAIN")
-    username = username_override or os.getenv("WP_API_USER")
-    password = password_override or os.getenv("WP_API_TOKEN")
+    domain = (domain_override or os.getenv("WP_DOMAIN") or "").strip()
+    username = (username_override or os.getenv("WP_API_USER") or "").strip()
+    password = (password_override or os.getenv("WP_API_TOKEN") or "").strip()
 
     # Валидация
     missing = []
@@ -64,7 +64,7 @@ def load_credentials_from_env(
             f"Укажите их в .env файле или через параметры командной строки."
         )
 
-    logger.debug(f"Credentials загружены: domain={domain}, user={username}")
+    logger.debug(f"Credentials загружены: domain={domain}, user={username[:3]}***")
     return domain, username, password
 
 

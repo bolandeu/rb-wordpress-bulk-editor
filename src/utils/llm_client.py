@@ -17,6 +17,9 @@ class LLMError(Exception):
     pass
 
 
+_PLACEHOLDER_RE = re.compile(r'\[([^\]]+)\]')
+
+
 class LLMClient:
     """
     Клиент для работы с LLM API (OpenAI-compatible).
@@ -32,17 +35,23 @@ class LLMClient:
         self,
         endpoint: str,
         token: str,
-        timeout: int = 120
+        timeout: int = 120,
+        image_timeout: int = 300,
+        connect_timeout: int = 10,
     ):
         """
         Args:
             endpoint: URL LLM API endpoint
             token: API token
-            timeout: Timeout для запросов (секунды)
+            timeout: Read timeout для текстовых запросов (секунды)
+            image_timeout: Read timeout для генерации изображений (секунды)
+            connect_timeout: Connect timeout (секунды)
         """
         self.endpoint = endpoint
         self.token = token
         self.timeout = timeout
+        self.image_timeout = image_timeout
+        self.connect_timeout = connect_timeout
 
     async def generate(
         self,
@@ -79,6 +88,8 @@ class LLMClient:
                     logger.info(f"✓ Модель {model} успешно сгенерировала текст (попытка {attempt + 1})")
                     return result
 
+                except (KeyboardInterrupt, SystemExit):
+                    raise
                 except Exception as e:
                     last_error = e
                     logger.warning(f"✗ Модель {model}, попытка {attempt + 1}/{max_retries}: {e}")
@@ -132,6 +143,8 @@ class LLMClient:
                     logger.info(f"[IMG] Модель {model} успешно сгенерировала изображение (попытка {attempt + 1})")
                     return result
 
+                except (KeyboardInterrupt, SystemExit):
+                    raise
                 except Exception as e:
                     last_error = e
                     logger.warning(f"[IMG] Модель {model}, попытка {attempt + 1}/{max_retries}: {e}")
@@ -179,7 +192,7 @@ class LLMClient:
                 self.endpoint,
                 headers=headers,
                 json=payload,
-                timeout=(10, 300)  # Генерация изображений может занять больше времени
+                timeout=(self.connect_timeout, self.image_timeout)
             )
 
             if response.status_code != 200:
@@ -285,7 +298,7 @@ class LLMClient:
                 self.endpoint,
                 headers=headers,
                 json=payload,
-                timeout=(10, self.timeout)  # (connect_timeout, read_timeout)
+                timeout=(self.connect_timeout, self.timeout)
             )
 
             if response.status_code != 200:
@@ -379,7 +392,7 @@ class LLMClient:
         result = template
 
         # Находим все плейсхолдеры [column_name]
-        placeholders = re.findall(r'\[([^\]]+)\]', template)
+        placeholders = _PLACEHOLDER_RE.findall(template)
 
         for placeholder in placeholders:
             # Ищем значение в row_data

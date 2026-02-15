@@ -12,11 +12,11 @@ import asyncio
 from loguru import logger
 
 from . import app, console
+from .common import handle_command_errors, load_and_print_credentials
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..utils.logger import setup_logger
-from ..utils.auth import load_credentials_from_env, load_async_config_from_env
-from ..exceptions import WPBulkEditorError
+from ..utils.auth import load_async_config_from_env
 
 import typer
 
@@ -116,7 +116,7 @@ def download_google_sheet(
     )
     logger.info(f"Лог-файл создан: {log_file}")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
 
         final_sheet_id, credentials_path = _load_google_params(
@@ -142,11 +142,6 @@ def download_google_sheet(
 
         console.print(f"\n[bold green]OK Файл успешно скачан![/bold green]")
         console.print(f"[bold]Сохранено:[/bold] {output}")
-
-    except Exception as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]")
-        logger.exception("Критическая ошибка")
-        raise typer.Exit(1)
 
 
 # ============================================================
@@ -227,7 +222,7 @@ def upload_to_google_sheets(
     )
     logger.info(f"Лог-файл создан: {log_file}")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
 
         final_sheet_id, credentials_path = _load_google_params(
@@ -258,14 +253,6 @@ def upload_to_google_sheets(
 
         console.print(f"\n[bold green]OK Данные успешно загружены в Google Sheets![/bold green]")
         console.print(f"[bold]Локальный файл:[/bold] {file}\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 # ============================================================
@@ -308,7 +295,7 @@ def sync_from_google(
     console.print("\n[bold cyan]Google Sheets -> WordPress Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync
 
@@ -340,10 +327,7 @@ def sync_from_google(
         # ========== ШАГ 2: СИНХРОНИЗАЦИЯ С WORDPRESS ==========
         console.print("[bold yellow]ШАГ 2: Синхронизация с WordPress[/bold yellow]\n")
 
-        console.print("[yellow]Загрузка credentials из .env...[/yellow]")
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}")
-        console.print(f"[green]OK[/green] User: {username}\n")
+        domain, username, password = load_and_print_credentials(env_file=env_file)
 
         config = AppConfig.from_excel(
             excel_file=output,
@@ -377,14 +361,6 @@ def sync_from_google(
         console.print(f"\n[bold green]SUCCESS! Пайплайн завершен![/bold green]")
         console.print(f"Скачанный файл: [cyan]{output}[/cyan]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 # ============================================================
@@ -432,7 +408,7 @@ def sync_google_bidirectional(
     console.print("\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync
 
@@ -464,10 +440,7 @@ def sync_google_bidirectional(
         # ========== ШАГ 2: СИНХРОНИЗАЦИЯ С WORDPRESS ==========
         console.print("[bold yellow]ШАГ 2: Синхронизация с WordPress[/bold yellow]\n")
 
-        console.print("[yellow]Загрузка WordPress credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}")
-        console.print(f"[green]OK[/green] User: {username}\n")
+        domain, username, password = load_and_print_credentials(env_file=env_file)
 
         config = AppConfig.from_excel(
             excel_file=output,
@@ -531,14 +504,6 @@ def sync_google_bidirectional(
         console.print(f"Локальный файл: [cyan]{output}[/cyan]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
 
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
-
 
 # ============================================================
 # async-from-google
@@ -577,7 +542,7 @@ def async_sync_from_google(
 
     console.print(f"\n[bold cyan]Google Sheets -> WordPress (Async)[/bold cyan]\n")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync_async
 
@@ -598,8 +563,7 @@ def async_sync_from_google(
         # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
         console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
 
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+        domain, username, password = load_and_print_credentials(env_file=env_file)
 
         concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
             env_file=env_file,
@@ -645,14 +609,6 @@ def async_sync_from_google(
         console.print(f"Файл: [cyan]{output}[/cyan]")
         console.print(f"Лог: [cyan]{log_file}[/cyan]\n")
 
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Ошибка")
-        raise typer.Exit(code=1)
-
 
 # ============================================================
 # async-google-bidirectional
@@ -694,7 +650,7 @@ def async_sync_google_bidirectional(
 
     console.print(f"\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets (Async)[/bold cyan]\n")
 
-    try:
+    with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync_async
 
@@ -715,8 +671,7 @@ def async_sync_google_bidirectional(
         # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
         console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
 
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+        domain, username, password = load_and_print_credentials(env_file=env_file)
 
         concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
             env_file=env_file,
@@ -781,11 +736,3 @@ def async_sync_google_bidirectional(
         console.print(f"[bold green]SUCCESS! Полный пайплайн завершен![/bold green]")
         console.print(f"Файл: [cyan]{output}[/cyan]")
         console.print(f"Лог: [cyan]{log_file}[/cyan]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Ошибка")
-        raise typer.Exit(code=1)

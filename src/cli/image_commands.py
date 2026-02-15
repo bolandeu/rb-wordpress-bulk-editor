@@ -16,9 +16,8 @@ from rich.progress import (
 from rich.table import Table
 
 from . import app, console
-from .helpers import get_project, resolve_logs_folder
-from ..config import LoggingConfig
-from ..utils.logger import setup_logger
+from .helpers import get_project
+from .common import setup_command_logging
 from ..utils.image_processor import ImageProcessor, BatchProcessingStats
 
 import typer
@@ -84,14 +83,7 @@ def _print_stats(stats: BatchProcessingStats, log_file: Optional[Path] = None):
 
 def _setup_logging(ctx: typer.Context, command_name: str, verbose: bool) -> Path:
     """Настройка логирования для image-команд."""
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-    return setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name=command_name,
-    )
+    return setup_command_logging(ctx, command_name, verbose)
 
 
 def _make_progress() -> Progress:

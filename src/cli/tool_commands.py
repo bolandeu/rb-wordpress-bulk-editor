@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
 from ..config import LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
@@ -18,7 +19,6 @@ from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
 from ..utils.logger import setup_logger
 from ..utils.auth import load_credentials_from_env
-from ..exceptions import WPBulkEditorError
 
 import typer
 
@@ -62,13 +62,9 @@ def validate(
     )
     logger.info(f"Лог-файл создан: {log_file}")
 
-    try:
+    with handle_command_errors():
         # Проверка credentials
-        console.print("[yellow]Проверка credentials из .env...[/yellow]")
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] Domain: {domain}")
-        console.print(f"[green]OK[/green] User: {username}")
-        console.print(f"[green]OK[/green] Token: {'*' * 20}\n")
+        domain, username, password = load_and_print_credentials(env_file=env_file)
 
         # Проверка структуры
         console.print("[yellow]Проверка структуры листов...[/yellow]")
@@ -78,10 +74,6 @@ def validate(
             console.print(f"[green]OK[/green] Taxonomy sheets: {len(sheets['taxonomy'])}\n")
 
         console.print("[bold green]SUCCESS! File is valid![/bold green]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -160,11 +152,9 @@ def options(
 
         console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-        try:
+        with handle_command_errors():
             # 1. Загружаем credentials
-            console.print("[yellow]Загрузка credentials из .env...[/yellow]")
-            domain, username, password = load_credentials_from_env(env_file=env_file)
-            console.print(f"[green]OK[/green] WordPress: {domain}\n")
+            domain, username, password = load_and_print_credentials(env_file=env_file)
 
             # 2. Получаем настройки из WordPress
             console.print("[yellow]Получение настроек из WordPress...[/yellow]")
@@ -197,14 +187,6 @@ def options(
 
             console.print(f"\n[bold green]SUCCESS! Настройки выгружены в {file}![/bold green]\n")
 
-        except WPBulkEditorError as e:
-            console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-            raise typer.Exit(code=1)
-        except Exception as e:
-            console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-            logger.exception("Неожиданная ошибка")
-            raise typer.Exit(code=1)
-
     # Режим UPDATE - загрузка из Excel в WordPress
     else:
         if file is None:
@@ -217,11 +199,9 @@ def options(
 
         console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-        try:
+        with handle_command_errors():
             # 1. Загружаем credentials из .env
-            console.print("[yellow]Загрузка credentials из .env...[/yellow]")
-            domain, username, password = load_credentials_from_env(env_file=env_file)
-            console.print(f"[green]OK[/green] WordPress: {domain}\n")
+            domain, username, password = load_and_print_credentials(env_file=env_file)
 
             # 2. Читаем опции
             console.print("[yellow]Чтение настроек из листа 'options'...[/yellow]")
@@ -258,14 +238,6 @@ def options(
             asyncio.run(_update_options(wp_config, site_options))
 
             console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
-
-        except WPBulkEditorError as e:
-            console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-            raise typer.Exit(code=1)
-        except Exception as e:
-            console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-            logger.exception("Неожиданная ошибка")
-            raise typer.Exit(code=1)
 
 
 async def _update_options(wp_config: WordPressConfig, site_options: dict):
@@ -363,7 +335,7 @@ def bulk_delete(
     console.print("\n[bold red]Bulk Delete[/bold red]")
     console.print("=" * 60 + "\n")
 
-    try:
+    with handle_command_errors():
         # Настройка логирования
         logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
@@ -376,15 +348,13 @@ def bulk_delete(
         )
 
         # Получаем credentials (приоритет: CLI параметры -> .env файл)
-        console.print(f"[yellow]->[/yellow] Загрузка credentials...")
-        domain, username, password = load_credentials_from_env(
+        domain, username, password = load_and_print_credentials(
             env_file=env_file,
-            domain_override=domain,
-            username_override=username,
-            password_override=password
+            domain=domain,
+            username=username,
+            password=password
         )
 
-        console.print(f"[green]OK[/green] WordPress: {domain}")
         console.print(f"[yellow]->[/yellow] Тип контента: {post_type}")
         console.print(f"[yellow]->[/yellow] Статус: {status}")
         console.print(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
@@ -419,14 +389,6 @@ def bulk_delete(
             console.print(f"  Удалено медиа: [cyan]{stats['media_deleted']}[/cyan]")
         console.print(f"  Ошибок: [{'red' if stats['errors'] > 0 else 'green'}]{stats['errors']}[/{'red' if stats['errors'] > 0 else 'green'}]")
         console.print(f"\n[dim]Логи: {log_file}[/dim]")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]")
-        raise typer.Exit(1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]")
-        logger.exception("Критическая ошибка")
-        raise typer.Exit(1)
 
 
 async def _run_bulk_delete(
@@ -586,16 +548,14 @@ def counter(
     )
     logger.info(f"Лог-файл создан: {log_file}")
 
-    try:
+    with handle_command_errors():
         # 1. Загружаем credentials
-        console.print("[yellow]Загрузка credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(
+        domain, username, password = load_and_print_credentials(
             env_file=env_file,
-            domain_override=domain,
-            username_override=username,
-            password_override=password
+            domain=domain,
+            username=username,
+            password=password
         )
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
 
         # 2. Запускаем асинхронный подсчет
         asyncio.run(_count_content_stats(
@@ -608,14 +568,6 @@ def counter(
             limit=limit,
             concurrency=concurrency
         ))
-
-    except ValueError as e:
-        console.print(f"\n[bold red]VALIDATION ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        logger.exception("Ошибка при подсчете статистики")
-        raise typer.Exit(code=1)
 
 
 async def _count_content_stats(
@@ -874,7 +826,7 @@ def llm(
     )
     logger.info(f"Лог-файл создан: {log_file}")
 
-    try:
+    with handle_command_errors():
         # 1. Загружаем credentials для LLM
         import os
         from dotenv import load_dotenv
@@ -948,11 +900,6 @@ def llm(
             content_folder=content_folder,
             media_folder=media_folder
         ))
-
-    except Exception as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        logger.exception("Ошибка при генерации через LLM")
-        raise typer.Exit(code=1)
 
 
 async def _run_llm_generation(

@@ -30,7 +30,7 @@ class GoogleSheetsClient:
     def _authenticate(self):
         """Аутентификация через Service Account"""
         try:
-            logger.info(f"Аутентификация через {self.credentials_path}")
+            logger.info(f"Аутентификация через {self.credentials_path.name}")
 
             # Области доступа для Google Sheets и Google Drive (с правами записи)
             scopes = [

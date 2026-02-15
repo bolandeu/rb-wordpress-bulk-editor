@@ -146,7 +146,7 @@ class MediaExporter:
         # Относительный путь к файлу
         file_relative = ""
         if file_path:
-            file_relative = str(file_path.relative_to(self.export_folder)).replace("\\", "/")
+            file_relative = file_path.relative_to(self.export_folder).as_posix()
 
         # Формируем запись
         self.csv_data.append({

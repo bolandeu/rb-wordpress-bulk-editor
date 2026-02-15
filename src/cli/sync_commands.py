@@ -12,6 +12,7 @@ from loguru import logger
 
 from . import app, console
 from .helpers import get_project, resolve_env_file
+from .common import handle_command_errors, load_and_print_credentials
 from ..config import AppConfig, SyncConfig, PathsConfig, LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -139,17 +140,14 @@ def sync(
             raise typer.Exit(code=1)
         console.print("[bold yellow]ТЕСТОВЫЙ РЕЖИМ: Будут обработаны только первые 3 строки[/bold yellow]\n")
 
-    try:
+    with handle_command_errors():
         # 1. Загружаем credentials (приоритет: CLI параметры -> .env файл)
-        console.print("[yellow]Загрузка credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(
+        domain, username, password = load_and_print_credentials(
             env_file=env_file,
-            domain_override=domain,
-            username_override=username,
-            password_override=password
+            domain=domain,
+            username=username,
+            password=password,
         )
-        console.print(f"[green]OK[/green] WordPress: {domain}")
-        console.print(f"[green]OK[/green] User: {username}\n")
 
         # 2. Создаем конфигурацию
         config = AppConfig.from_excel(
@@ -185,14 +183,6 @@ def sync(
 
         console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_mode: bool = False):
@@ -508,16 +498,13 @@ def async_sync(
             raise typer.Exit(code=1)
         console.print("[bold yellow]ТЕСТОВЫЙ РЕЖИМ: Будут обработаны только первые 3 строки[/bold yellow]\n")
 
-    try:
-        console.print("[yellow]Загрузка credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(
+    with handle_command_errors():
+        domain, username, password = load_and_print_credentials(
             env_file=env_file,
-            domain_override=domain,
-            username_override=username,
-            password_override=password
+            domain=domain,
+            username=username,
+            password=password,
         )
-        console.print(f"[green]OK[/green] WordPress: {domain}")
-        console.print(f"[green]OK[/green] User: {username}\n")
 
         concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
             env_file=env_file,
@@ -565,14 +552,6 @@ def async_sync(
 
         console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 async def run_sync_async(

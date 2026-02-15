@@ -242,7 +242,8 @@ class CircuitBreaker:
             CircuitBreakerOpenError: Если circuit breaker открыт
             Exception: Любое исключение из func
         """
-        # Проверяем состояние (с блокировкой)
+        # Проверяем состояние и определяем режим выполнения
+        is_half_open_probe = False
         async with self._lock:
             if self.state == CircuitState.OPEN:
                 # Проверяем не пора ли перейти в HALF_OPEN
@@ -254,11 +255,14 @@ class CircuitBreaker:
                             f"(recovery timeout {self.recovery_timeout}s elapsed)"
                         )
                         self.state = CircuitState.HALF_OPEN
+                        is_half_open_probe = True
                     else:
                         raise CircuitBreakerOpenError(
                             f"Circuit breaker OPEN. Consecutive failures: {self.consecutive_failures}. "
                             f"Retry in {self.recovery_timeout - elapsed:.1f}s"
                         )
+            elif self.state == CircuitState.HALF_OPEN:
+                is_half_open_probe = True
 
         # Выполняем функцию
         try:
@@ -266,7 +270,7 @@ class CircuitBreaker:
 
             # Успех - сбрасываем счетчик
             async with self._lock:
-                if self.state == CircuitState.HALF_OPEN:
+                if is_half_open_probe:
                     logger.info("Circuit breaker: HALF_OPEN → CLOSED (successful request)")
                 self.state = CircuitState.CLOSED
                 self.consecutive_failures = 0
@@ -280,7 +284,7 @@ class CircuitBreaker:
                 self.consecutive_failures += 1
                 self.last_failure_time = datetime.now()
 
-                if self.state == CircuitState.HALF_OPEN:
+                if is_half_open_probe:
                     logger.warning(
                         f"Circuit breaker: HALF_OPEN → OPEN (failed request: {e})"
                     )

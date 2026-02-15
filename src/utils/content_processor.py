@@ -24,27 +24,41 @@ class ContentProcessor:
     def _resolve_file_path(self, filename: str) -> Optional[Path]:
         """
         Разрешить путь к файлу (сначала от корня проекта, затем в content_folder).
+        Запрещает абсолютные пути и path traversal за пределы content_folder.
 
         Args:
-            filename: Имя файла или путь
+            filename: Имя файла или относительный путь
 
         Returns:
             Path к файлу или None если не найден
         """
+        # Запрещаем абсолютные пути
+        if Path(filename).is_absolute():
+            logger.warning(f"Absolute paths not allowed: {filename}")
+            return None
+
+        # Нормализуем и проверяем на path traversal
+        safe_name = Path(filename).as_posix()
+        if ".." in safe_name.split("/"):
+            logger.warning(f"Path traversal detected: {filename}")
+            return None
+
+        # Сначала проверяем относительно CWD
         file_path = Path(filename)
-
-        # Если абсолютный путь
-        if file_path.is_absolute():
-            return file_path if file_path.exists() else None
-
-        # Сначала проверяем от корня проекта
         if file_path.exists():
-            return file_path
+            return file_path.resolve()
 
         # Затем в content_folder как fallback
         fallback_path = self.content_folder / filename
         if fallback_path.exists():
-            return fallback_path
+            resolved = fallback_path.resolve()
+            # Проверяем что resolved path внутри content_folder
+            try:
+                resolved.relative_to(self.content_folder.resolve())
+            except ValueError:
+                logger.warning(f"Path escapes content_folder: {filename}")
+                return None
+            return resolved
 
         return None
 
@@ -90,8 +104,14 @@ class ContentProcessor:
             logger.info(f"Successfully processed content file: {filename}")
             return gutenberg_content
 
+        except FileNotFoundError:
+            logger.error(f"Content file not found: {filename}")
+            return None
+        except UnicodeDecodeError as e:
+            logger.error(f"Encoding error in content file {filename}: {e}")
+            return None
         except Exception as e:
-            logger.error(f"Error processing content file {filename}: {e}")
+            logger.exception(f"Unexpected error processing content file {filename}: {e}")
             return None
 
     def validate_file_exists(self, filename: str) -> bool:

@@ -102,7 +102,7 @@ class WordPressClient:
             try:
                 error_data = response.json()
                 message = error_data.get("message", response.text[:200])
-            except:
+            except Exception:
                 message = response.text[:200]
 
             raise WordPressError(

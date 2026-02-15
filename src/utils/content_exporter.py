@@ -19,17 +19,19 @@ class ContentExporter:
     """Экспорт контента из WordPress в файлы с организацией по типам."""
 
     def __init__(self, wp_client: WordPressClient, export_folder: Path, concurrency: int = 10,
-                 skip_post_type_patterns: list = None):
+                 skip_post_type_patterns: list = None, download_timeout: float = 30.0):
         """
         Args:
             wp_client: WordPress клиент
             export_folder: Папка для экспорта
             concurrency: Максимум параллельных загрузок (по умолчанию 10)
             skip_post_type_patterns: Паттерны для пропуска типов записей (из .env)
+            download_timeout: Timeout для скачивания изображений (секунды)
         """
         self.wp_client = wp_client
         self.export_folder = export_folder
         self.concurrency = concurrency
+        self.download_timeout = download_timeout
         self.csv_data = []
         self._semaphore = asyncio.Semaphore(concurrency)
         self.skip_post_type_patterns = skip_post_type_patterns or DEFAULT_SKIP_POST_TYPE_PATTERNS
@@ -70,6 +72,48 @@ class ContentExporter:
             # Fallback to standard types
             return ["posts", "pages"]
 
+    async def _prefetch_media_cache(self, posts: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+        """
+        Batch-загрузка метаданных медиафайлов для всех постов (устраняет N+1 запросы).
+
+        Args:
+            posts: Список постов
+
+        Returns:
+            Словарь {media_id: media_data}
+        """
+        media_ids = set()
+        for post in posts:
+            mid = post.get("featured_media")
+            if mid and mid != 0:
+                media_ids.add(mid)
+
+        if not media_ids:
+            return {}
+
+        logger.info(f"Prefetching {len(media_ids)} media items...")
+        cache: Dict[int, Dict[str, Any]] = {}
+
+        # Загружаем пачками по 100 через include параметр
+        media_id_list = list(media_ids)
+        for i in range(0, len(media_id_list), 100):
+            batch = media_id_list[i:i + 100]
+            try:
+                params = {
+                    "include": ",".join(str(mid) for mid in batch),
+                    "per_page": 100,
+                }
+                media_items = await self.wp_client.get("/wp-json/wp/v2/media", params)
+                if isinstance(media_items, list):
+                    for item in media_items:
+                        cache[item["id"]] = item
+                logger.debug(f"Prefetched media batch {i // 100 + 1}: {len(batch)} items")
+            except Exception as e:
+                logger.warning(f"Failed to prefetch media batch: {e}")
+
+        logger.info(f"Media cache ready: {len(cache)} items")
+        return cache
+
     async def export_post_type(self, post_type: str) -> int:
         """
         Экспортировать все записи указанного типа.
@@ -94,9 +138,12 @@ class ContentExporter:
         type_folder = self.export_folder / post_type
         type_folder.mkdir(parents=True, exist_ok=True)
 
+        # Batch prefetch медиа-метаданных (устраняет N+1)
+        media_cache = await self._prefetch_media_cache(all_posts)
+
         # Экспортируем посты параллельно
         logger.info(f"Processing {len(all_posts)} posts with concurrency={self.concurrency}")
-        tasks = [self._export_single_post(post, post_type, type_folder) for post in all_posts]
+        tasks = [self._export_single_post(post, post_type, type_folder, media_cache) for post in all_posts]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Подсчитываем успешные экспорты
@@ -113,7 +160,8 @@ class ContentExporter:
         self,
         post: Dict[str, Any],
         post_type: str,
-        type_folder: Path
+        type_folder: Path,
+        media_cache: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> bool:
         """
         Экспортировать один пост (используется для параллельной обработки).
@@ -128,7 +176,13 @@ class ContentExporter:
         """
         async with self._semaphore:
             try:
-                post_id = post["id"]
+                post_id = post.get("id")
+                if post_id is None:
+                    logger.warning("Post missing 'id' field, skipping")
+                    return False
+
+                # Санитизация post_id для безопасного имени файла
+                safe_id = str(post_id).replace("/", "_").replace("\\", "_").replace("..", "_")
 
                 # Извлекаем контент
                 content = self._extract_content(post)
@@ -136,7 +190,7 @@ class ContentExporter:
                 # Сохраняем HTML только если контент не пустой И файл не существует
                 html_path = None
                 if content and content.strip():
-                    file_path = type_folder / f"{post_id}.html"
+                    file_path = type_folder / f"{safe_id}.html"
                     if file_path.exists():
                         logger.debug(f"HTML already exists for post {post_id}, skipping")
                         html_path = file_path
@@ -148,7 +202,7 @@ class ContentExporter:
                     logger.debug(f"Skipped empty HTML for post {post_id}")
 
                 # Скачиваем featured image независимо от контента
-                image_path = await self._download_featured_image(post, type_folder, post_id)
+                image_path = await self._download_featured_image(post, type_folder, post_id, safe_id, media_cache)
 
                 # Добавляем в CSV ВСЕГДА (даже если файлы уже существовали)
                 # html_path и image_path содержат пути к файлам (существующим или новым)
@@ -202,8 +256,15 @@ class ContentExporter:
 
                 page += 1
 
+            except (KeyboardInterrupt, SystemExit):
+                raise
             except Exception as e:
                 logger.warning(f"Error fetching page {page} of {post_type}: {e}")
+                if page == 1:
+                    # Первая страница не загрузилась — тип контента недоступен
+                    break
+                # Для последующих страниц — возвращаем что уже собрали
+                logger.info(f"Returning {len(all_posts)} posts fetched before error")
                 break
 
         return all_posts
@@ -232,7 +293,9 @@ class ContentExporter:
         self,
         post: Dict[str, Any],
         type_folder: Path,
-        post_id: int
+        post_id: int,
+        safe_id: str = None,
+        media_cache: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> Optional[Path]:
         """
         Скачать featured image для записи.
@@ -241,6 +304,8 @@ class ContentExporter:
             post: Данные записи
             type_folder: Папка типа контента
             post_id: ID записи
+            safe_id: Безопасный ID для имени файла
+            media_cache: Кэш метаданных медиа (batch prefetch)
 
         Returns:
             Path к сохраненному изображению или None
@@ -252,9 +317,12 @@ class ContentExporter:
                 logger.debug(f"No featured media for post {post_id}")
                 return None
 
-            # Получаем данные медиафайла
-            media_endpoint = f"/wp-json/wp/v2/media/{featured_media_id}"
-            media_data = await self.wp_client.get(media_endpoint)
+            # Получаем данные медиафайла из кэша или API
+            if media_cache and featured_media_id in media_cache:
+                media_data = media_cache[featured_media_id]
+            else:
+                media_endpoint = f"/wp-json/wp/v2/media/{featured_media_id}"
+                media_data = await self.wp_client.get(media_endpoint)
 
             # Получаем URL изображения
             source_url = media_data.get("source_url")
@@ -266,7 +334,8 @@ class ContentExporter:
             extension = self._get_extension_from_url(source_url)
 
             # Проверяем существование файла
-            image_filename = f"{post_id}{extension}"
+            file_id = safe_id or str(post_id)
+            image_filename = f"{file_id}{extension}"
             image_path = type_folder / image_filename
 
             if image_path.exists():
@@ -274,7 +343,7 @@ class ContentExporter:
                 return image_path
 
             # Скачиваем изображение
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=self.download_timeout) as client:
                 response = await client.get(source_url)
                 if response.status_code == 200:
                     image_path.write_bytes(response.content)
@@ -342,11 +411,11 @@ class ContentExporter:
         # Относительные пути к файлам
         html_relative = ""
         if html_path:
-            html_relative = str(html_path.relative_to(self.export_folder)).replace("\\", "/")
+            html_relative = html_path.relative_to(self.export_folder).as_posix()
 
         image_relative = ""
         if image_path:
-            image_relative = str(image_path.relative_to(self.export_folder)).replace("\\", "/")
+            image_relative = image_path.relative_to(self.export_folder).as_posix()
 
         # SEO title (может быть в разных полях в зависимости от плагина)
         seo_title = post.get("seo_title") or \
@@ -361,7 +430,7 @@ class ContentExporter:
 
         self.csv_data.append({
             "post_type": post_type,
-            "id": post["id"],
+            "id": post.get("id", ""),
             "title": title_text,
             "slug": post.get("slug", ""),
             "link": post.get("link", ""),

@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
 from ..excel.reader import ExcelReader
@@ -19,8 +20,7 @@ from ..wordpress.posts import PostsEndpoint
 from ..wordpress.taxonomies import TaxonomiesEndpoint, normalize_taxonomy_name
 from ..mappers.response_mapper import ResponseMapper
 from ..utils.logger import setup_logger
-from ..utils.auth import load_credentials_from_env
-from ..exceptions import WPBulkEditorError, NotFoundError
+from ..exceptions import NotFoundError
 
 import typer
 
@@ -110,7 +110,7 @@ def fetch(
 
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    try:
+    with handle_command_errors():
         # 1. Настройка логирования
         logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
@@ -124,14 +124,12 @@ def fetch(
         logger.info(f"Лог-файл создан: {log_file}")
 
         # 2. Загружаем credentials
-        console.print("[yellow]Загрузка credentials...[/yellow]")
-        domain, username, password = load_credentials_from_env(
+        domain, username, password = load_and_print_credentials(
             env_file=env_file,
-            domain_override=domain,
-            username_override=username,
-            password_override=password
+            domain=domain,
+            username=username,
+            password=password,
         )
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
 
         # 3. Определяем листы для обработки
         if auto_mode:
@@ -181,14 +179,6 @@ def fetch(
         ))
 
         console.print(f"\n[bold green]SUCCESS! Данные добавлены в Excel![/bold green]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 async def fetch_and_append(
@@ -472,10 +462,10 @@ def fetch_media(
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    try:
-        console.print("[yellow]Загрузка credentials из .env...[/yellow]")
-        domain, username, password = load_credentials_from_env(env_file=env_file)
-        console.print(f"[green]OK[/green] WordPress: {domain}\n")
+    with handle_command_errors():
+        domain, username, password = load_and_print_credentials(
+            env_file=env_file,
+        )
 
         wp_config = WordPressConfig(
             url=domain,
@@ -497,14 +487,6 @@ def fetch_media(
 
         console.print(f"\n[bold green]SUCCESS! Медиафайлы загружены в лист 'media'![/bold green]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
-
-    except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
-    except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
-        logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
 
 
 async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
