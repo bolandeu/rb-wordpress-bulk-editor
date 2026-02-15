@@ -3289,10 +3289,11 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
             },
             'fetch': {
                 params: [
-                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'file', type: 'text', required: false, placeholder: 'fetch.xlsx', description: 'Путь к Excel файлу (по умолчанию fetch.xlsx)' },
                     { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов' },
                     { name: 'status', type: 'select', required: false, options: ['publish', 'draft', 'any'], description: 'Фильтр по статусу' },
                     { name: 'limit', type: 'number', required: false, placeholder: '50', description: 'Максимум записей' },
+                    { name: 'exclude', type: 'text', required: false, placeholder: 'posts,category', description: 'Исключить типы через запятую' },
                     { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
                     { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
                     { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
@@ -3317,12 +3318,16 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'domain', type: 'text', required: false, placeholder: 'https://example.com', description: 'URL WordPress сайта' },
                     { name: 'username', type: 'text', required: false, placeholder: 'admin', description: 'Имя пользователя' },
                     { name: 'password', type: 'text', required: false, placeholder: 'xxxx xxxx xxxx xxxx', description: 'Application Password' },
-                    { name: 'no-download-files', type: 'checkbox', required: false, description: 'Только метаданные' }
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'no-download-files', type: 'checkbox', required: false, description: 'Только метаданные (не скачивать файлы)' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'fetch-media': {
                 params: [
-                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' }
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'download-google-sheet': {
@@ -3337,7 +3342,9 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'file', type: 'text', required: true, placeholder: 'export.xlsx', description: 'Путь к Excel файлу' },
                     { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Список листов' },
                     { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
-                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' }
+                    { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'sync-from-google': {
@@ -3345,8 +3352,15 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'sheet-id', type: 'text', required: false, placeholder: '1B5gj1n...', description: 'ID Google таблицы' },
                     { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
                     { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
-                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' }
                 ]
             },
             'sync-google-bidirectional': {
@@ -3355,9 +3369,16 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'credentials', type: 'text', required: false, placeholder: 'credentials/google.json', description: 'Путь к credentials.json' },
                     { name: 'sheets', type: 'text', required: false, placeholder: 'posts,pages', description: 'Фильтр листов' },
                     { name: 'output', type: 'text', required: false, placeholder: 'data/my_project.xlsx', description: 'Путь к локальному файлу' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' },
+                    { name: 'concurrency', type: 'number', required: false, placeholder: '5', description: 'Параллельные запросы' },
                     { name: 'no-upload-back', type: 'checkbox', required: false, description: 'Не загружать обратно' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
-                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' }
                 ]
             },
             'async-from-google': {
@@ -3371,9 +3392,11 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'max-retries', type: 'number', required: false, placeholder: '3', description: 'Максимум retry' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
-                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить медиа' },
-                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
-                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' }
                 ]
             },
             'async-google-bidirectional': {
@@ -3388,9 +3411,11 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'no-upload-back', type: 'checkbox', required: false, description: 'Не загружать обратно' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
-                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить медиа' },
-                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
-                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
+                    { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' }
                 ]
             },
             'reshape': {
@@ -3412,12 +3437,14 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к кастомному .env' },
                     { name: 'force', type: 'checkbox', required: false, description: 'Удалить полностью (не в корзину)' },
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' },
-                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет удалено' }
+                    { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет удалено' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'validate': {
                 params: [
-                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' }
+                    { name: 'file', type: 'text', required: true, placeholder: 'example.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'env-file', type: 'text', required: false, placeholder: 'project2/.env', description: 'Путь к .env файлу' }
                 ]
             },
             'counter': {
@@ -3447,7 +3474,8 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Тестовый режим без сохранения' },
                     { name: 'strip-tags', type: 'checkbox', required: false, description: 'Удалить HTML теги' },
                     { name: 'md-to-html', type: 'checkbox', required: false, description: 'Markdown → HTML' },
-                    { name: 'html-to-md', type: 'checkbox', required: false, description: 'HTML → Markdown' }
+                    { name: 'html-to-md', type: 'checkbox', required: false, description: 'HTML → Markdown' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'options': {
