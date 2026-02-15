@@ -1,5 +1,5 @@
 """
-Утилитарные команды: validate, options, bulk-delete, counter, llm
+Утилитарные команды: validate, options, bulk-delete, counter, llm, reshape
 """
 
 from pathlib import Path
@@ -12,6 +12,7 @@ from loguru import logger
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
+from .project import find_repo_root
 from ..config import LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
 from ..wordpress.client import WordPressClient
@@ -1131,3 +1132,169 @@ async def _run_llm_generation(
 
     if total_errors > 0:
         console.print(f"[yellow]Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")
+
+
+def _resolve_template(template_name: Optional[str]) -> Path:
+    """Резолвинг пути к шаблону: None → default.xlsx, имя → templates/<имя>, путь → как есть."""
+    repo_root = find_repo_root()
+    templates_dir = repo_root / "templates"
+
+    if template_name is None:
+        return templates_dir / "default.xlsx"
+
+    template_path = Path(template_name)
+    if template_path.is_absolute() or template_path.exists():
+        return template_path
+
+    return templates_dir / template_name
+
+
+@app.command()
+def reshape(
+    ctx: typer.Context,
+    source: Optional[Path] = typer.Option(
+        None, "--source", "--src", "-s",
+        help="Excel-источник (по умолчанию fetch.xlsx)",
+    ),
+    template: Optional[str] = typer.Option(
+        None, "--template", "--tpl", "-t",
+        help="Шаблон: имя в templates/ или полный путь (по умолчанию default.xlsx)",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Результирующий файл (по умолчанию export.xlsx)",
+    ),
+    extra_columns: Optional[str] = typer.Option(
+        None, "--extra", "-e",
+        help="Доп. колонки из источника: список через запятую или 'none' чтобы не добавлять",
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v",
+        help="Подробные логи",
+    ),
+):
+    """
+    Перенос данных из fetch-файла в структуру шаблона.
+
+    Берёт Excel-источник (результат fetch), Excel-шаблон (из templates/),
+    и создаёт результирующий Excel, где данные из источника перенесены
+    в структуру шаблона (листы, колонки, порядок).
+
+    По умолчанию колонки из источника, которых нет в шаблоне, дописываются
+    в конец. --extra none отключает это, --extra "col1,col2" добавляет только указанные.
+
+    Примеры:
+        wp-bulk reshape
+        wp-bulk reshape --extra none
+        wp-bulk reshape --extra "acf_price,acf_address"
+        wp-bulk reshape --src custom.xlsx --tpl my_template.xlsx -o result.xlsx
+    """
+    from openpyxl import Workbook
+
+    proj = get_project(ctx)
+
+    # Резолвинг source
+    if source is None:
+        if proj.active:
+            source = proj.root / "fetch.xlsx"
+        else:
+            source = Path("fetch.xlsx")
+
+    # Резолвинг template
+    template_path = _resolve_template(template)
+
+    # Резолвинг output
+    if output is None:
+        if proj.active:
+            output = proj.root / "export.xlsx"
+        else:
+            output = Path("export.xlsx")
+
+    log_file = setup_command_logging(ctx, "reshape", verbose)
+
+    console.print(f"\n[bold blue]WordPress Bulk Editor - Reshape[/bold blue]\n")
+    console.print(f"  Source:   [cyan]{source}[/cyan]")
+    console.print(f"  Template: [cyan]{template_path}[/cyan]")
+    console.print(f"  Output:   [cyan]{output}[/cyan]\n")
+
+    with handle_command_errors():
+        if not source.exists():
+            console.print(f"[red]ERROR: Файл-источник не найден: {source}[/red]\n")
+            raise typer.Exit(code=1)
+
+        if not template_path.exists():
+            console.print(f"[red]ERROR: Шаблон не найден: {template_path}[/red]\n")
+            raise typer.Exit(code=1)
+
+        console.print("[yellow]Обработка листов:[/yellow]")
+
+        # Парсим --extra
+        if extra_columns is not None and extra_columns.strip().lower() == "none":
+            extra_whitelist = []  # не добавлять лишние
+        elif extra_columns is not None:
+            extra_whitelist = [c.strip() for c in extra_columns.split(",") if c.strip()]
+        else:
+            extra_whitelist = None  # добавлять все
+
+        with ExcelReader(source) as src, ExcelReader(template_path) as tpl:
+            wb = Workbook()
+            # Удаляем дефолтный лист
+            wb.remove(wb.active)
+
+            source_sheets = src.get_sheet_names()
+
+            for tpl_sheet in tpl.get_sheet_names():
+                tpl_columns = tpl.get_content_columns(tpl_sheet)
+
+                if tpl_sheet in source_sheets:
+                    src_df = src.read_sheet(tpl_sheet)
+                    src_columns = src_df.columns.tolist()
+
+                    # Колонки шаблона (в порядке шаблона)
+                    all_columns = list(tpl_columns)
+
+                    # Доп. колонки из source, которых нет в шаблоне
+                    tpl_set = set(tpl_columns)
+                    if extra_whitelist is None:
+                        # Все extra-колонки
+                        extra = [c for c in src_columns if c not in tpl_set]
+                    elif extra_whitelist:
+                        # Только указанные, в порядке whitelist, если есть в source
+                        src_set = set(src_columns)
+                        extra = [c for c in extra_whitelist if c in src_set and c not in tpl_set]
+                    else:
+                        # none — без extra
+                        extra = []
+                    all_columns.extend(extra)
+
+                    # Создаём лист и записываем
+                    ws = wb.create_sheet(tpl_sheet)
+                    for col_idx, col_name in enumerate(all_columns, 1):
+                        ws.cell(row=1, column=col_idx, value=col_name)
+
+                    for row_idx, (_, row) in enumerate(src_df.iterrows(), 2):
+                        for col_idx, col_name in enumerate(all_columns, 1):
+                            value = row.get(col_name, "")
+                            if pd.notna(value) and value != "":
+                                ws.cell(row=row_idx, column=col_idx, value=value)
+
+                    extra_info = f" (+{len(extra)} extra)" if extra else ""
+                    console.print(
+                        f"  {tpl_sheet}:".ljust(20)
+                        + f"{len(src_df)} строк, "
+                        + f"{len(tpl_columns)} → {len(all_columns)} колонок{extra_info}"
+                    )
+                else:
+                    # Листа нет в source — пустой лист с заголовками шаблона
+                    ws = wb.create_sheet(tpl_sheet)
+                    for col_idx, col_name in enumerate(tpl_columns, 1):
+                        ws.cell(row=1, column=col_idx, value=col_name)
+
+                    console.print(
+                        f"  {tpl_sheet}:".ljust(20)
+                        + "0 строк (нет в источнике)"
+                    )
+
+            wb.save(output)
+
+        console.print(f"\n[bold green]SUCCESS! Файл создан: {output}[/bold green]\n")

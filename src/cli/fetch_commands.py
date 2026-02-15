@@ -96,7 +96,7 @@ def fetch(
 
     # Определяем режим работы
     if file is None:
-        file = resolve_excel_file(ctx, None) or (proj.resolve_output("fetch.xlsx") if proj.active else Path.cwd() / "fetch.xlsx")
+        file = proj.resolve_output("fetch.xlsx") if proj.active else Path.cwd() / "fetch.xlsx"
         auto_mode = True
         console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
@@ -228,50 +228,50 @@ async def fetch_and_append(
                 all_taxonomies = [t for t in all_taxonomies if t not in exclude_list]
                 logger.info(f"Исключены: {', '.join(exclude_list)}")
 
-            # 5. Выгружаем данные и анализируем поля
-            logger.info("Выгрузка данных для анализа полей...")
+            # 5. Выгружаем данные параллельно
+            logger.info("Выгрузка данных (параллельно)...")
             sheets_data = {}
 
-            for post_type in all_post_types:
-                logger.info(f"Выгрузка данных для '{post_type}'...")
+            async def _fetch_post_type(post_type: str):
                 try:
                     posts_endpoint = PostsEndpoint(client, post_type)
                     posts = await posts_endpoint.get_all(status=status)
-
                     if posts:
                         fields = await discovery.analyze_fields_from_data(posts, "content")
-                        sheets_data[post_type] = {
-                            "data": posts,
-                            "fields": fields,
-                            "type": "content"
-                        }
                         logger.info(f"'{post_type}': выгружено {len(posts)} записей, {len(fields)} полей")
+                        return post_type, {"data": posts, "fields": fields, "type": "content"}
                     else:
                         logger.warning(f"'{post_type}': нет данных, лист не будет создан")
                 except NotFoundError:
                     logger.warning(f"'{post_type}': REST API недоступен (404), пропускаем. "
                                    f"Добавьте '{post_type}' в WP_SKIP_POST_TYPE_PATTERNS в .env")
+                return None, None
 
-            for taxonomy in all_taxonomies:
-                logger.info(f"Выгрузка данных для таксономии '{taxonomy}'...")
+            async def _fetch_taxonomy(taxonomy: str):
                 try:
                     normalized_taxonomy = normalize_taxonomy_name(taxonomy)
                     tax_endpoint = TaxonomiesEndpoint(client, normalized_taxonomy)
                     terms = await tax_endpoint.get_all()
-
                     if terms:
                         fields = await discovery.analyze_fields_from_data(terms, "taxonomy")
-                        sheets_data[taxonomy] = {
-                            "data": terms,
-                            "fields": fields,
-                            "type": "taxonomy"
-                        }
                         logger.info(f"'{taxonomy}': выгружено {len(terms)} терминов, {len(fields)} полей")
+                        return taxonomy, {"data": terms, "fields": fields, "type": "taxonomy"}
                     else:
                         logger.warning(f"'{taxonomy}': нет данных, лист не будет создан")
                 except NotFoundError:
                     logger.warning(f"'{taxonomy}': REST API недоступен (404), пропускаем. "
                                    f"Добавьте '{taxonomy}' в WP_SKIP_TAXONOMY_PATTERNS в .env")
+                return None, None
+
+            # Запускаем все запросы параллельно
+            tasks = []
+            tasks.extend([_fetch_post_type(pt) for pt in all_post_types])
+            tasks.extend([_fetch_taxonomy(t) for t in all_taxonomies])
+
+            results = await asyncio.gather(*tasks)
+            for name, data in results:
+                if name and data:
+                    sheets_data[name] = data
 
             # 6. Создаём Excel файл
             logger.info(f"Создание Excel файла {excel_file}...")
@@ -284,33 +284,34 @@ async def fetch_and_append(
             excel_writer = ExcelWriter(excel_file)
             excel_writer.load()
 
-            # Загружаем taxonomy cache
-            logger.info("Загрузка кэша таксономий для преобразования ID в названия...")
+            # Строим кэш таксономий из уже загруженных данных (без повторных запросов)
+            logger.info("Построение кэша таксономий из загруженных данных...")
             taxonomy_cache = {}
 
-            all_taxonomies_for_cache = set()
-            all_taxonomies_for_cache.add("categories")
-            all_taxonomies_for_cache.add("tags")
-
+            # Используем уже загруженные данные таксономий
             for sheet_name, sheet_meta in sheets_data.items():
                 if sheet_meta["type"] == "taxonomy":
-                    all_taxonomies_for_cache.add(sheet_name)
-
-            for taxonomy in all_taxonomies_for_cache:
-                try:
-                    normalized_taxonomy = normalize_taxonomy_name(taxonomy)
-                    tax_endpoint = TaxonomiesEndpoint(client, normalized_taxonomy)
-                    terms = await tax_endpoint.get_all()
-                    taxonomy_cache[taxonomy] = {
+                    taxonomy_cache[sheet_name] = {
                         term["id"]: term["name"]
-                        for term in terms
+                        for term in sheet_meta["data"]
                     }
-                    logger.debug(f"Загружено {len(terms)} терминов для таксономии '{taxonomy}'")
-                except Exception as e:
-                    logger.warning(f"Не удалось загрузить термины для '{taxonomy}': {e}")
-                    taxonomy_cache[taxonomy] = {}
 
-            logger.info(f"Кэш таксономий загружен: {len(taxonomy_cache)} таксономий")
+            # categories/tags могут не быть как листы, но нужны для маппинга ID→имена в контенте
+            for tax_name in ["categories", "tags"]:
+                if tax_name not in taxonomy_cache:
+                    try:
+                        normalized = normalize_taxonomy_name(tax_name)
+                        tax_endpoint = TaxonomiesEndpoint(client, normalized)
+                        terms = await tax_endpoint.get_all()
+                        taxonomy_cache[tax_name] = {
+                            term["id"]: term["name"] for term in terms
+                        }
+                        logger.debug(f"Дозагружено {len(terms)} терминов для '{tax_name}'")
+                    except Exception as e:
+                        logger.warning(f"Не удалось загрузить термины для '{tax_name}': {e}")
+                        taxonomy_cache[tax_name] = {}
+
+            logger.info(f"Кэш таксономий: {len(taxonomy_cache)} таксономий")
 
             mapper = ResponseMapper(taxonomy_cache=taxonomy_cache)
 

@@ -46,6 +46,13 @@ class ContentSyncBase(BaseSync):
         row: pd.Series
     ) -> Dict[str, Any]:
         """Создать новую запись."""
+        # Dry-run: только логируем, не отправляем
+        if self.config.sync.dry_run:
+            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            payload = mapper.map_row(row, taxonomy_ids)
+            logger.info(f"[DRY-RUN] Would CREATE post: {payload.get('title', 'No title')}")
+            return {"id": 0, "link": "", "dry_run": True}
+
         # 1. Обрабатываем таксономии
         taxonomy_ids = await self._process_taxonomies(row, mapper)
 
@@ -141,6 +148,13 @@ class ContentSyncBase(BaseSync):
         """Обновить существующую запись."""
         post_id = int(row["id"])
 
+        # Dry-run: только логируем, не отправляем
+        if self.config.sync.dry_run:
+            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            payload = mapper.map_row(row, taxonomy_ids)
+            logger.info(f"[DRY-RUN] Would UPDATE post ID={post_id}: {payload.get('title', 'No title')}")
+            return {"id": post_id, "link": "", "dry_run": True}
+
         # 1. Обрабатываем таксономии
         taxonomy_ids = await self._process_taxonomies(row, mapper)
 
@@ -166,7 +180,7 @@ class ContentSyncBase(BaseSync):
         saved_media_result = None
 
         # Проверяем: нужно ли загружать новую картинку или прикрепить существующую
-        img_path_filled = mapper.should_upload_media(row)
+        img_path_filled = not self.config.sync.skip_media and mapper.should_upload_media(row)
         featured_media_in_excel = "featured_media" in row.index and pd.notna(row["featured_media"]) and str(row["featured_media"]).strip() != ""
 
         if img_path_filled:
@@ -259,6 +273,12 @@ class ContentSyncBase(BaseSync):
     ) -> Dict[str, Any]:
         """Удалить запись (в корзину)."""
         post_id = int(row["id"])
+
+        # Dry-run: только логируем, не удаляем
+        if self.config.sync.dry_run:
+            logger.info(f"[DRY-RUN] Would DELETE post ID={post_id}")
+            return {"id": post_id, "deleted": True, "dry_run": True}
+
         logger.debug(f"Deleting post ID={post_id}")
 
         # Удаляем featured media если включено

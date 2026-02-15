@@ -405,6 +405,9 @@
                             <a class="nav-link" href="#llm">llm</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="#reshape">reshape</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="#validate">validate</a>
                         </li>
                         <li class="nav-item">
@@ -460,6 +463,7 @@
                                         <option value="async-from-google">async-from-google - 🚀 Async Google → WP</option>
                                         <option value="sync-google-bidirectional">sync-google-bidirectional - Двусторонняя синхронизация</option>
                                         <option value="async-google-bidirectional">async-google-bidirectional - 🚀 Async Google ↔ WP</option>
+                                        <option value="reshape">reshape - Перенос данных в шаблон</option>
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
                                         <option value="counter">counter - Подсчет слов и символов</option>
                                         <option value="llm">llm - Генерация контента через LLM API</option>
@@ -575,6 +579,7 @@
                                         <li><a href="#bulk-delete">bulk-delete</a></li>
                                         <li><a href="#counter">counter</a></li>
                                         <li><a href="#llm">llm</a></li>
+                                        <li><a href="#reshape">reshape</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -2286,6 +2291,80 @@ WP_CIRCUIT_BREAKER_RECOVERY=60       # Время восстановления (
                         </div>
                     </div>
 
+                    <!-- reshape -->
+                    <div id="reshape" class="command-card">
+                        <h2 class="command-title">reshape</h2>
+                        <p class="command-description">Перенос данных из fetch-файла в структуру шаблона</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Берёт Excel-источник (результат fetch) и Excel-шаблон (из templates/),
+                            создаёт результирующий файл где данные перенесены в структуру шаблона
+                            (листы, колонки, порядок). Колонки из источника, которых нет в шаблоне,
+                            дописываются в конец.
+                        </div>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--source / --src / -s</span> Excel-источник (по умолчанию fetch.xlsx)
+                            <span class="param-badge param-optional">--template / --tpl / -t</span> шаблон: имя в templates/ или полный путь (по умолчанию default.xlsx)
+                            <span class="param-badge param-optional">--output / -o</span> результирующий файл (по умолчанию export.xlsx)
+                            <span class="param-badge param-optional">--extra / -e</span> доп. колонки: список через запятую или "none" (по умолчанию все)
+                            <span class="param-badge param-optional">--verbose / -v</span> подробные логи
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk reshape</code>
+                            <div class="text-muted small mt-2">Дефолтные пути: fetch.xlsx → templates/default.xlsx → export.xlsx</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk reshape -P mysite</code>
+                            <div class="text-muted small mt-2">С проектом: projects/mysite/fetch.xlsx → export.xlsx</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk reshape --extra none</code>
+                            <div class="text-muted small mt-2">Только колонки шаблона, без лишних из источника</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk reshape --extra "acf_price,acf_address,acf_phone"</code>
+                            <div class="text-muted small mt-2">Только указанные доп. колонки из источника</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk reshape --src custom.xlsx --tpl my_template.xlsx -o result.xlsx</code>
+                            <div class="text-muted small mt-2">Явные пути к источнику, шаблону и результату</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Формат вывода:</strong>
+                            <ul class="mb-0">
+                                <li>Статистика по каждому листу: количество строк, колонок</li>
+                                <li>Информация о дополнительных колонках из источника</li>
+                                <li>Путь к созданному файлу</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- bulk-delete -->
                     <div id="bulk-delete" class="command-card">
                         <h2 class="command-title">bulk-delete</h2>
@@ -3180,7 +3259,11 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
                     { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
-                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' }
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
+                    { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'test-mode', type: 'checkbox', required: false, description: 'Тестовый режим (первые 3 строки)' }
                 ]
             },
             'async': {
@@ -3197,7 +3280,9 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Режим симуляции' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' },
                     { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить загрузку медиа' },
-                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' },
+                    { name: 'skip-tax', type: 'checkbox', required: false, description: 'Пропустить обновление таксономий' },
+                    { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
+                    { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
                     { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
                     { name: 'test-mode', type: 'checkbox', required: false, description: 'Тестовый режим (первые 3 строки)' }
                 ]
@@ -3306,6 +3391,15 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'skip-media', type: 'checkbox', required: false, description: 'Пропустить медиа' },
                     { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять media при delete' }
+                ]
+            },
+            'reshape': {
+                params: [
+                    { name: 'source', type: 'text', required: false, placeholder: 'fetch.xlsx', description: 'Excel-источник' },
+                    { name: 'template', type: 'text', required: false, placeholder: 'default.xlsx', description: 'Шаблон (имя в templates/ или путь)' },
+                    { name: 'output', type: 'text', required: false, placeholder: 'export.xlsx', description: 'Результирующий файл' },
+                    { name: 'extra', type: 'text', required: false, placeholder: 'none или col1,col2', description: 'Доп. колонки: "none" или список через запятую' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },
             'bulk-delete': {

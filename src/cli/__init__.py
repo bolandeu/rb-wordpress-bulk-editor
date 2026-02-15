@@ -8,7 +8,7 @@ CLI интерфейс для WordPress Bulk Editor
 - google_commands.py  - download-google-sheet, upload-to-google-sheets,
                         sync-from-google, sync-google-bidirectional,
                         async-from-google, async-google-bidirectional
-- tool_commands.py    - validate, options, bulk-delete, counter, llm
+- tool_commands.py    - validate, options, bulk-delete, counter, llm, reshape
 - image_commands.py   - image-crop, image-compress, image-convert
 """
 

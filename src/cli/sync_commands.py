@@ -29,6 +29,26 @@ from ..exceptions import WPBulkEditorError
 
 import typer
 
+from .project import ProjectContext
+
+
+def _resolve_file(proj: ProjectContext, file: Path) -> Path:
+    """Резолвинг Excel файла: если не абсолютный и не существует — ищем в проекте."""
+    if file.is_absolute() and file.exists():
+        return file
+    if file.exists():
+        return file.resolve()
+    # Пробуем относительно проекта
+    if proj.active:
+        project_path = proj.root / file
+        if project_path.exists():
+            return project_path
+    # Ничего не найдено — возвращаем как есть, ошибка вылетит дальше
+    console.print(f"[red]ERROR: Файл не найден: {file}[/red]")
+    if proj.active:
+        console.print(f"[dim]Проверены пути: {file}, {proj.root / file}[/dim]")
+    raise typer.Exit(code=1)
+
 
 @app.command()
 def sync(
@@ -38,10 +58,6 @@ def sync(
         "--file",
         "-f",
         help="Путь к Excel файлу",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
     ),
     domain: Optional[str] = typer.Option(
         None,
@@ -125,6 +141,7 @@ def sync(
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+    file = _resolve_file(proj, file)
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
@@ -376,10 +393,6 @@ def async_sync(
         "--file",
         "-f",
         help="Путь к Excel файлу",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
     ),
     domain: Optional[str] = typer.Option(
         None,
@@ -484,6 +497,7 @@ def async_sync(
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+    file = _resolve_file(proj, file)
 
     console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
@@ -525,6 +539,7 @@ def async_sync(
                 dry_run=dry_run,
                 concurrency=concurrency_val,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media,

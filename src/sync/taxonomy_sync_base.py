@@ -30,6 +30,11 @@ class TaxonomySyncBase(BaseSync):
         # Создаем payload
         payload = self._build_payload(row)
 
+        # Dry-run: только логируем
+        if self.config.sync.dry_run:
+            logger.info(f"[DRY-RUN] Would CREATE term: {payload.get('name', 'No name')}")
+            return {"id": 0, "name": payload.get("name", ""), "dry_run": True}
+
         # Проверяем дубликаты по slug (если slug заполнен)
         slug = payload.get("slug")
         if slug and slug.strip():
@@ -61,6 +66,11 @@ class TaxonomySyncBase(BaseSync):
         # Создаем payload
         payload = self._build_payload(row)
 
+        # Dry-run: только логируем
+        if self.config.sync.dry_run:
+            logger.info(f"[DRY-RUN] Would UPDATE term ID={term_id}: {payload.get('name', 'No name')}")
+            return {"id": term_id, "name": payload.get("name", ""), "dry_run": True}
+
         # Обновляем термин
         logger.info(f"Updating term ID={term_id} with payload: {payload}")
         result = await taxonomy_endpoint.update(term_id, payload)
@@ -75,6 +85,12 @@ class TaxonomySyncBase(BaseSync):
     ) -> Dict[str, Any]:
         """Удалить термин (в корзину)."""
         term_id = int(row["id"])
+
+        # Dry-run: только логируем
+        if self.config.sync.dry_run:
+            logger.info(f"[DRY-RUN] Would DELETE term ID={term_id}")
+            return {"id": term_id, "deleted": True, "dry_run": True}
+
         logger.debug(f"Deleting term ID={term_id}")
 
         # Удаляем в корзину (force=False)
