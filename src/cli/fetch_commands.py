@@ -429,15 +429,11 @@ async def fetch_and_append(
 @app.command()
 def fetch_media(
     ctx: typer.Context,
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
+        help="Путь к Excel файлу (авто-определяется из --project)",
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -458,7 +454,15 @@ def fetch_media(
     """
     Загрузить список медиафайлов из WordPress в Excel (лист media)
     """
+    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+
+    if file is None:
+        file = proj.find_excel() if proj.active else None
+        if file is None:
+            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
+            raise typer.Exit(code=1)
+        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")

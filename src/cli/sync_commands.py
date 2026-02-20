@@ -32,8 +32,15 @@ import typer
 from .project import ProjectContext
 
 
-def _resolve_file(proj: ProjectContext, file: Path) -> Path:
-    """Резолвинг Excel файла: если не абсолютный и не существует — ищем в проекте."""
+def _resolve_file(proj: ProjectContext, file: Optional[Path]) -> Path:
+    """Резолвинг Excel файла: авто-поиск в проекте если не указан явно."""
+    if file is None:
+        found = proj.find_excel() if proj.active else None
+        if found is None:
+            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
+            raise typer.Exit(code=1)
+        console.print(f"[dim]Excel файл (авто): {found.name}[/dim]")
+        return found
     if file.is_absolute() and file.exists():
         return file
     if file.exists():
@@ -43,7 +50,6 @@ def _resolve_file(proj: ProjectContext, file: Path) -> Path:
         project_path = proj.root / file
         if project_path.exists():
             return project_path
-    # Ничего не найдено — возвращаем как есть, ошибка вылетит дальше
     console.print(f"[red]ERROR: Файл не найден: {file}[/red]")
     if proj.active:
         console.print(f"[dim]Проверены пути: {file}, {proj.root / file}[/dim]")
@@ -53,11 +59,11 @@ def _resolve_file(proj: ProjectContext, file: Path) -> Path:
 @app.command()
 def sync(
     ctx: typer.Context,
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу",
+        help="Путь к Excel файлу (авто-определяется из --project)",
     ),
     domain: Optional[str] = typer.Option(
         None,
@@ -233,11 +239,13 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_
                 filter_list = [s.strip() for s in sheets_filter.split(",")]
                 sheets_to_process = filter_list
             else:
-                sheets_to_process = (
-                    sheets_by_type["content"] +
-                    sheets_by_type["taxonomy"]
-                )
+                taxonomy_sheets = [] if config.sync.skip_tax else sheets_by_type["taxonomy"]
+                sheets_to_process = sheets_by_type["content"] + taxonomy_sheets
 
+            if config.sync.skip_tax:
+                logger.info("--skip-tax: taxonomy-листы исключены из обработки")
+            if config.sync.skip_media:
+                logger.info("--skip-media: загрузка медиа пропускается")
             logger.info(f"Листы для обработки: {sheets_to_process}")
 
             async with WordPressClient(config.wordpress) as wp_client:
@@ -254,7 +262,7 @@ async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_
                         for col in df.columns:
                             if col in ["categories", "tags"] or col.endswith("-cat"):
                                 taxonomies_to_cache.add(col)
-                    elif sheet_type == "taxonomy":
+                    elif sheet_type == "taxonomy" and not config.sync.skip_tax:
                         taxonomies_to_cache.add(sheet_name)
 
                 if taxonomies_to_cache:
@@ -358,10 +366,16 @@ async def process_sheet(
             stats["total"] = len(df)
             return stats
         elif sheet_type == "media":
+            if config.sync.skip_media:
+                logger.info(f"--skip-media: пропускаем лист '{sheet_name}'")
+                return {"total": len(df), "added": 0, "updated": 0, "deleted": 0, "skipped": len(df), "errors": 0}
             stats = await media_sync.sync_media(df, excel_writer)
             stats["total"] = len(df)
             return stats
         elif sheet_type == "taxonomy":
+            if config.sync.skip_tax:
+                logger.info(f"--skip-tax: пропускаем лист '{sheet_name}'")
+                return {"total": len(df), "added": 0, "updated": 0, "deleted": 0, "skipped": len(df), "errors": 0}
             stats = await taxonomy_sync.sync_sheet(sheet_name, df, excel_writer)
             stats["total"] = len(df)
             return stats
@@ -388,11 +402,11 @@ async def process_sheet(
 @app.command(name="async")
 def async_sync(
     ctx: typer.Context,
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу",
+        help="Путь к Excel файлу (авто-определяется из --project)",
     ),
     domain: Optional[str] = typer.Option(
         None,
@@ -606,11 +620,13 @@ async def run_sync_async(
                 filter_list = [s.strip() for s in sheets_filter.split(",")]
                 sheets_to_process = filter_list
             else:
-                sheets_to_process = (
-                    sheets_by_type["content"] +
-                    sheets_by_type["taxonomy"]
-                )
+                taxonomy_sheets = [] if config.sync.skip_tax else sheets_by_type["taxonomy"]
+                sheets_to_process = sheets_by_type["content"] + taxonomy_sheets
 
+            if config.sync.skip_tax:
+                logger.info("--skip-tax: taxonomy-листы исключены из обработки")
+            if config.sync.skip_media:
+                logger.info("--skip-media: загрузка медиа пропускается")
             logger.info(f"Листы для обработки: {sheets_to_process}")
 
             timeout = config.sync.timeout if hasattr(config.sync, 'timeout') else 30
@@ -634,7 +650,7 @@ async def run_sync_async(
                         for col in df.columns:
                             if col in ["categories", "tags"] or col.endswith("-cat"):
                                 taxonomies_to_cache.add(col)
-                    elif sheet_type == "taxonomy":
+                    elif sheet_type == "taxonomy" and not config.sync.skip_tax:
                         taxonomies_to_cache.add(sheet_name)
 
                 if taxonomies_to_cache:
@@ -738,10 +754,16 @@ async def process_sheet_async(
             stats["total"] = len(df)
             return stats
         elif sheet_type == "media":
+            if config.sync.skip_media:
+                logger.info(f"--skip-media: пропускаем лист '{sheet_name}'")
+                return {"total": len(df), "added": 0, "updated": 0, "deleted": 0, "skipped": len(df), "errors": 0}
             stats = await media_sync.sync_media(df, excel_writer)
             stats["total"] = len(df)
             return stats
         elif sheet_type == "taxonomy":
+            if config.sync.skip_tax:
+                logger.info(f"--skip-tax: пропускаем лист '{sheet_name}'")
+                return {"total": len(df), "added": 0, "updated": 0, "deleted": 0, "skipped": len(df), "errors": 0}
             stats = await taxonomy_sync.sync_sheet(sheet_name, df, excel_writer)
             stats["total"] = len(df)
             return stats

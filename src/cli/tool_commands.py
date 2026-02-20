@@ -27,11 +27,11 @@ import typer
 @app.command()
 def validate(
     ctx: typer.Context,
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу"
+        help="Путь к Excel файлу (авто-определяется из --project)"
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -46,7 +46,15 @@ def validate(
     """
     Валидация Excel файла без синхронизации
     """
+    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+
+    if file is None:
+        file = proj.find_excel() if proj.active else None
+        if file is None:
+            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
+            raise typer.Exit(code=1)
+        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
 
     console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 

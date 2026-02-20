@@ -92,8 +92,10 @@ class WordPressDiscovery:
                 if should_skip:
                     logger.debug(f"Пропускаем таксономию: {tax_key} (служебная таксономия)")
                 else:
-                    taxonomies.append(tax_key)
-                    logger.debug(f"Найдена таксономия: {tax_key} - {tax_data.get('name', 'N/A')}")
+                    normalized = normalize_taxonomy_name(tax_key)
+                    if normalized not in taxonomies:
+                        taxonomies.append(normalized)
+                    logger.debug(f"Найдена таксономия: {tax_key} -> {normalized} - {tax_data.get('name', 'N/A')}")
 
             logger.info(f"Обнаружено {len(taxonomies)} таксономий: {', '.join(taxonomies)}")
             return taxonomies
@@ -101,8 +103,8 @@ class WordPressDiscovery:
         except Exception as e:
             logger.error(f"Ошибка обнаружения таксономий: {e}")
             # Fallback к стандартным таксономиям
-            logger.warning("Используем fallback к стандартным таксономиям: category, post_tag")
-            return ["category", "post_tag"]
+            logger.warning("Используем fallback к стандартным таксономиям: categories, tags")
+            return ["categories", "tags"]
 
     async def discover_acf_fields_for_post_type(self, post_type: str) -> List[str]:
         """

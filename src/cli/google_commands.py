@@ -151,15 +151,11 @@ def download_google_sheet(
 @app.command()
 def upload_to_google_sheets(
     ctx: typer.Context,
-    file: Path = typer.Option(
-        ...,
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу для загрузки",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
+        help="Путь к Excel файлу для загрузки (авто-определяется из --project)",
     ),
     sheet_id: Optional[str] = typer.Option(
         None,
@@ -205,7 +201,15 @@ def upload_to_google_sheets(
         # Загрузить только определенные листы
         python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
     """
+    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+
+    if file is None:
+        file = proj.find_excel() if proj.active else None
+        if file is None:
+            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
+            raise typer.Exit(code=1)
+        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
 
     console.print("\n[bold cyan]Upload Excel -> Google Sheets[/bold cyan]")
     console.print("=" * 60 + "\n")
