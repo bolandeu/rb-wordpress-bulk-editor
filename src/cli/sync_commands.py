@@ -24,8 +24,7 @@ from ..sync.media_sync import MediaSync
 from ..sync.taxonomy_sync import TaxonomySync
 from ..sync.taxonomy_sync_async import TaxonomySyncAsync
 from ..utils.logger import setup_logger, log_summary
-from ..utils.auth import load_credentials_from_env, load_async_config_from_env
-from ..exceptions import WPBulkEditorError
+from ..utils.auth import load_async_config_from_env
 
 import typer
 
@@ -387,8 +386,7 @@ async def process_sheet(
             }
 
     except Exception as e:
-        logger.error(f"Ошибка обработки листа {sheet_name}: {e}")
-        logger.exception(e)
+        logger.exception(f"Ошибка обработки листа {sheet_name}")
         return {
             "total": 0, "added": 0, "updated": 0,
             "deleted": 0, "skipped": 0, "errors": 1
@@ -629,7 +627,7 @@ async def run_sync_async(
                 logger.info("--skip-media: загрузка медиа пропускается")
             logger.info(f"Листы для обработки: {sheets_to_process}")
 
-            timeout = config.sync.timeout if hasattr(config.sync, 'timeout') else 30
+            timeout = config.sync.timeout
 
             async with WordPressClient(
                 config.wordpress,
@@ -775,8 +773,7 @@ async def process_sheet_async(
             }
 
     except Exception as e:
-        logger.error(f"Ошибка обработки листа {sheet_name}: {e}")
-        logger.exception(e)
+        logger.exception(f"Ошибка обработки листа {sheet_name}")
         return {
             "total": 0, "added": 0, "updated": 0,
             "deleted": 0, "skipped": 0, "errors": 1

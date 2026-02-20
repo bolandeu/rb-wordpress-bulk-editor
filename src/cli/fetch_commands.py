@@ -10,8 +10,8 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
-from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file
+from .common import handle_command_errors, load_and_print_credentials
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file, require_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -454,15 +454,8 @@ def fetch_media(
     """
     Загрузить список медиафайлов из WordPress в Excel (лист media)
     """
-    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
-
-    if file is None:
-        file = proj.find_excel() if proj.active else None
-        if file is None:
-            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
-            raise typer.Exit(code=1)
-        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
+    file = require_excel_file(ctx, file)
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
@@ -554,7 +547,9 @@ async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
         df = pd.DataFrame(media_rows)
 
         logger.info(f"Writing {len(df)} media records to Excel...")
-        with pd.ExcelWriter(excel_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+        mode = "a" if excel_file.exists() else "w"
+        kwargs = {"if_sheet_exists": "replace"} if mode == "a" else {}
+        with pd.ExcelWriter(excel_file, engine="openpyxl", mode=mode, **kwargs) as writer:
             df.to_excel(writer, sheet_name="media", index=False)
 
         logger.info(f"Successfully written {len(df)} media records to sheet 'media'")

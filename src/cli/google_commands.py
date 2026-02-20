@@ -13,7 +13,7 @@ from loguru import logger
 
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output, require_excel_file
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..utils.logger import setup_logger
 from ..utils.auth import load_async_config_from_env
@@ -201,15 +201,8 @@ def upload_to_google_sheets(
         # Загрузить только определенные листы
         python -m src.cli upload-to-google-sheets --file export.xlsx --sheets posts,pages
     """
-    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
-
-    if file is None:
-        file = proj.find_excel() if proj.active else None
-        if file is None:
-            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
-            raise typer.Exit(code=1)
-        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
+    file = require_excel_file(ctx, file)
 
     console.print("\n[bold cyan]Upload Excel -> Google Sheets[/bold cyan]")
     console.print("=" * 60 + "\n")
@@ -529,6 +522,7 @@ def async_sync_from_google(
     enable_circuit_breaker: bool = typer.Option(True, "--circuit-breaker/--no-circuit-breaker",
         help="Circuit breaker"),
     skip_media: bool = typer.Option(False, "--skip-media", help="Пропустить медиа"),
+    skip_tax: bool = typer.Option(False, "--skip-tax", help="Пропустить обновление таксономий"),
     no_update_excel: bool = typer.Option(False, "--no-update-excel", help="Не писать ID в Excel"),
     delete_media: bool = typer.Option(False, "--delete-media", help="Удалять media при delete"),
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media",
@@ -588,6 +582,7 @@ def async_sync_from_google(
                 dry_run=dry_run,
                 concurrency=concurrency_val,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media
@@ -634,6 +629,7 @@ def async_sync_google_bidirectional(
     enable_circuit_breaker: bool = typer.Option(True, "--circuit-breaker/--no-circuit-breaker",
         help="Circuit breaker"),
     skip_media: bool = typer.Option(False, "--skip-media", help="Пропустить медиа"),
+    skip_tax: bool = typer.Option(False, "--skip-tax", help="Пропустить обновление таксономий"),
     no_update_excel: bool = typer.Option(False, "--no-update-excel", help="Не писать ID в Excel"),
     no_upload_back: bool = typer.Option(False, "--no-upload-back",
         help="Не загружать обратно в Google Sheets"),
@@ -696,6 +692,7 @@ def async_sync_google_bidirectional(
                 dry_run=dry_run,
                 concurrency=concurrency_val,
                 skip_media=skip_media,
+                skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media

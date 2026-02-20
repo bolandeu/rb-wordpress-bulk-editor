@@ -11,7 +11,7 @@ from loguru import logger
 
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output
+from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output, require_excel_file
 from .project import find_repo_root
 from ..config import LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
@@ -19,7 +19,6 @@ from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
 from ..utils.logger import setup_logger
-from ..utils.auth import load_credentials_from_env
 
 import typer
 
@@ -46,15 +45,8 @@ def validate(
     """
     Валидация Excel файла без синхронизации
     """
-    proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
-
-    if file is None:
-        file = proj.find_excel() if proj.active else None
-        if file is None:
-            console.print("[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]")
-            raise typer.Exit(code=1)
-        console.print(f"[dim]Excel файл (авто): {file.name}[/dim]")
+    file = require_excel_file(ctx, file)
 
     console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
@@ -1138,9 +1130,6 @@ async def _run_llm_generation(
     if total_errors > 0:
         console.print(f"[yellow]Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")
 
-    if total_errors > 0:
-        console.print(f"[yellow]Обнаружены ошибки. Проверьте лог: {log_file}[/yellow]\n")
-
 
 def _resolve_template(template_name: Optional[str]) -> Path:
     """Резолвинг пути к шаблону: None → default.xlsx, имя → templates/<имя>, путь → как есть."""
@@ -1266,6 +1255,8 @@ def reshape(
                     if extra_whitelist is None:
                         # Все extra-колонки
                         extra = [c for c in src_columns if c not in tpl_set]
+                        if extra:
+                            all_columns.append(None)  # пустой столбец-разрыв перед extra
                     elif extra_whitelist:
                         # Только указанные, в порядке whitelist, если есть в source
                         src_set = set(src_columns)

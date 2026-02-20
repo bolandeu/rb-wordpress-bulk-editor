@@ -9,6 +9,11 @@ import typer
 
 from .project import ProjectContext
 
+# Импорт console откладываем до вызова функций, чтобы избежать циклических импортов
+def _console():
+    from . import console
+    return console
+
 
 def get_project(ctx: typer.Context) -> ProjectContext:
     """Получить ProjectContext из typer контекста."""
@@ -30,6 +35,22 @@ def resolve_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Optional
     if explicit:
         return explicit
     return get_project(ctx).find_excel()
+
+
+def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
+    """
+    Разрешить Excel файл с обязательным результатом.
+    explicit > авто-поиск в проекте > ошибка с подсказкой.
+    """
+    file = resolve_excel_file(ctx, explicit)
+    if file is None:
+        _console().print(
+            "[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]"
+        )
+        raise typer.Exit(code=1)
+    if explicit is None:
+        _console().print(f"[dim]Excel файл (авто): {file.name}[/dim]")
+    return file
 
 
 def resolve_logs_folder(ctx: typer.Context) -> Path:
