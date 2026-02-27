@@ -12,7 +12,7 @@ from loguru import logger
 
 from . import app, console
 from .helpers import get_project, resolve_env_file
-from .common import handle_command_errors, load_and_print_credentials
+from .common import handle_command_errors, load_and_print_credentials, parse_comma_list
 from ..config import AppConfig, SyncConfig, PathsConfig, LoggingConfig, WordPressConfig
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -140,6 +140,11 @@ def sync(
         "--test-mode",
         help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"
     ),
+    columns: Optional[str] = typer.Option(
+        None,
+        "--columns",
+        help="Колонки для обновления через запятую (excerpt,seo_title). Остальные поля не отправляются в API"
+    ),
 ):
     """
     Синхронизация Excel -> WordPress
@@ -185,12 +190,16 @@ def sync(
                 skip_tax=skip_tax,
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
-                skip_existing_media=skip_existing_media
+                skip_existing_media=skip_existing_media,
+                columns_filter=parse_comma_list(columns)
             ),
             logging=LoggingConfig(
                 level="DEBUG" if verbose else "INFO"
             )
         )
+
+        if config.sync.columns_filter:
+            console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
 
         # 3. Настройка логирования
         config.paths.ensure_dirs()
@@ -497,6 +506,11 @@ def async_sync(
         "--test-mode",
         help="Тестовый режим: обрабатывает только первые 3 строки"
     ),
+    columns: Optional[str] = typer.Option(
+        None,
+        "--columns",
+        help="Колонки для обновления через запятую (excerpt,seo_title). Остальные поля не отправляются в API"
+    ),
 ):
     """
      Асинхронная синхронизация Excel -> WordPress
@@ -555,12 +569,16 @@ def async_sync(
                 update_excel=not no_update_excel,
                 delete_featured_media=delete_media,
                 skip_existing_media=skip_existing_media,
-                timeout=api_timeout or 30
+                timeout=api_timeout or 30,
+                columns_filter=parse_comma_list(columns)
             ),
             logging=LoggingConfig(
                 level="DEBUG" if verbose else "INFO"
             )
         )
+
+        if config.sync.columns_filter:
+            console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
 
         config.paths.ensure_dirs()
         log_file = setup_logger(

@@ -60,7 +60,9 @@ class ContentSyncBase(BaseSync):
         payload = mapper.map_row(row, taxonomy_ids)
 
         # 3. Обрабатываем content_path если заполнен
-        if "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
+        # Пропускаем если columns_filter активен и content не в фильтре
+        _cf = mapper.allowed_columns
+        if (not _cf or "content" in _cf) and "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
             content_filename = str(row["content_path"]).strip()
 
             if content_processor.validate_file_exists(content_filename):
@@ -99,7 +101,9 @@ class ContentSyncBase(BaseSync):
             post_id = result["id"]
 
         # 5. Загружаем медиа (если есть img_path)
-        if not self.config.sync.skip_media and mapper.should_upload_media(row):
+        # Пропускаем если columns_filter активен и img_path/featured_media не в фильтре
+        _should_media = not _cf or "img_path" in _cf or "featured_media" in _cf
+        if _should_media and not self.config.sync.skip_media and mapper.should_upload_media(row):
             media_path = mapper.extract_media_path(row)
             # Берем title и alt_text из строки
             title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else ""
@@ -162,7 +166,9 @@ class ContentSyncBase(BaseSync):
         payload = mapper.map_row(row, taxonomy_ids)
 
         # 3. Обрабатываем content_path если заполнен
-        if "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
+        # Пропускаем если columns_filter активен и content не в фильтре
+        _cf = mapper.allowed_columns
+        if (not _cf or "content" in _cf) and "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
             content_filename = str(row["content_path"]).strip()
 
             if content_processor.validate_file_exists(content_filename):
@@ -180,8 +186,10 @@ class ContentSyncBase(BaseSync):
         saved_media_result = None
 
         # Проверяем: нужно ли загружать новую картинку или прикрепить существующую
-        img_path_filled = not self.config.sync.skip_media and mapper.should_upload_media(row)
-        featured_media_in_excel = "featured_media" in row.index and pd.notna(row["featured_media"]) and str(row["featured_media"]).strip() != ""
+        # Пропускаем если columns_filter активен и img_path/featured_media не в фильтре
+        _should_media = not _cf or "img_path" in _cf or "featured_media" in _cf
+        img_path_filled = _should_media and not self.config.sync.skip_media and mapper.should_upload_media(row)
+        featured_media_in_excel = _should_media and "featured_media" in row.index and pd.notna(row["featured_media"]) and str(row["featured_media"]).strip() != ""
 
         if img_path_filled:
             # Загружаем новую картинку
@@ -320,6 +328,13 @@ class ContentSyncBase(BaseSync):
             return {}
 
         taxonomy_fields = mapper.detector.get_taxonomy_fields()
+
+        # Если columns_filter активен — обрабатываем только таксономии из фильтра
+        if mapper.allowed_columns:
+            taxonomy_fields = [f for f in taxonomy_fields if f in mapper.allowed_columns]
+            if not taxonomy_fields:
+                return {}
+
         taxonomy_ids = {}
 
         for tax_field in taxonomy_fields:

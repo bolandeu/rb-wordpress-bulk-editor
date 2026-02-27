@@ -58,6 +58,7 @@ from . import export_commands  # noqa: E402, F401
 from . import google_commands  # noqa: E402, F401
 from . import tool_commands  # noqa: E402, F401
 from . import image_commands  # noqa: E402, F401
+from . import vlook_commands  # noqa: E402, F401
 
 
 def main():

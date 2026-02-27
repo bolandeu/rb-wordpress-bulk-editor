@@ -5,7 +5,7 @@
 import asyncio
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import pandas as pd
 from openpyxl import load_workbook
 from loguru import logger
@@ -195,7 +195,8 @@ class ExcelWriter:
         self,
         sheet_name: str,
         api_response: Dict[str, Any],
-        action: str
+        action: str,
+        columns_filter: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Построить словарь данных для обновления строки из ответа WordPress API.
@@ -206,6 +207,7 @@ class ExcelWriter:
             sheet_name: Название листа
             api_response: Ответ от WordPress API
             action: Тип операции (add, update, delete)
+            columns_filter: Если задан — минимальный writeback (action, modified, id)
 
         Returns:
             Словарь {column_name: value} для обновления
@@ -218,6 +220,18 @@ class ExcelWriter:
 
         df = self._dataframes[sheet_name]
         existing_columns = df.columns.tolist()
+
+        # --- Режим columns_filter: минимальный writeback ---
+        if columns_filter:
+            if action == "add" and "id" in api_response and "id" in existing_columns:
+                update_data["id"] = api_response["id"]
+            if "modified" in api_response and "modified" in existing_columns:
+                update_data["modified"] = api_response["modified"]
+            if "action" in existing_columns:
+                update_data["action"] = "skip"
+            return update_data
+
+        # --- Стандартный полный writeback ---
 
         # ID (для add операций)
         if action == "add" and "id" in api_response and "id" in existing_columns:
@@ -360,7 +374,8 @@ class ExcelWriter:
         sheet_name: str,
         row_index: int,
         api_response: Dict[str, Any],
-        action: str
+        action: str,
+        columns_filter: Optional[List[str]] = None
     ):
         """
         Обновить строку данными из ответа WordPress API.
@@ -370,8 +385,11 @@ class ExcelWriter:
             row_index: Индекс строки
             api_response: Ответ от WordPress API
             action: Тип операции (add, update, delete)
+            columns_filter: Если задан — ограничить writeback (только action, modified, id)
         """
-        update_data = self._build_update_data_from_api(sheet_name, api_response, action)
+        update_data = self._build_update_data_from_api(
+            sheet_name, api_response, action, columns_filter=columns_filter
+        )
         if update_data:
             self.update_row(sheet_name, row_index, update_data)
 
@@ -407,7 +425,8 @@ class ExcelWriter:
         sheet_name: str,
         row_index: int,
         api_response: Dict[str, Any],
-        action: str
+        action: str,
+        columns_filter: Optional[List[str]] = None
     ):
         """
         Async версия update_from_api_response с thread-safety.
@@ -417,9 +436,12 @@ class ExcelWriter:
             row_index: Индекс строки
             api_response: Ответ от WordPress API
             action: Тип операции (add, update, delete)
+            columns_filter: Если задан — ограничить writeback (только action, modified, id)
         """
         # Формируем update_data (вне блокировки для минимизации времени lock)
-        update_data = self._build_update_data_from_api(sheet_name, api_response, action)
+        update_data = self._build_update_data_from_api(
+            sheet_name, api_response, action, columns_filter=columns_filter
+        )
 
         # Блокируем только момент записи
         if update_data:

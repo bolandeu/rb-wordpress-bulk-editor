@@ -34,11 +34,12 @@ No tests exist in this project.
 `src/cli/__init__.py` defines the Typer app with a `--project` callback that loads project context from `projects/<name>/` (auto-resolves .env, .xlsx, media/, logs/).
 
 Commands are split across files in `src/cli/`:
-- `sync_commands.py` — `sync`, `async` (Excel → WordPress)
+- `sync_commands.py` — `sync`, `async` (Excel → WordPress, `--columns` for selective field updates)
 - `fetch_commands.py` — `fetch`, `fetch-media` (WordPress → Excel)
 - `export_commands.py` — `export`, `export-media` (content to HTML/CSV)
 - `google_commands.py` — 6 Google Sheets ↔ WordPress commands
 - `tool_commands.py` — `validate`, `options`, `bulk-delete`, `counter`, `llm`
+- `vlook_commands.py` — `vlook` (привязка файлов к строкам Excel по ID)
 - `image_commands.py` — `image-crop`, `image-compress`, `image-convert`
 - `common.py` — shared helpers: `handle_command_errors()` context manager, `setup_command_logging()`, `load_and_print_credentials()`
 

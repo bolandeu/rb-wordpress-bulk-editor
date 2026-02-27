@@ -97,6 +97,10 @@ class SyncConfig(BaseModel):
         default=False,
         description="Не прикреплять существующие featured_media при update (когда img_path пустой)"
     )
+    columns_filter: Optional[List[str]] = Field(
+        default=None,
+        description="Фильтр колонок для отправки в API (None = все)"
+    )
 
 
 class PathsConfig(BaseModel):

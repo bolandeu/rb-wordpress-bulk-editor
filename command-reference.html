@@ -411,6 +411,9 @@
                             <a class="nav-link" href="#validate">validate</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="#vlook">vlook</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="#options">options</a>
                         </li>
                         <li class="nav-item mt-3">
@@ -467,6 +470,7 @@
                                         <option value="bulk-delete">bulk-delete - Массовое удаление</option>
                                         <option value="counter">counter - Подсчет слов и символов</option>
                                         <option value="llm">llm - Генерация контента через LLM API</option>
+                                        <option value="vlook">vlook - Привязка файлов по ID</option>
                                         <option value="validate">validate - Валидация файла</option>
                                         <option value="options">options - Управление настройками (загрузка/выгрузка)</option>
                                         <option value="image-crop">image-crop - Обрезка изображений</option>
@@ -580,6 +584,7 @@
                                         <li><a href="#counter">counter</a></li>
                                         <li><a href="#llm">llm</a></li>
                                         <li><a href="#reshape">reshape</a></li>
+                                        <li><a href="#vlook">vlook</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1273,6 +1278,7 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
                             <span class="param-badge param-optional">--no-update-excel</span> не записывать ID обратно в Excel
                             <span class="param-badge param-optional">--test-mode</span> обработать только первые 3 строки (требует --sheets с одним листом)
+                            <span class="param-badge param-optional">--columns</span> колонки для обновления через запятую (excerpt,seo_title). Остальные поля не отправляются
                             <span class="param-badge param-optional">--domain</span> URL WordPress сайта
                             <span class="param-badge param-optional">--username</span> имя пользователя
                             <span class="param-badge param-optional">--password</span> Application Password
@@ -1287,6 +1293,14 @@ LLM_PROMPT=Напиши текст для [title]</pre>
                             </button>
                             <code>wp-bulk sync --file example.xlsx</code>
                             <div class="text-muted small mt-2">Полная синхронизация всех листов</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk sync --file w.xlsx --sheets posts --columns excerpt,seo_title</code>
+                            <div class="text-muted small mt-2">Обновить только excerpt и seo_title для листа posts</div>
                         </div>
 
                         <div class="code-block">
@@ -2045,6 +2059,7 @@ wp-bulk fetch-media --file export.xlsx</pre>
                             <span class="param-badge param-optional">--delete-media</span> удалять featured media при action=delete
                             <span class="param-badge param-optional">--no-update-excel</span> не записывать ID обратно в Excel
                             <span class="param-badge param-optional">--test-mode</span> обработать только первые 3 строки
+                            <span class="param-badge param-optional">--columns</span> колонки для обновления через запятую (excerpt,seo_title). Остальные поля не отправляются
                         </div>
 
                         <div class="example-title">Примеры использования:</div>
@@ -2894,6 +2909,84 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                         </div>
                     </div>
 
+                    <!-- vlook -->
+                    <div id="vlook" class="command-card">
+                        <h2 class="command-title">vlook</h2>
+                        <p class="command-description">Привязка файлов к строкам Excel по ID (VLOOKUP по файловой системе)</p>
+
+                        <div class="info-box">
+                            <strong><i class="bi bi-info-circle me-2"></i>Назначение:</strong>
+                            Поиск файлов вида <code>{id}.ext</code> в указанной папке и запись имени файла
+                            в соответствующую колонку Excel. Полезно для привязки HTML-контента и изображений
+                            к записям перед синхронизацией.
+                        </div>
+
+                        <h5 class="mt-4">Режимы:</h5>
+                        <table class="table table-sm table-bordered">
+                            <thead><tr><th>Режим</th><th>Папка</th><th>Расширения</th><th>Колонка</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>content</code> (по умолчанию)</td><td>content/</td><td>.html</td><td>content_path</td></tr>
+                                <tr><td><code>media</code></td><td>media/</td><td>jpg, png, gif, webp, svg, bmp, tiff, ico</td><td>img_path</td></tr>
+                                <tr><td><code>both</code></td><td>content/ + media/</td><td>обе группы</td><td>content_path + img_path</td></tr>
+                                <tr><td><code>custom</code></td><td>--folder</td><td>любые</td><td>--column</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h5 class="mt-4">Параметры:</h5>
+                        <div class="badge-section">
+                            <span class="param-badge param-optional">--mode, -m</span> режим: content, media, both, custom [default: content]
+                            <span class="param-badge param-optional">--file, -f</span> Excel файл [default: export.xlsx]
+                            <span class="param-badge param-optional">--sheet, -s</span> конкретный лист (по умолчанию все контентные)
+                            <span class="param-badge param-optional">--folder</span> папка для поиска (режим custom)
+                            <span class="param-badge param-optional">--column</span> колонка для записи (режим custom)
+                            <span class="param-badge param-optional">--verbose, -v</span> подробные логи
+                        </div>
+
+                        <div class="example-title">Примеры использования:</div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk vlook</code>
+                            <div class="text-muted small mt-2">Привязка HTML файлов из content/ к content_path (режим по умолчанию)</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk -P mysite vlook --mode both</code>
+                            <div class="text-muted small mt-2">Привязка контента и изображений в проектном режиме</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk vlook --mode media --file data.xlsx --sheet posts</code>
+                            <div class="text-muted small mt-2">Привязка изображений только для листа posts</div>
+                        </div>
+
+                        <div class="code-block">
+                            <button class="btn btn-sm btn-outline-primary copy-btn" onclick="copyCode(this)">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <code>wp-bulk vlook --mode custom --folder ./exports --column content_path --sheet pages</code>
+                            <div class="text-muted small mt-2">Произвольная папка и колонка, конкретный лист</div>
+                        </div>
+
+                        <div class="success-box mt-4">
+                            <strong><i class="bi bi-check-circle me-2"></i>Как работает:</strong>
+                            <ul class="mb-0">
+                                <li>Строит индекс файлов в папке (быстрый O(1) поиск)</li>
+                                <li>Пропускает служебные листы (media, options) и таксономии</li>
+                                <li>Если файл не найден - ячейка остается без изменений</li>
+                                <li>Перезаписывает значение если файл найден</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- ─── ОБРАБОТКА ИЗОБРАЖЕНИЙ ─── -->
 
                     <!-- image-crop -->
@@ -3263,6 +3356,7 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
                     { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'columns', type: 'text', required: false, placeholder: 'excerpt,seo_title', description: 'Колонки для обновления (остальные не отправляются)' },
                     { name: 'test-mode', type: 'checkbox', required: false, description: 'Тестовый режим (первые 3 строки)' }
                 ]
             },
@@ -3284,6 +3378,7 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'skip-existing-media', type: 'checkbox', required: false, description: 'Не прикреплять существующие featured_media' },
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media при delete' },
                     { name: 'no-update-excel', type: 'checkbox', required: false, description: 'Не писать ID в Excel' },
+                    { name: 'columns', type: 'text', required: false, placeholder: 'excerpt,seo_title', description: 'Колонки для обновления (остальные не отправляются)' },
                     { name: 'test-mode', type: 'checkbox', required: false, description: 'Тестовый режим (первые 3 строки)' }
                 ]
             },
@@ -3438,6 +3533,16 @@ wp-bulk -P mysite llm --column img_path --file data.xlsx \
                     { name: 'force', type: 'checkbox', required: false, description: 'Удалить полностью (не в корзину)' },
                     { name: 'delete-media', type: 'checkbox', required: false, description: 'Удалять featured media' },
                     { name: 'dry-run', type: 'checkbox', required: false, description: 'Показать что будет удалено' },
+                    { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
+                ]
+            },
+            'vlook': {
+                params: [
+                    { name: 'mode', type: 'select', required: false, options: ['content', 'media', 'both', 'custom'], description: 'Режим поиска' },
+                    { name: 'file', type: 'text', required: false, placeholder: 'export.xlsx', description: 'Путь к Excel файлу' },
+                    { name: 'sheet', type: 'text', required: false, placeholder: 'posts', description: 'Конкретный лист' },
+                    { name: 'folder', type: 'text', required: false, placeholder: './exports', description: 'Папка для поиска (режим custom)' },
+                    { name: 'column', type: 'text', required: false, placeholder: 'content_path', description: 'Колонка для записи (режим custom)' },
                     { name: 'verbose', type: 'checkbox', required: false, description: 'Подробные логи' }
                 ]
             },

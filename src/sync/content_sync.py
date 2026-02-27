@@ -41,7 +41,7 @@ class ContentSync(ContentSyncBase):
         media_endpoint = MediaEndpoint(self.wp_client)
 
         # Создаем mapper и content processor
-        mapper = ContentMapper(df.columns.tolist())
+        mapper = ContentMapper(df.columns.tolist(), allowed_columns=self.config.sync.columns_filter)
         content_processor = ContentProcessor(self.config.paths.content_folder)
 
         # Обрабатываем в порядке: delete → update → add
@@ -100,7 +100,8 @@ class ContentSync(ContentSyncBase):
                             sheet_name,
                             idx,
                             result,
-                            action
+                            action,
+                            columns_filter=self.config.sync.columns_filter
                         )
 
                 except Exception as e:

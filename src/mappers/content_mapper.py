@@ -15,14 +15,16 @@ class ContentMapper:
     Преобразует строки Excel в payload для WordPress REST API.
     """
 
-    def __init__(self, columns: List[str]):
+    def __init__(self, columns: List[str], allowed_columns: Optional[List[str]] = None):
         """
         Args:
             columns: Список колонок из Excel
+            allowed_columns: Если задан — отправлять в API только эти поля
         """
         self.columns = columns
         self.detector = FieldDetector(columns)
         self.analysis = self.detector.analyze()
+        self.allowed_columns: Optional[Set[str]] = set(allowed_columns) if allowed_columns else None
 
     def map_row(
         self,
@@ -123,14 +125,31 @@ class ContentMapper:
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid featured_media value: {value}")
 
+        # --- Фильтрация по allowed_columns ---
+        if self.allowed_columns:
+            filtered = {}
+            for key, value in payload.items():
+                if key in self.allowed_columns:
+                    filtered[key] = value
+                elif key == "acf" and isinstance(value, dict):
+                    # Фильтруем ACF: acf_field_name -> оставляем если acf_field_name в allowed
+                    acf_filtered = {
+                        k: v for k, v in value.items()
+                        if f"acf_{k}" in self.allowed_columns
+                    }
+                    if acf_filtered:
+                        filtered["acf"] = acf_filtered
+            payload = filtered
+            logger.debug(f"Columns filter active: {self.allowed_columns} -> payload keys: {list(payload.keys())}")
+
         # Итоговый лог с payload
         logger.debug(f"Mapped row id={row_id} to payload keys: {list(payload.keys())}")
-        
+
         # Детальный лог для SEO полей в финальном payload
         seo_fields_in_payload = {k: v for k, v in payload.items() if k.startswith("seo_")}
         if seo_fields_in_payload:
             logger.debug(f"SEO fields in final payload: {seo_fields_in_payload}")
-        
+
         return payload
 
     def _convert_value(self, value: Any) -> Any:
