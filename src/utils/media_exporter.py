@@ -9,6 +9,7 @@ import asyncio
 from loguru import logger
 
 from ..wordpress.media import MediaEndpoint
+from .wp_helpers import wp_rendered
 
 
 class MediaExporter:
@@ -123,26 +124,6 @@ class MediaExporter:
             media: Данные медиафайла
             file_path: Путь к скачанному файлу или None
         """
-        # Извлекаем заголовок
-        title = media.get("title", {})
-        if isinstance(title, dict):
-            title_text = title.get("rendered", "")
-        else:
-            title_text = str(title)
-
-        # Извлекаем caption и description
-        caption = media.get("caption", {})
-        if isinstance(caption, dict):
-            caption_text = caption.get("rendered", "")
-        else:
-            caption_text = str(caption) if caption else ""
-
-        description = media.get("description", {})
-        if isinstance(description, dict):
-            description_text = description.get("rendered", "")
-        else:
-            description_text = str(description) if description else ""
-
         # Относительный путь к файлу
         file_relative = ""
         if file_path:
@@ -153,19 +134,20 @@ class MediaExporter:
             "id": media.get("id", ""),
             "date": media.get("date", ""),
             "modified": media.get("modified", ""),
-            "title": title_text,
+            "title": wp_rendered(media.get("title", {})),
             "type": media.get("type", ""),
             "slug": media.get("slug", ""),
             "link": media.get("link", ""),
             "status": media.get("status", ""),
-            "guid": media.get("guid", {}).get("rendered", ""),
-            "caption": caption_text,
+            "guid": wp_rendered(media.get("guid", {})),
+            "caption": wp_rendered(media.get("caption", {})),
             "alt_text": media.get("alt_text", ""),
             "media_type": media.get("media_type", ""),
             "mime_type": media.get("mime_type", ""),
             "post": media.get("post", ""),
             "source_url": media.get("source_url", ""),
-            "file_path": file_relative
+            "description": wp_rendered(media.get("description", {})),
+            "file_path": file_relative,
         })
 
     def save_csv_index(self):

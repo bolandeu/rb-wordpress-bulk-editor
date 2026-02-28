@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from loguru import logger
 
 from ..constants import TAXONOMY_DELIMITER
+from ..utils.wp_helpers import convert_taxonomy_ids_to_names
 
 
 def normalize_api_value(value: Any) -> Any:
@@ -285,8 +286,13 @@ class ExcelWriter:
                 tax_ids = api_response[tax_field]
                 if isinstance(tax_ids, list) and tax_ids:
                     # Конвертируем ID в имена
-                    names = self._convert_taxonomy_ids_to_names(tax_ids, tax_field)
-                    update_data[tax_field] = names
+                    id_to_name = {}
+                    if self._taxonomy_cache:
+                        mapping = self._taxonomy_cache.get_id_to_name_mapping()
+                        id_to_name = mapping.get(tax_field, {})
+                    update_data[tax_field] = convert_taxonomy_ids_to_names(
+                        tax_ids, id_to_name, tax_field,
+                    )
 
         # ACF поля из ответа API (обновляем только те, что есть в Excel)
         acf = api_response.get("acf", {})
@@ -319,55 +325,6 @@ class ExcelWriter:
             update_data["img_path"] = ""
 
         return update_data
-
-    def _convert_taxonomy_ids_to_names(
-        self,
-        term_ids: list,
-        taxonomy: str
-    ) -> str:
-        """
-        Преобразовать массив ID терминов в строку с названиями.
-
-        Args:
-            term_ids: Список ID терминов
-            taxonomy: Название таксономии (categories, tags, etc.)
-
-        Returns:
-            Строка с названиями через "; " или пустая строка
-        """
-        if not term_ids:
-            return ""
-
-        # Если нет кэша, возвращаем ID через "; "
-        if not self._taxonomy_cache:
-            logger.warning(
-                f"No taxonomy cache available, returning IDs for '{taxonomy}'"
-            )
-            return TAXONOMY_DELIMITER.join(map(str, term_ids))
-
-        # Получаем актуальный маппинг ID->Name из кэша
-        # (включает новые термины, созданные во время синхронизации)
-        id_to_name_mapping = self._taxonomy_cache.get_id_to_name_mapping()
-
-        if taxonomy not in id_to_name_mapping:
-            logger.warning(
-                f"No cache for taxonomy '{taxonomy}', returning IDs"
-            )
-            return TAXONOMY_DELIMITER.join(map(str, term_ids))
-
-        # Преобразуем ID в названия
-        names = []
-        for term_id in term_ids:
-            term_name = id_to_name_mapping[taxonomy].get(term_id)
-            if term_name:
-                names.append(term_name)
-            else:
-                logger.warning(
-                    f"Term ID {term_id} not found in {taxonomy} cache"
-                )
-                names.append(str(term_id))  # Fallback на ID
-
-        return TAXONOMY_DELIMITER.join(names)
 
     def update_from_api_response(
         self,

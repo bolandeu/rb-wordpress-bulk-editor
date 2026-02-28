@@ -5,11 +5,13 @@
 _add_term, _update_term, _delete_term, _build_payload
 """
 
+from abc import abstractmethod
 from typing import Dict, Any
 import pandas as pd
 from loguru import logger
 
 from ..wordpress.taxonomies import TaxonomiesEndpoint
+from ..constants import ACF_PREFIX
 from .base_sync import BaseSync
 
 
@@ -20,6 +22,14 @@ class TaxonomySyncBase(BaseSync):
     Содержит общую логику обработки терминов.
     Наследники (TaxonomySync, TaxonomySyncAsync) реализуют только sync_sheet().
     """
+
+    @abstractmethod
+    async def sync_sheet(self, sheet_name: str, df, excel_writer=None):
+        """Синхронизировать один лист таксономии."""
+
+    def _make_taxonomy_endpoint(self, taxonomy: str) -> TaxonomiesEndpoint:
+        """Фабричный метод для TaxonomiesEndpoint (можно переопределить в тестах)."""
+        return TaxonomiesEndpoint(self.wp_client, taxonomy)
 
     async def _add_term(
         self,
@@ -139,7 +149,6 @@ class TaxonomySyncBase(BaseSync):
         # Кастомные мета-поля (все остальные поля из Excel)
         # Пропускаем системные поля
         system_fields = {"id", "action", "name", "slug", "description", "parent", "link", "count"}
-        ACF_PREFIX = "acf_"
 
         for field_name in row.index:
             # Пропускаем уже обработанные и системные поля

@@ -6,14 +6,12 @@ async-from-google, async-google-bidirectional
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import asyncio
 
-from loguru import logger
-
 from . import app, console
-from .common import handle_command_errors, load_and_print_credentials
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output, require_excel_file
+from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
+from .helpers import get_project, resolve_env_file, resolve_output, require_excel_file
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..utils.logger import setup_logger
 from ..utils.auth import load_async_config_from_env
@@ -22,7 +20,7 @@ import typer
 
 
 # ============================================================
-# Helpers для загрузки Google Sheets параметров
+# Shared helpers
 # ============================================================
 
 def _load_google_params(sheet_id: Optional[str], credentials: Optional[str], env_file: Optional[Path] = None):
@@ -59,6 +57,99 @@ def _load_google_params(sheet_id: Optional[str], credentials: Optional[str], env
     return final_sheet_id, credentials_path
 
 
+def _download_from_google(sheet_id: str, credentials_path: Path, output: Path, verbose: bool = True):
+    """Скачать Google Sheets в Excel. Возвращает GoogleSheetsClient для дальнейшего использования."""
+    from ..utils.google_sheets import GoogleSheetsClient
+
+    gs_client = GoogleSheetsClient(credentials_path)
+
+    if verbose:
+        info = gs_client.get_spreadsheet_info(sheet_id)
+        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
+        console.print(f"[green]OK[/green] Последнее изменение: {info.get('modified_time', 'Unknown')}")
+        console.print()
+
+    gs_client.download_as_excel(sheet_id, output)
+    console.print(f"[bold green]OK Файл успешно скачан![/bold green]")
+    console.print(f"[bold]Сохранено:[/bold] {output}\n")
+
+    return gs_client
+
+
+def _upload_back_to_google(
+    gs_client,
+    output: Path,
+    sheet_id: str,
+    sheets: Optional[str],
+    no_upload_back: bool,
+    dry_run: bool,
+):
+    """Шаг 3: загрузка обратно в Google Sheets (для bidirectional команд)."""
+    if no_upload_back:
+        console.print("[yellow]ШАГ 3 пропущен: --no-upload-back[/yellow]\n")
+        return
+    if dry_run:
+        console.print("[yellow]ШАГ 3 пропущен: DRY-RUN режим[/yellow]\n")
+        return
+
+    console.print("[bold yellow]ШАГ 3: Загрузка обратно в Google Sheets[/bold yellow]\n")
+
+    sheets_to_upload = [s.strip() for s in sheets.split(",")] if sheets else None
+    if sheets_to_upload:
+        console.print(f"[yellow]->[/yellow] Листы для обновления: {', '.join(sheets_to_upload)}")
+    else:
+        console.print(f"[yellow]->[/yellow] Будут обновлены все листы из Excel файла")
+    console.print()
+
+    gs_client.upload_excel_to_sheets(
+        excel_path=output,
+        spreadsheet_id=sheet_id,
+        sheets_to_update=sheets_to_upload,
+    )
+    console.print(f"[bold green]OK Данные успешно загружены в Google Sheets![/bold green]\n")
+
+
+def _build_google_sync_config(
+    dry_run: bool,
+    concurrency: int,
+    skip_media: bool,
+    skip_tax: bool,
+    no_update_excel: bool,
+    delete_media: bool,
+    skip_existing_media: bool,
+) -> SyncConfig:
+    """Построить SyncConfig для Google pipeline-команд."""
+    return SyncConfig(
+        dry_run=dry_run,
+        concurrency=concurrency,
+        skip_media=skip_media,
+        skip_tax=skip_tax,
+        update_excel=not no_update_excel,
+        delete_featured_media=delete_media,
+        skip_existing_media=skip_existing_media,
+    )
+
+
+def _build_app_config(
+    excel_file: Path,
+    env_file: Optional[Path],
+    project_root: Path,
+    sync_config: SyncConfig,
+    verbose: bool,
+) -> AppConfig:
+    """Построить AppConfig с загрузкой credentials."""
+    domain, username, password = load_and_print_credentials(env_file=env_file)
+    return AppConfig.from_excel(
+        excel_file=excel_file,
+        wp_url=domain,
+        wp_username=username,
+        wp_password=password,
+        project_root=project_root,
+        sync=sync_config,
+        logging=LoggingConfig(level="DEBUG" if verbose else "INFO"),
+    )
+
+
 # ============================================================
 # download-google-sheet
 # ============================================================
@@ -67,19 +158,13 @@ def _load_google_params(sheet_id: Optional[str], credentials: Optional[str], env
 def download_google_sheet(
     ctx: typer.Context,
     sheet_id: Optional[str] = typer.Option(
-        None,
-        "--sheet-id",
-        help="ID Google Sheets документа"
+        None, "--sheet-id", help="ID Google Sheets документа"
     ),
     credentials: Optional[Path] = typer.Option(
-        None,
-        "--credentials",
-        help="Путь к JSON файлу с credentials"
+        None, "--credentials", help="Путь к JSON файлу с credentials"
     ),
     output: Path = typer.Option(
-        Path("export.xlsx"),
-        "--output",
-        "-o",
+        Path("export.xlsx"), "--output", "-o",
         help="Путь для сохранения .xlsx файла (по умолчанию export.xlsx)"
     ),
 ):
@@ -103,22 +188,9 @@ def download_google_sheet(
     console.print("\n[bold cyan]Google Sheets Downloader[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-
-    logging_config = LoggingConfig()
-
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name="download_google_sheet"
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    setup_command_logging(ctx, "download_google_sheet")
 
     with handle_command_errors():
-        from ..utils.google_sheets import GoogleSheetsClient
-
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
@@ -128,20 +200,8 @@ def download_google_sheet(
         console.print(f"[yellow]->[/yellow] Файл назначения: {output}")
         console.print()
 
-        # Скачиваем
         console.print("[yellow]Скачивание Google Sheets...[/yellow]")
-
-        downloader = GoogleSheetsClient(credentials_path)
-
-        info = downloader.get_spreadsheet_info(final_sheet_id)
-        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
-        console.print(f"[green]OK[/green] Последнее изменение: {info.get('modified_time', 'Unknown')}")
-        console.print()
-
-        downloader.download_as_excel(final_sheet_id, output)
-
-        console.print(f"\n[bold green]OK Файл успешно скачан![/bold green]")
-        console.print(f"[bold]Сохранено:[/bold] {output}")
+        _download_from_google(final_sheet_id, credentials_path, output)
 
 
 # ============================================================
@@ -152,41 +212,20 @@ def download_google_sheet(
 def upload_to_google_sheets(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None,
-        "--file",
-        "-f",
+        None, "--file", "-f",
         help="Путь к Excel файлу для загрузки (авто-определяется из --project)",
     ),
-    sheet_id: Optional[str] = typer.Option(
-        None,
-        "--sheet-id",
-        help="ID Google Sheets документа"
-    ),
-    credentials: Optional[Path] = typer.Option(
-        None,
-        "--credentials",
-        help="Путь к JSON файлу с credentials"
-    ),
+    sheet_id: Optional[str] = typer.Option(None, "--sheet-id", help="ID Google Sheets документа"),
+    credentials: Optional[Path] = typer.Option(None, "--credentials", help="Путь к JSON файлу с credentials"),
     sheets: Optional[str] = typer.Option(
-        None,
-        "--sheets",
+        None, "--sheets",
         help="Список листов для обновления через запятую (posts,pages). Если не указано - обновляются все листы"
     ),
     env_file: Optional[Path] = typer.Option(
-        None,
-        "--env-file",
-        help="Путь к .env файлу (по умолчанию .env)",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
+        None, "--env-file", help="Путь к .env файлу (по умолчанию .env)",
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Подробные логи"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
 ):
     """
     Загрузить локальный Excel файл в Google Sheets
@@ -207,17 +246,7 @@ def upload_to_google_sheets(
     console.print("\n[bold cyan]Upload Excel -> Google Sheets[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name="upload_to_google_sheets"
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    setup_command_logging(ctx, "upload_to_google_sheets", verbose)
 
     with handle_command_errors():
         from ..utils.google_sheets import GoogleSheetsClient
@@ -238,7 +267,6 @@ def upload_to_google_sheets(
             console.print(f"[yellow]->[/yellow] Будут обновлены все листы из Excel файла")
 
         console.print()
-
         console.print("[yellow]Загрузка в Google Sheets...[/yellow]")
         gs_client = GoogleSheetsClient(credentials_path)
 
@@ -293,64 +321,32 @@ def sync_from_google(
     console.print("=" * 60 + "\n")
 
     with handle_command_errors():
-        from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync
 
-        # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
+        # ШАГ 1
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
-
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
-
         console.print(f"[yellow]->[/yellow] Google Sheets ID: {final_sheet_id}")
         console.print(f"[yellow]->[/yellow] Credentials: {credentials_path}")
         console.print(f"[yellow]->[/yellow] Файл назначения: {output}")
         console.print()
+        _download_from_google(final_sheet_id, credentials_path, output)
 
-        console.print("[yellow]Скачивание Google Sheets...[/yellow]")
-        downloader = GoogleSheetsClient(credentials_path)
-
-        info = downloader.get_spreadsheet_info(final_sheet_id)
-        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
-        console.print(f"[green]OK[/green] Последнее изменение: {info.get('modified_time', 'Unknown')}")
-        console.print()
-
-        downloader.download_as_excel(final_sheet_id, output)
-
-        console.print(f"[bold green]OK Файл успешно скачан![/bold green]")
-        console.print(f"[bold]Сохранено:[/bold] {output}\n")
-
-        # ========== ШАГ 2: СИНХРОНИЗАЦИЯ С WORDPRESS ==========
+        # ШАГ 2
         console.print("[bold yellow]ШАГ 2: Синхронизация с WordPress[/bold yellow]\n")
-
-        domain, username, password = load_and_print_credentials(env_file=env_file)
-
-        config = AppConfig.from_excel(
-            excel_file=output,
-            wp_url=domain,
-            wp_username=username,
-            wp_password=password,
-            project_root=proj.root,
-            sync=SyncConfig(
-                dry_run=dry_run,
-                concurrency=concurrency,
-                skip_media=skip_media,
-                skip_tax=skip_tax,
-                update_excel=not no_update_excel,
-                delete_featured_media=delete_media,
-                skip_existing_media=skip_existing_media
-            ),
-            logging=LoggingConfig(
-                level="DEBUG" if verbose else "INFO"
-            )
+        sync_config = _build_google_sync_config(
+            dry_run=dry_run, concurrency=concurrency,
+            skip_media=skip_media, skip_tax=skip_tax,
+            no_update_excel=no_update_excel, delete_media=delete_media,
+            skip_existing_media=skip_existing_media,
         )
-
+        config = _build_app_config(output, env_file, proj.root, sync_config, verbose)
         config.paths.ensure_dirs()
         log_file = setup_logger(
-            logs_folder=config.paths.logs_folder,
-            config=config.logging,
-            command_name="sync_from_google"
+            logs_folder=config.paths.logs_folder, config=config.logging,
+            command_name="sync_from_google",
         )
 
         asyncio.run(run_sync(config, sheets))
@@ -406,97 +402,40 @@ def sync_google_bidirectional(
     console.print("=" * 60 + "\n")
 
     with handle_command_errors():
-        from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync
 
-        # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
+        # ШАГ 1
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
-
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
-
         console.print(f"[yellow]->[/yellow] Google Sheets ID: {final_sheet_id}")
         console.print(f"[yellow]->[/yellow] Credentials: {credentials_path}")
         console.print(f"[yellow]->[/yellow] Файл назначения: {output}")
         console.print()
+        gs_client = _download_from_google(final_sheet_id, credentials_path, output)
 
-        console.print("[yellow]Скачивание Google Sheets...[/yellow]")
-        gs_client = GoogleSheetsClient(credentials_path)
-
-        info = gs_client.get_spreadsheet_info(final_sheet_id)
-        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
-        console.print(f"[green]OK[/green] Последнее изменение: {info.get('modified_time', 'Unknown')}")
-        console.print()
-
-        gs_client.download_as_excel(final_sheet_id, output)
-
-        console.print(f"[bold green]OK Файл успешно скачан![/bold green]")
-        console.print(f"[bold]Сохранено:[/bold] {output}\n")
-
-        # ========== ШАГ 2: СИНХРОНИЗАЦИЯ С WORDPRESS ==========
+        # ШАГ 2
         console.print("[bold yellow]ШАГ 2: Синхронизация с WordPress[/bold yellow]\n")
-
-        domain, username, password = load_and_print_credentials(env_file=env_file)
-
-        config = AppConfig.from_excel(
-            excel_file=output,
-            wp_url=domain,
-            wp_username=username,
-            wp_password=password,
-            project_root=proj.root,
-            sync=SyncConfig(
-                dry_run=dry_run,
-                concurrency=concurrency,
-                skip_media=skip_media,
-                skip_tax=skip_tax,
-                update_excel=not no_update_excel,
-                delete_featured_media=delete_media,
-                skip_existing_media=skip_existing_media
-            ),
-            logging=LoggingConfig(
-                level="DEBUG" if verbose else "INFO"
-            )
+        sync_config = _build_google_sync_config(
+            dry_run=dry_run, concurrency=concurrency,
+            skip_media=skip_media, skip_tax=skip_tax,
+            no_update_excel=no_update_excel, delete_media=delete_media,
+            skip_existing_media=skip_existing_media,
         )
-
+        config = _build_app_config(output, env_file, proj.root, sync_config, verbose)
         config.paths.ensure_dirs()
         log_file = setup_logger(
-            logs_folder=config.paths.logs_folder,
-            config=config.logging,
-            command_name="sync_google_bidirectional"
+            logs_folder=config.paths.logs_folder, config=config.logging,
+            command_name="sync_google_bidirectional",
         )
 
         asyncio.run(run_sync(config, sheets))
-
         console.print(f"\n[bold green]OK Синхронизация с WordPress завершена![/bold green]\n")
 
-        # ========== ШАГ 3: ЗАГРУЗКА ОБРАТНО В GOOGLE SHEETS ==========
-        if not no_upload_back and not dry_run:
-            console.print("[bold yellow]ШАГ 3: Загрузка обратно в Google Sheets[/bold yellow]\n")
+        # ШАГ 3
+        _upload_back_to_google(gs_client, output, final_sheet_id, sheets, no_upload_back, dry_run)
 
-            sheets_to_upload = None
-            if sheets:
-                sheets_to_upload = [s.strip() for s in sheets.split(",")]
-                console.print(f"[yellow]->[/yellow] Листы для обновления: {', '.join(sheets_to_upload)}")
-            else:
-                console.print(f"[yellow]->[/yellow] Будут обновлены все листы из Excel файла")
-
-            console.print()
-            console.print("[yellow]Загрузка в Google Sheets...[/yellow]")
-
-            gs_client.upload_excel_to_sheets(
-                excel_path=output,
-                spreadsheet_id=final_sheet_id,
-                sheets_to_update=sheets_to_upload
-            )
-
-            console.print(f"[bold green]OK Данные успешно загружены в Google Sheets![/bold green]\n")
-        elif dry_run:
-            console.print("[yellow]ШАГ 3 пропущен: DRY-RUN режим[/yellow]\n")
-        else:
-            console.print("[yellow]ШАГ 3 пропущен: --no-upload-back флаг[/yellow]\n")
-
-        # ========== ИТОГИ ==========
         console.print(f"[bold green]SUCCESS! Полный пайплайн завершен![/bold green]")
         console.print(f"Локальный файл: [cyan]{output}[/cyan]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
@@ -541,67 +480,40 @@ def async_sync_from_google(
     console.print(f"\n[bold cyan]Google Sheets -> WordPress (Async)[/bold cyan]\n")
 
     with handle_command_errors():
-        from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync_async
 
-        # ========== ШАГ 1: СКАЧИВАНИЕ GOOGLE SHEETS ==========
+        # ШАГ 1
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
-
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
+        _download_from_google(final_sheet_id, credentials_path, output)
 
-        gs_client = GoogleSheetsClient(credentials_path)
-        info = gs_client.get_spreadsheet_info(final_sheet_id)
-        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
-
-        gs_client.download_as_excel(final_sheet_id, output)
-        console.print(f"[bold green]OK Файл скачан![/bold green]\n")
-
-        # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
+        # ШАГ 2
         console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
 
-        domain, username, password = load_and_print_credentials(env_file=env_file)
-
         concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
-            env_file=env_file,
-            cli_concurrency=concurrency,
-            cli_max_retries=max_retries
+            env_file=env_file, cli_concurrency=concurrency, cli_max_retries=max_retries,
         )
-
         if not enable_circuit_breaker:
             circuit_breaker_obj = None
 
-        config = AppConfig.from_excel(
-            excel_file=output,
-            wp_url=domain,
-            wp_username=username,
-            wp_password=password,
-            project_root=proj.root,
-            sync=SyncConfig(
-                dry_run=dry_run,
-                concurrency=concurrency_val,
-                skip_media=skip_media,
-                skip_tax=skip_tax,
-                update_excel=not no_update_excel,
-                delete_featured_media=delete_media,
-                skip_existing_media=skip_existing_media
-            ),
-            logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
+        sync_config = _build_google_sync_config(
+            dry_run=dry_run, concurrency=concurrency_val,
+            skip_media=skip_media, skip_tax=skip_tax,
+            no_update_excel=no_update_excel, delete_media=delete_media,
+            skip_existing_media=skip_existing_media,
         )
-
+        config = _build_app_config(output, env_file, proj.root, sync_config, verbose)
         config.paths.ensure_dirs()
         log_file = setup_logger(
-            logs_folder=config.paths.logs_folder,
-            config=config.logging,
-            command_name="async_from_google"
+            logs_folder=config.paths.logs_folder, config=config.logging,
+            command_name="async_from_google",
         )
 
         asyncio.run(run_sync_async(
-            config=config,
-            sheets_filter=sheets,
-            retry_config=retry_cfg,
-            circuit_breaker=circuit_breaker_obj
+            config=config, sheets_filter=sheets,
+            retry_config=retry_cfg, circuit_breaker=circuit_breaker_obj,
         ))
 
         console.print(f"\n[bold green]SUCCESS! Пайплайн завершен![/bold green]")
@@ -651,88 +563,46 @@ def async_sync_google_bidirectional(
     console.print(f"\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets (Async)[/bold cyan]\n")
 
     with handle_command_errors():
-        from ..utils.google_sheets import GoogleSheetsClient
         from .sync_commands import run_sync_async
 
-        # ========== ШАГ 1: СКАЧИВАНИЕ ==========
+        # ШАГ 1
         console.print("[bold yellow]ШАГ 1: Скачивание Google Sheets[/bold yellow]\n")
-
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
+        gs_client = _download_from_google(final_sheet_id, credentials_path, output)
 
-        gs_client = GoogleSheetsClient(credentials_path)
-        info = gs_client.get_spreadsheet_info(final_sheet_id)
-        console.print(f"[green]OK[/green] Документ: {info.get('name', 'Unknown')}")
-
-        gs_client.download_as_excel(final_sheet_id, output)
-        console.print(f"[bold green]OK Файл скачан![/bold green]\n")
-
-        # ========== ШАГ 2: ASYNC СИНХРОНИЗАЦИЯ ==========
+        # ШАГ 2
         console.print("[bold yellow]ШАГ 2: Async синхронизация с WordPress[/bold yellow]\n")
 
-        domain, username, password = load_and_print_credentials(env_file=env_file)
-
         concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
-            env_file=env_file,
-            cli_concurrency=concurrency,
-            cli_max_retries=max_retries
+            env_file=env_file, cli_concurrency=concurrency, cli_max_retries=max_retries,
         )
-
         if not enable_circuit_breaker:
             circuit_breaker_obj = None
 
-        config = AppConfig.from_excel(
-            excel_file=output,
-            wp_url=domain,
-            wp_username=username,
-            wp_password=password,
-            project_root=proj.root,
-            sync=SyncConfig(
-                dry_run=dry_run,
-                concurrency=concurrency_val,
-                skip_media=skip_media,
-                skip_tax=skip_tax,
-                update_excel=not no_update_excel,
-                delete_featured_media=delete_media,
-                skip_existing_media=skip_existing_media
-            ),
-            logging=LoggingConfig(level="DEBUG" if verbose else "INFO")
+        sync_config = _build_google_sync_config(
+            dry_run=dry_run, concurrency=concurrency_val,
+            skip_media=skip_media, skip_tax=skip_tax,
+            no_update_excel=no_update_excel, delete_media=delete_media,
+            skip_existing_media=skip_existing_media,
         )
-
+        config = _build_app_config(output, env_file, proj.root, sync_config, verbose)
         config.paths.ensure_dirs()
         log_file = setup_logger(
-            logs_folder=config.paths.logs_folder,
-            config=config.logging,
-            command_name="async_google_bidirectional"
+            logs_folder=config.paths.logs_folder, config=config.logging,
+            command_name="async_google_bidirectional",
         )
 
         asyncio.run(run_sync_async(
-            config=config,
-            sheets_filter=sheets,
-            retry_config=retry_cfg,
-            circuit_breaker=circuit_breaker_obj
+            config=config, sheets_filter=sheets,
+            retry_config=retry_cfg, circuit_breaker=circuit_breaker_obj,
         ))
 
         console.print(f"\n[bold green]OK Синхронизация завершена![/bold green]\n")
 
-        # ========== ШАГ 3: ЗАГРУЗКА ОБРАТНО ==========
-        if not no_upload_back and not dry_run:
-            console.print("[bold yellow]ШАГ 3: Загрузка обратно в Google Sheets[/bold yellow]\n")
-
-            sheets_to_upload = [s.strip() for s in sheets.split(",")] if sheets else None
-
-            gs_client.upload_excel_to_sheets(
-                excel_path=output,
-                spreadsheet_id=final_sheet_id,
-                sheets_to_update=sheets_to_upload
-            )
-
-            console.print(f"[bold green]OK Загружено в Google Sheets![/bold green]\n")
-        elif dry_run:
-            console.print("[yellow]ШАГ 3 пропущен: DRY-RUN режим[/yellow]\n")
-        else:
-            console.print("[yellow]ШАГ 3 пропущен: --no-upload-back[/yellow]\n")
+        # ШАГ 3
+        _upload_back_to_google(gs_client, output, final_sheet_id, sheets, no_upload_back, dry_run)
 
         console.print(f"[bold green]SUCCESS! Полный пайплайн завершен![/bold green]")
         console.print(f"Файл: [cyan]{output}[/cyan]")

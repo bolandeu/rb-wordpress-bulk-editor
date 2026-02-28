@@ -46,6 +46,16 @@ WP_API_BASE = "/wp-json/wp/v2"
 # Timeout для HTTP запросов (секунды)
 DEFAULT_TIMEOUT = 30
 
+
+def is_taxonomy_column(col: str) -> bool:
+    """Проверяет является ли колонка (или имя листа) таксономией."""
+    col_lower = col.lower()
+    if col_lower in STANDARD_TAXONOMIES:
+        return True
+    if col.endswith(TAXONOMY_SUFFIX):
+        return True
+    return False
+
 # Максимум параллельных запросов
 DEFAULT_CONCURRENCY = 5
 
@@ -65,8 +75,8 @@ LOG_DATE_FORMAT = "%Y%m%d_%H%M%S"
 # Async Sync Configuration (NEW)
 # ========================================
 
-# API request timeout (seconds)
-DEFAULT_API_TIMEOUT = 30
+# API request timeout (seconds) — алиас DEFAULT_TIMEOUT
+DEFAULT_API_TIMEOUT = DEFAULT_TIMEOUT
 
 # Media upload timeout (seconds)
 DEFAULT_MEDIA_TIMEOUT = 120
@@ -79,3 +89,10 @@ DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 10
 
 # Circuit breaker recovery timeout (seconds)
 DEFAULT_CIRCUIT_BREAKER_RECOVERY = 60
+
+
+# ========================================
+# Shared helpers (перенесены в utils/)
+# ========================================
+# wp_rendered, convert_taxonomy_ids_to_names → src/utils/wp_helpers.py
+# resolve_media_file → src/utils/path_utils.py

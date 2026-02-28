@@ -3,33 +3,29 @@
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import pandas as pd
 from loguru import logger
 
-from ..wordpress.client import WordPressClient
 from ..wordpress.media import MediaEndpoint
 from ..excel.writer import ExcelWriter
 from ..config import AppConfig
-from ..exceptions import ValidationError
+from ..models import SyncReport, SyncResult
+from .base_sync import BaseSync
 
 
-class MediaSync:
+class MediaSync(BaseSync):
     """Синхронизация медиафайлов между Excel и WordPress"""
 
-    def __init__(
-        self,
-        wp_client: WordPressClient,
-        config: AppConfig
-    ):
-        self.wp_client = wp_client
-        self.config = config
+    def _make_media_endpoint(self) -> MediaEndpoint:
+        """Фабричный метод для создания MediaEndpoint (можно переопределить в тестах)."""
+        return MediaEndpoint(self.wp_client)
 
     async def sync_media(
         self,
         df: pd.DataFrame,
         excel_writer: Optional[ExcelWriter] = None
-    ) -> Dict[str, int]:
+    ) -> SyncReport:
         """
         Синхронизировать лист media.
 
@@ -38,18 +34,13 @@ class MediaSync:
             excel_writer: Writer для обратной записи
 
         Returns:
-            Статистика: {added: N, updated: N, deleted: N, errors: N, skipped: N}
+            SyncReport со статистикой и списком ошибочных строк
         """
-        stats = {
-            "added": 0,
-            "updated": 0,
-            "deleted": 0,
-            "errors": 0,
-            "skipped": 0
-        }
+        stats = self._init_stats()
+        error_results: List[SyncResult] = []
 
         # Создаем endpoint
-        media_endpoint = MediaEndpoint(self.wp_client)
+        media_endpoint = self._make_media_endpoint()
 
         # Обрабатываем в порядке: delete → update → add
         for action in ["delete", "update", "add"]:
@@ -98,13 +89,21 @@ class MediaSync:
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    error_results.append(SyncResult(
+                        row_index=idx,
+                        action=action,
+                        post_id=None,
+                        success=False,
+                        error=str(e),
+                    ))
 
         # Подсчитываем пропущенные
         valid_actions = {"add", "update", "delete"}
         skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
         stats["skipped"] = len(skipped)
+        stats["total"] = len(df)
 
-        return stats
+        return SyncReport.from_stats(stats, error_results)
 
     def _validate_row(self, row: pd.Series, action: str) -> tuple[bool, Optional[str]]:
         """
@@ -161,17 +160,8 @@ class MediaSync:
             )
         else:
             # Локальный файл
-            file_path = Path(media_path)
-
-            if not file_path.is_absolute():
-                # Сначала проверяем от корня проекта
-                if file_path.exists():
-                    pass
-                else:
-                    # Пробуем в data/media как fallback
-                    fallback_path = self.config.paths.media_folder / media_path
-                    if fallback_path.exists():
-                        file_path = fallback_path
+            from ..utils.path_utils import resolve_media_file
+            file_path = resolve_media_file(media_path, self.config.paths.media_folder)
 
             if not file_path.exists():
                 raise FileNotFoundError(f"Media file not found: {media_path}")

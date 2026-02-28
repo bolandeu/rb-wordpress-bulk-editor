@@ -13,6 +13,7 @@ import mimetypes
 
 from ..wordpress.client import WordPressClient
 from ..constants import DEFAULT_SKIP_POST_TYPE_PATTERNS
+from .wp_helpers import wp_rendered
 
 
 class ContentExporter:
@@ -279,15 +280,7 @@ class ContentExporter:
         Returns:
             HTML контент
         """
-        # Получаем rendered версию контента если есть
-        content = post.get("content", {})
-
-        if isinstance(content, dict):
-            html_content = content.get("rendered", "")
-        else:
-            html_content = str(content)
-
-        return html_content
+        return wp_rendered(post.get("content", {}))
 
     async def _download_featured_image(
         self,
@@ -398,15 +391,9 @@ class ContentExporter:
             html_path: Путь к HTML файлу или None
             image_path: Путь к изображению или None
         """
-        # Извлекаем заголовок
-        title = post.get("title", {})
-        if isinstance(title, dict):
-            title_text = title.get("rendered", "")
-            # Убираем HTML теги из заголовка
-            soup = BeautifulSoup(title_text, "html.parser")
-            title_text = soup.get_text()
-        else:
-            title_text = str(title)
+        # Извлекаем заголовок (убираем HTML теги)
+        title_raw = wp_rendered(post.get("title", {}))
+        title_text = BeautifulSoup(title_raw, "html.parser").get_text() if title_raw else ""
 
         # Относительные пути к файлам
         html_relative = ""
@@ -496,31 +483,17 @@ class ContentExporter:
             writer.writeheader()
 
             for media in all_media:
-                # Извлекаем заголовок
-                title = media.get("title", {})
-                if isinstance(title, dict):
-                    title_text = title.get("rendered", "")
-                else:
-                    title_text = str(title)
-
-                # Извлекаем caption и description
-                caption = media.get("caption", {})
-                if isinstance(caption, dict):
-                    caption_text = caption.get("rendered", "")
-                else:
-                    caption_text = str(caption) if caption else ""
-
                 writer.writerow({
                     "id": media.get("id", ""),
                     "date": media.get("date", ""),
                     "modified": media.get("modified", ""),
-                    "title": title_text,
+                    "title": wp_rendered(media.get("title", {})),
                     "type": media.get("type", ""),
                     "slug": media.get("slug", ""),
                     "link": media.get("link", ""),
                     "status": media.get("status", ""),
-                    "guid": media.get("guid", {}).get("rendered", ""),
-                    "caption": caption_text,
+                    "guid": wp_rendered(media.get("guid", {})),
+                    "caption": wp_rendered(media.get("caption", {})),
                     "alt_text": media.get("alt_text", ""),
                     "media_type": media.get("media_type", ""),
                     "mime_type": media.get("mime_type", ""),

@@ -13,6 +13,8 @@ from . import app, console
 from .common import handle_command_errors, load_and_print_credentials
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file, require_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
+from ..constants import is_taxonomy_column
+from ..utils.wp_helpers import wp_rendered
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
 from ..wordpress.client import WordPressClient
@@ -380,12 +382,7 @@ async def fetch_and_append(
             logger.info(f"Получение данных для листа: {sheet_name}")
             logger.info(f"{'='*50}")
 
-            is_taxonomy = (
-                sheet_name in ["category", "tag", "categories", "tags"] or
-                sheet_name.endswith("-cat")
-            )
-
-            if is_taxonomy:
+            if is_taxonomy_column(sheet_name):
                 taxonomy_name = normalize_taxonomy_name(sheet_name)
                 tax_endpoint = TaxonomiesEndpoint(client, taxonomy_name)
 
@@ -506,42 +503,25 @@ async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
 
         media_rows = []
         for media in all_media:
-            title = media.get("title", {})
-            if isinstance(title, dict):
-                title_text = title.get("rendered", "")
-            else:
-                title_text = str(title)
-
-            caption = media.get("caption", {})
-            if isinstance(caption, dict):
-                caption_text = caption.get("rendered", "")
-            else:
-                caption_text = str(caption) if caption else ""
-
-            description = media.get("description", {})
-            if isinstance(description, dict):
-                description_text = description.get("rendered", "")
-            else:
-                description_text = str(description) if description else ""
-
             media_rows.append({
                 "action": "skip",
                 "img_path": "",
                 "id": media.get("id", ""),
                 "date": media.get("date", ""),
                 "modified": media.get("modified", ""),
-                "title": title_text,
+                "title": wp_rendered(media.get("title", {})),
                 "type": media.get("type", ""),
                 "slug": media.get("slug", ""),
                 "link": media.get("link", ""),
                 "status": media.get("status", ""),
-                "guid": media.get("guid", {}).get("rendered", ""),
-                "caption": caption_text,
+                "guid": wp_rendered(media.get("guid", {})),
+                "caption": wp_rendered(media.get("caption", {})),
                 "alt_text": media.get("alt_text", ""),
                 "media_type": media.get("media_type", ""),
                 "mime_type": media.get("mime_type", ""),
                 "post": media.get("post", ""),
                 "source_url": media.get("source_url", ""),
+                "description": wp_rendered(media.get("description", {})),
             })
 
         df = pd.DataFrame(media_rows)

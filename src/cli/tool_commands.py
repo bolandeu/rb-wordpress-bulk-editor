@@ -11,16 +11,21 @@ from loguru import logger
 
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_output, require_excel_file
+from .helpers import get_project, resolve_env_file, resolve_output, require_excel_file
 from .project import find_repo_root
-from ..config import LoggingConfig, WordPressConfig
+from ..config import WordPressConfig
 from ..excel.reader import ExcelReader
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
-from ..utils.logger import setup_logger
+from ..utils.wp_helpers import wp_rendered
 
 import typer
+
+
+def _make_wp_config(domain: str, username: str, password: str) -> WordPressConfig:
+    """Создать WordPressConfig из credentials."""
+    return WordPressConfig(url=domain, username=username, password=password)
 
 
 @app.command()
@@ -50,18 +55,7 @@ def validate(
 
     console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-
-    logging_config = LoggingConfig()
-
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name="validate"
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    setup_command_logging(ctx, "validate")
 
     with handle_command_errors():
         # Проверка credentials
@@ -121,19 +115,8 @@ def options(
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-
-    logging_config = LoggingConfig()
-
     command_name = "options_fetch" if fetch else "options"
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name=command_name
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    setup_command_logging(ctx, command_name)
     logger.info(f"Режим: {'FETCH (выгрузка)' if fetch else 'UPDATE (загрузка)'}")
 
     # Режим FETCH - выгрузка из WordPress в Excel
@@ -160,11 +143,7 @@ def options(
             # 2. Получаем настройки из WordPress
             console.print("[yellow]Получение настроек из WordPress...[/yellow]")
 
-            wp_config = WordPressConfig(
-                url=domain,
-                username=username,
-                password=password
-            )
+            wp_config = _make_wp_config(domain, username, password)
 
             site_options = asyncio.run(_fetch_options(wp_config))
 
@@ -230,11 +209,7 @@ def options(
             # 3. Подключаемся к WordPress и отправляем
             console.print("[yellow]Отправка настроек в WordPress...[/yellow]")
 
-            wp_config = WordPressConfig(
-                url=domain,
-                username=username,
-                password=password
-            )
+            wp_config = _make_wp_config(domain, username, password)
 
             asyncio.run(_update_options(wp_config, site_options))
 
@@ -337,16 +312,7 @@ def bulk_delete(
     console.print("=" * 60 + "\n")
 
     with handle_command_errors():
-        # Настройка логирования
-        logs_folder = resolve_logs_folder(ctx)
-        logs_folder.mkdir(parents=True, exist_ok=True)
-
-        logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-        log_file = setup_logger(
-            logs_folder=logs_folder,
-            config=logging_config,
-            command_name="bulk_delete"
-        )
+        log_file = setup_command_logging(ctx, "bulk_delete", verbose)
 
         # Получаем credentials (приоритет: CLI параметры -> .env файл)
         domain, username, password = load_and_print_credentials(
@@ -365,11 +331,7 @@ def bulk_delete(
         console.print()
 
         # Создаем WordPress клиент
-        wp_config = WordPressConfig(
-            url=domain,
-            username=username,
-            password=password
-        )
+        wp_config = _make_wp_config(domain, username, password)
 
         # Запускаем удаление
         stats = asyncio.run(_run_bulk_delete(
@@ -423,11 +385,7 @@ async def _run_bulk_delete(
         if dry_run:
             console.print(f"\n[yellow]DRY-RUN: Будет удалено {len(all_posts)} записей[/yellow]")
             for post in all_posts[:10]:
-                title = post.get("title", {})
-                if isinstance(title, dict):
-                    title_text = title.get("rendered", "No title")
-                else:
-                    title_text = str(title)
+                title_text = wp_rendered(post.get("title", {}), "No title")
                 console.print(f"  ID={post['id']}: {title_text}")
             if len(all_posts) > 10:
                 console.print(f"  ... и еще {len(all_posts) - 10} записей")
@@ -436,11 +394,7 @@ async def _run_bulk_delete(
         for post in all_posts:
             try:
                 post_id = post["id"]
-                title = post.get("title", {})
-                if isinstance(title, dict):
-                    title_text = title.get("rendered", "No title")
-                else:
-                    title_text = str(title)
+                title_text = wp_rendered(post.get("title", {}), "No title")
 
                 if delete_media and media_endpoint:
                     featured_media_id = post.get("featured_media")
@@ -536,18 +490,7 @@ def counter(
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-
-    logging_config = LoggingConfig()
-
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name="counter"
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    setup_command_logging(ctx, "counter")
 
     with handle_command_errors():
         # 1. Загружаем credentials
@@ -586,11 +529,7 @@ async def _count_content_stats(
     import html
     from bs4 import BeautifulSoup
 
-    wp_config = WordPressConfig(
-        url=domain,
-        username=username,
-        password=password
-    )
+    wp_config = _make_wp_config(domain, username, password)
 
     results = []
 
@@ -652,17 +591,8 @@ async def _count_content_stats(
             return words, chars
 
         for post in all_posts:
-            content = post.get("content", {})
-            if isinstance(content, dict):
-                content_html = content.get("rendered", "")
-            else:
-                content_html = str(content) if content else ""
-
-            title = post.get("title", {})
-            if isinstance(title, dict):
-                title_text = title.get("rendered", "")
-            else:
-                title_text = str(title) if title else ""
+            content_html = wp_rendered(post.get("content", {}))
+            title_text = wp_rendered(post.get("title", {}))
 
             words, chars = count_words_and_chars(content_html)
 
@@ -715,15 +645,11 @@ def llm(
         "-c",
         help="Колонка для генерации контента"
     ),
-    file: Path = typer.Option(
-        Path("export.xlsx"),
+    file: Optional[Path] = typer.Option(
+        None,
         "--file",
         "-f",
-        help="Путь к Excel файлу",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
+        help="Путь к Excel файлу (авто-определяется из --project)",
     ),
     sheets: Optional[str] = typer.Option(
         None,
@@ -810,22 +736,12 @@ def llm(
         # С конвертацией Markdown в HTML
         llm --column content --model "gpt-4" --prompt "Напиши статью про [title]" --md-to-html
     """
+    file = require_excel_file(ctx, file)
     env_file = resolve_env_file(ctx, env_file)
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - LLM Generator[/bold blue]\n")
 
-    # Настройка логирования
-    logs_folder = resolve_logs_folder(ctx)
-    logs_folder.mkdir(parents=True, exist_ok=True)
-
-    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-
-    log_file = setup_logger(
-        logs_folder=logs_folder,
-        config=logging_config,
-        command_name="llm"
-    )
-    logger.info(f"Лог-файл создан: {log_file}")
+    log_file = setup_command_logging(ctx, "llm", verbose)
 
     with handle_command_errors():
         # 1. Загружаем credentials для LLM

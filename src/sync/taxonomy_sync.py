@@ -2,12 +2,13 @@
 Синхронизация таксономий (categories, tags, custom taxonomies) — последовательная обработка.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import pandas as pd
 from loguru import logger
 
-from ..wordpress.taxonomies import TaxonomiesEndpoint, normalize_taxonomy_name
+from ..wordpress.taxonomies import normalize_taxonomy_name
 from ..excel.writer import ExcelWriter
+from ..models import SyncReport, SyncResult
 from .taxonomy_sync_base import TaxonomySyncBase
 
 
@@ -19,7 +20,7 @@ class TaxonomySync(TaxonomySyncBase):
         sheet_name: str,
         df: pd.DataFrame,
         excel_writer: Optional[ExcelWriter] = None
-    ) -> Dict[str, int]:
+    ) -> SyncReport:
         """
         Синхронизировать один лист таксономии (последовательно).
 
@@ -29,15 +30,16 @@ class TaxonomySync(TaxonomySyncBase):
             excel_writer: Writer для обратной записи (если нужна)
 
         Returns:
-            Статистика: {added: N, updated: N, deleted: N, errors: N, skipped: N, total: N}
+            SyncReport со статистикой и списком ошибочных строк
         """
         stats = self._init_stats()
+        error_results: List[SyncResult] = []
 
         # Нормализуем имя таксономии для API
         normalized_taxonomy = normalize_taxonomy_name(sheet_name)
 
         # Создаем endpoint
-        taxonomy_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_taxonomy)
+        taxonomy_endpoint = self._make_taxonomy_endpoint(normalized_taxonomy)
 
         # Обрабатываем в порядке: delete → update → add
         for action in ["delete", "update", "add"]:
@@ -88,6 +90,13 @@ class TaxonomySync(TaxonomySyncBase):
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    error_results.append(SyncResult(
+                        row_index=idx,
+                        action=action,
+                        post_id=None,
+                        success=False,
+                        error=str(e),
+                    ))
 
         # Подсчитываем пропущенные
         valid_actions = {"add", "update", "delete"}
@@ -95,4 +104,4 @@ class TaxonomySync(TaxonomySyncBase):
         stats["skipped"] = len(skipped)
         stats["total"] = len(df)
 
-        return stats
+        return SyncReport.from_stats(stats, error_results)

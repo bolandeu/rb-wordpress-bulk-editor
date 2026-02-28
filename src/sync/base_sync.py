@@ -4,12 +4,13 @@
 Предоставляет общую логику для ContentSync, TaxonomySync и их async версий.
 """
 
+from abc import ABC
 from typing import Dict
 from ..wordpress.client import WordPressClient
 from ..config import AppConfig
 
 
-class BaseSync:
+class BaseSync(ABC):
     """
     Базовый класс для всех sync операций.
 

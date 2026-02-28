@@ -4,15 +4,16 @@
 
 from functools import partial
 import asyncio
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import pandas as pd
 from loguru import logger
 
 from ..wordpress.client import WordPressClient
-from ..wordpress.taxonomies import TaxonomiesEndpoint, normalize_taxonomy_name
+from ..wordpress.taxonomies import normalize_taxonomy_name
 from ..excel.writer import ExcelWriter
 from ..config import AppConfig
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
+from ..models import SyncReport, SyncResult
 from .taxonomy_sync_base import TaxonomySyncBase
 
 
@@ -39,7 +40,7 @@ class TaxonomySyncAsync(TaxonomySyncBase):
         sheet_name: str,
         df: pd.DataFrame,
         excel_writer: Optional[ExcelWriter] = None
-    ) -> Dict[str, int]:
+    ) -> SyncReport:
         """
         Асинхронная синхронизация листа таксономии с параллельной обработкой строк.
 
@@ -49,15 +50,16 @@ class TaxonomySyncAsync(TaxonomySyncBase):
             excel_writer: Writer для обратной записи (если нужна)
 
         Returns:
-            Статистика: {added: N, updated: N, deleted: N, errors: N, skipped: N, total: N}
+            SyncReport со статистикой и списком ошибочных строк
         """
         stats = self._init_stats()
+        error_results: List[SyncResult] = []
 
         # Нормализуем имя таксономии для API
         normalized_taxonomy = normalize_taxonomy_name(sheet_name)
 
         # Создаем endpoint
-        taxonomy_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_taxonomy)
+        taxonomy_endpoint = self._make_taxonomy_endpoint(normalized_taxonomy)
 
         # Обрабатываем в порядке: delete → update → add
         for action in ["delete", "update", "add"]:
@@ -123,7 +125,7 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                         elif action == "delete":
                             stats["deleted"] += 1
 
-                        # ✨ Записываем в Excel через ASYNC метод
+                        # Записываем в Excel через ASYNC метод
                         if excel_writer and result.api_response and self.config.sync.update_excel:
                             await excel_writer.update_from_api_response_async(
                                 sheet_name,
@@ -133,7 +135,13 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                             )
                     else:
                         stats["errors"] += 1
-                        # Ошибка уже залогирована в process_row
+                        error_results.append(SyncResult(
+                            row_index=result.row_index,
+                            action=result.action,
+                            post_id=None,
+                            success=False,
+                            error=str(result.error) if result.error else "Неизвестная ошибка",
+                        ))
 
         # Подсчитываем пропущенные
         valid_actions = {"add", "update", "delete"}
@@ -141,4 +149,4 @@ class TaxonomySyncAsync(TaxonomySyncBase):
         stats["skipped"] = len(skipped)
         stats["total"] = len(df)
 
-        return stats
+        return SyncReport.from_stats(stats, error_results)

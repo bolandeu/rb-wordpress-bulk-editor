@@ -9,7 +9,7 @@ import typer
 from loguru import logger
 
 from . import app, console
-from .helpers import get_project, resolve_logs_folder
+from .helpers import get_project, resolve_logs_folder, require_excel_file
 from .common import handle_command_errors, setup_command_logging
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -24,35 +24,8 @@ VALID_MODES = {"content", "media", "both", "custom"}
 
 
 def _resolve_vlook_excel(ctx: typer.Context, explicit: Optional[Path]) -> Path:
-    """Resolve Excel: explicit > project auto > export.xlsx."""
-    if explicit:
-        if not explicit.exists():
-            console.print(f"[red]ERROR: Файл не найден: {explicit}[/red]")
-            raise typer.Exit(code=1)
-        return explicit
-
-    proj = get_project(ctx)
-
-    if proj.active:
-        found = proj.find_excel()
-        if found:
-            console.print(f"[dim]Excel файл (авто): {found.name}[/dim]")
-            return found
-        default = proj.root / "export.xlsx"
-        if default.exists():
-            console.print(f"[dim]Excel файл: {default.name}[/dim]")
-            return default
-
-    default = Path("export.xlsx")
-    if default.exists():
-        console.print(f"[dim]Excel файл: export.xlsx[/dim]")
-        return default
-
-    console.print(
-        "[red]ERROR: Файл export.xlsx не найден. "
-        "Укажите --file или --project[/red]"
-    )
-    raise typer.Exit(code=1)
+    """Resolve Excel через общий helper."""
+    return require_excel_file(ctx, explicit)
 
 
 def _build_file_index(

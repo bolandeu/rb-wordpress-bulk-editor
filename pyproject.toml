@@ -19,7 +19,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "PyYAML>=6.0",
     "Pillow>=10.0.0",
-    "tenacity>=8.2.0",
     "python-slugify>=8.0.0",
     "markdown>=3.5.0",
     "beautifulsoup4>=4.12.0",
@@ -34,3 +33,13 @@ wp-bulk = "src.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["src*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

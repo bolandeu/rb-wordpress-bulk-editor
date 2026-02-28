@@ -5,8 +5,9 @@
 from pathlib import Path
 from typing import Dict, List, Literal
 import pandas as pd
+from loguru import logger
 
-from ..constants import SYSTEM_SHEETS, TAXONOMY_SUFFIX
+from ..constants import SYSTEM_SHEETS, VALID_ACTIONS, is_taxonomy_column
 from ..exceptions import ExcelError, ExcelStructureError
 
 
@@ -57,8 +58,8 @@ class ExcelReader:
         if sheet_name == "media":
             return "media"
 
-        # Стандартные таксономии (category, categories, tag, tags) или с суффиксом -cat
-        if sheet_name in ["category", "categories", "tag", "tags"] or sheet_name.endswith(TAXONOMY_SUFFIX):
+        # Таксономии (стандартные + кастомные с суффиксом -cat)
+        if is_taxonomy_column(sheet_name):
             return "taxonomy"
 
         # Все остальное - контент
@@ -201,3 +202,56 @@ class ExcelReader:
         """
         df = self.read_sheet(sheet_name)
         return df.columns.tolist()
+
+    def check_duplicate_ids(self, df: pd.DataFrame, sheet_name: str) -> List[str]:
+        """
+        Проверить наличие дублирующихся ID в листе.
+
+        Args:
+            df: DataFrame листа
+            sheet_name: Название листа (для логов)
+
+        Returns:
+            Список дублирующихся ID
+        """
+        if "id" not in df.columns:
+            return []
+
+        ids = df["id"].dropna()
+        ids = ids[ids != ""]
+        duplicates = ids[ids.duplicated()].tolist()
+
+        if duplicates:
+            logger.warning(
+                f"Лист '{sheet_name}': найдены дублирующиеся ID: {duplicates}. "
+                "Это может привести к непредвиденному поведению."
+            )
+
+        return duplicates
+
+    def validate_actions(self, df: pd.DataFrame, sheet_name: str) -> List[str]:
+        """
+        Проверить корректность значений колонки action.
+
+        Args:
+            df: DataFrame листа
+            sheet_name: Название листа (для логов)
+
+        Returns:
+            Список строк с недопустимыми значениями action
+        """
+        if "action" not in df.columns:
+            return []
+
+        allowed = VALID_ACTIONS | {"", "skip"}
+        actions = df["action"].str.lower().str.strip()
+        invalid_mask = ~actions.isin(allowed)
+        invalid_values = actions[invalid_mask].tolist()
+
+        if invalid_values:
+            logger.warning(
+                f"Лист '{sheet_name}': недопустимые значения action: {list(set(invalid_values))}. "
+                f"Допустимые: {VALID_ACTIONS}. Строки будут пропущены."
+            )
+
+        return invalid_values

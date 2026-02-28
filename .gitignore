@@ -62,11 +62,6 @@ htmlcov/
 .claude
 .calude/
 
-test*.*
-tests/
-tests/*
-tests
-
 *.jpg
 *.png
 *.jpeg

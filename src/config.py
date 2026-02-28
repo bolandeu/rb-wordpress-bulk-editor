@@ -36,6 +36,12 @@ class WordPressConfig(BaseModel):
         v = v.strip().rstrip("/")
         if not v.startswith("http://") and not v.startswith("https://"):
             v = f"https://{v}"
+        # Пользователи часто вставляют полный endpoint вместо базового URL сайта
+        if "/wp-json/wp/v2" in v:
+            raise ValueError(
+                "URL не должен содержать '/wp-json/wp/v2'. "
+                "Укажите только базовый URL сайта, например: https://example.com"
+            )
         return v
 
     @field_validator("password")

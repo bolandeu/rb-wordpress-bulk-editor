@@ -7,7 +7,8 @@ import pandas as pd
 from loguru import logger
 
 from .field_detector import FieldDetector
-from ..constants import SYSTEM_COLUMNS
+from .value_converter import convert_acf_value
+from ..constants import SYSTEM_COLUMNS, ACF_PREFIX
 
 
 class ContentMapper:
@@ -104,7 +105,7 @@ class ContentMapper:
                     logger.debug(f"Field '{field}': sending empty value to reset on server")
 
         # 2. ACF поля
-        acf_data = FieldDetector.extract_acf_from_row(row)
+        acf_data = self._extract_acf_from_row(row)
         if acf_data:
             payload["acf"] = acf_data
             logger.debug(f"ACF fields: {list(acf_data.keys())}")
@@ -183,6 +184,18 @@ class ContentMapper:
 
         # Остальное преобразуем в строку
         return str(value)
+
+    @staticmethod
+    def _extract_acf_from_row(row: pd.Series) -> Dict[str, Any]:
+        """Извлечь ACF поля из строки Excel и конвертировать значения."""
+        acf_data = {}
+        for col in row.index:
+            if col.startswith(ACF_PREFIX):
+                field_name = col[len(ACF_PREFIX):]
+                value = row[col]
+                if pd.notna(value) and value != "":
+                    acf_data[field_name] = convert_acf_value(value)
+        return acf_data
 
     def get_required_fields(self, action: str) -> Set[str]:
         """

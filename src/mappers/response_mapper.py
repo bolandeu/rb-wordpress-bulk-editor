@@ -6,6 +6,9 @@ from typing import Dict, Any, Optional
 from loguru import logger
 import re
 
+from ..utils.wp_helpers import wp_rendered, convert_taxonomy_ids_to_names
+
+
 class ResponseMapper:
     """
     Преобразует ответы WordPress REST API в формат для записи в Excel.
@@ -42,26 +45,10 @@ class ResponseMapper:
         row["type"] = post.get("type", "")
         row["link"] = post.get("link", "")
 
-        # Title (может быть объектом с 'rendered')
-        title = post.get("title", {})
-        if isinstance(title, dict):
-            row["title"] = title.get("rendered", "")
-        else:
-            row["title"] = str(title)
-
-        # Content
-        content = post.get("content", {})
-        if isinstance(content, dict):
-            row["content"] = content.get("rendered", "")
-        else:
-            row["content"] = str(content)
-
-        # Excerpt
-        excerpt = post.get("excerpt", {})
-        if isinstance(excerpt, dict):
-            row["excerpt"] = excerpt.get("rendered", "")
-        else:
-            row["excerpt"] = str(excerpt)
+        # Title, Content, Excerpt (могут быть объектами с 'rendered')
+        row["title"] = wp_rendered(post.get("title", {}))
+        row["content"] = wp_rendered(post.get("content", {}))
+        row["excerpt"] = wp_rendered(post.get("excerpt", {}))
         if row["excerpt"]:
             row["excerpt"] = re.sub(r"<[^>]+>", "", row["excerpt"]).strip()
 
@@ -76,11 +63,15 @@ class ResponseMapper:
 
         # Таксономии (categories, tags)
         # API возвращает массивы ID, преобразуем в названия
-        row["categories"] = self._convert_taxonomy_ids_to_names(
-            post.get("categories", []), "categories"
+        row["categories"] = convert_taxonomy_ids_to_names(
+            post.get("categories", []),
+            self.taxonomy_cache.get("categories", {}),
+            "categories",
         )
-        row["tags"] = self._convert_taxonomy_ids_to_names(
-            post.get("tags", []), "tags"
+        row["tags"] = convert_taxonomy_ids_to_names(
+            post.get("tags", []),
+            self.taxonomy_cache.get("tags", {}),
+            "tags",
         )
 
         # ACF поля
@@ -107,7 +98,9 @@ class ResponseMapper:
                     # Это похоже на таксономию - список ID
                     # Проверяем есть ли в кэше
                     if key in self.taxonomy_cache:
-                        row[key] = self._convert_taxonomy_ids_to_names(value, key)
+                        row[key] = convert_taxonomy_ids_to_names(
+                            value, self.taxonomy_cache.get(key, {}), key,
+                        )
                         logger.debug(f"Converted custom taxonomy '{key}' IDs to names")
                     else:
                         # Нет в кэше, записываем как строку
@@ -169,39 +162,3 @@ class ResponseMapper:
         logger.debug(f"Mapped term ID={term.get('id')} to Excel row")
         return row
 
-    def _convert_taxonomy_ids_to_names(
-        self, term_ids: list, taxonomy: str
-    ) -> str:
-        """
-        Преобразовать массив ID терминов в строку с названиями.
-
-        Args:
-            term_ids: Список ID терминов
-            taxonomy: Название таксономии (categories, tags, etc.)
-
-        Returns:
-            Строка с названиями через "; " или пустая строка
-        """
-        if not term_ids:
-            return ""
-
-        # Если нет кэша для этой таксономии, возвращаем ID
-        if taxonomy not in self.taxonomy_cache:
-            logger.warning(
-                f"No cache for taxonomy '{taxonomy}', returning IDs"
-            )
-            return ", ".join(map(str, term_ids))
-
-        # Преобразуем ID в названия
-        names = []
-        for term_id in term_ids:
-            term_name = self.taxonomy_cache[taxonomy].get(term_id)
-            if term_name:
-                names.append(term_name)
-            else:
-                logger.warning(
-                    f"Term ID {term_id} not found in {taxonomy} cache"
-                )
-                names.append(str(term_id))  # Fallback на ID
-
-        return "; ".join(names)

@@ -2,15 +2,14 @@
 Синхронизация контента (posts, pages, custom types) — последовательная обработка.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import pandas as pd
 from loguru import logger
 
-from ..wordpress.posts import PostsEndpoint
-from ..wordpress.media import MediaEndpoint
 from ..excel.writer import ExcelWriter
 from ..mappers.content_mapper import ContentMapper
 from ..utils.content_processor import ContentProcessor
+from ..models import SyncReport, SyncResult
 from .content_sync_base import ContentSyncBase
 
 
@@ -22,7 +21,7 @@ class ContentSync(ContentSyncBase):
         sheet_name: str,
         df: pd.DataFrame,
         excel_writer: Optional[ExcelWriter] = None
-    ) -> Dict[str, int]:
+    ) -> SyncReport:
         """
         Синхронизировать один лист Excel (последовательно).
 
@@ -32,13 +31,14 @@ class ContentSync(ContentSyncBase):
             excel_writer: Writer для обратной записи (если нужна)
 
         Returns:
-            Статистика: {added: N, updated: N, deleted: N, errors: N, skipped: N, total: N}
+            SyncReport со статистикой и списком ошибочных строк
         """
         stats = self._init_stats()
+        error_results: List[SyncResult] = []
 
         # Создаем endpoints
-        posts_endpoint = PostsEndpoint(self.wp_client, sheet_name)
-        media_endpoint = MediaEndpoint(self.wp_client)
+        posts_endpoint = self._make_posts_endpoint(sheet_name)
+        media_endpoint = self._make_media_endpoint()
 
         # Создаем mapper и content processor
         mapper = ContentMapper(df.columns.tolist(), allowed_columns=self.config.sync.columns_filter)
@@ -107,6 +107,13 @@ class ContentSync(ContentSyncBase):
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    error_results.append(SyncResult(
+                        row_index=idx,
+                        action=action,
+                        post_id=None,
+                        success=False,
+                        error=str(e),
+                    ))
 
         # Подсчитываем пропущенные
         valid_actions = {"add", "update", "delete"}
@@ -114,4 +121,4 @@ class ContentSync(ContentSyncBase):
         stats["skipped"] = len(skipped)
         stats["total"] = len(df)
 
-        return stats
+        return SyncReport.from_stats(stats, error_results)
