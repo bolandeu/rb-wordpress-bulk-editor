@@ -164,11 +164,7 @@ def fetch(
         # 4. Подключаемся к WordPress
         console.print("[yellow]Подключение к WordPress...[/yellow]")
 
-        wp_config = WordPressConfig(
-            url=domain,
-            username=username,
-            password=password
-        )
+        wp_config = WordPressConfig.from_credentials(domain, username, password)
 
         asyncio.run(fetch_and_append(
             wp_config=wp_config,
@@ -468,11 +464,7 @@ def fetch_media(
             env_file=env_file,
         )
 
-        wp_config = WordPressConfig(
-            url=domain,
-            username=username,
-            password=password
-        )
+        wp_config = WordPressConfig.from_credentials(domain, username, password)
 
         logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
 

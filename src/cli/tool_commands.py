@@ -24,8 +24,8 @@ import typer
 
 
 def _make_wp_config(domain: str, username: str, password: str) -> WordPressConfig:
-    """Создать WordPressConfig из credentials."""
-    return WordPressConfig(url=domain, username=username, password=password)
+    """Создать WordPressConfig из credentials (с WP_VERIFY_SSL из .env)."""
+    return WordPressConfig.from_credentials(domain, username, password)
 
 
 @app.command()
@@ -1237,7 +1237,7 @@ def taxonomies(
     Вывести список таксономий сайта в формате для копирования в .env проекта.
 
     Пример:
-        wp-bulk taxonomies --project mysite
+        wp-bulk --project mysite taxonomies
         → WP_TAXONOMIES=product_cat,brand,regions
     """
     env_file = resolve_env_file(ctx, env_file)

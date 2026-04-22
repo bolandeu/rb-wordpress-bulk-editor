@@ -57,7 +57,7 @@ def export(
             console.print(f"[yellow]->[/yellow] Экспорт медиа: Да (только метаданные)")
         console.print()
 
-        wp_config = WordPressConfig(url=domain, username=username, password=password)
+        wp_config = WordPressConfig.from_credentials(domain, username, password)
 
         stats = asyncio.run(export_content(wp_config, output, concurrency, include_media))
 
@@ -118,7 +118,7 @@ def export_media(
             username=username, password=password,
         )
 
-        wp_config = WordPressConfig(url=domain, username=username, password=password)
+        wp_config = WordPressConfig.from_credentials(domain, username, password)
         log_file = setup_command_logging(ctx, "export_media", verbose)
 
         console.print(f"[green]Скачивание файлов:[/green] {'Да' if download_files else 'Нет'}")

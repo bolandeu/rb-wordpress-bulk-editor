@@ -29,6 +29,16 @@ class WordPressConfig(BaseModel):
     password: Optional[str] = Field(default=None, description="Application Password (опционально)")
     verify_ssl: bool = Field(default=True, description="Проверять SSL сертификаты")
 
+    @classmethod
+    def from_credentials(cls, url: str, username: str, password: str) -> "WordPressConfig":
+        """Собрать config из credentials, забирая verify_ssl из .env (WP_VERIFY_SSL)."""
+        return cls(
+            url=url,
+            username=username,
+            password=password,
+            verify_ssl=Settings().verify_ssl,
+        )
+
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
@@ -238,6 +248,9 @@ class Settings(BaseSettings):
     # Список SEO-полей для этого проекта/плагина.
     # Dot-путь = вложенность в WP payload: `seo.title`, `meta._yoast_wpseo_title` и т.д.
     seo_fields: str = ""
+
+    # Проверять SSL-сертификат WP. Для локального Docker с самоподписанным сертом: false.
+    verify_ssl: bool = True
 
     @staticmethod
     def _parse_csv(value: str) -> List[str]:
