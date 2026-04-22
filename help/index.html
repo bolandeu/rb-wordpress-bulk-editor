@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wordpress-bulk-editor &mdash; docs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>wordpress-bulk-editor</h1>
+<p class="subtitle">Bulk-редактор контента WordPress через Excel &mdash; команды и сценарии</p>
+
+<input type="text" class="search" placeholder="Поиск команд..." id="search">
+
+<div class="tabs">
+  <div class="tab active" data-tab="commands">Команды</div>
+  <div class="tab" data-tab="hooks">Хуки</div>
+  <div class="tab" data-tab="scenarios">Сценарии</div>
+  <div class="tab" data-tab="scrum">Scrum / Agile</div>
+  <div class="tab" data-tab="constructor">Конструктор</div>
+</div>
+
+<div class="panel active" id="commands"></div>
+<div class="panel" id="hooks"></div>
+<div class="panel" id="scenarios"></div>
+<div class="panel" id="scrum"></div>
+<div class="panel" id="constructor"></div>
+
+<script src="app.js"></script>
+<script>
+// fetch works with both file:// and http://
+// For file:// in some browsers, run: python3 -m http.server 8080
+function loadJSON(url) {
+  return fetch(url).then(function(r) { return r.json(); });
+}
+Promise.all([loadJSON('commands.json'), loadJSON('scenarios.json')])
+  .then(function(data) { initApp(data[0], data[1]); })
+  .catch(function() {
+    document.body.insertAdjacentHTML('afterbegin',
+      '<div style="background:#2a1a1a;color:#ff6b6b;padding:1rem;border-radius:8px;margin-bottom:1rem;font-size:.9rem">' +
+      'JSON не загрузился. Открой через локальный сервер:<br>' +
+      '<code style="color:#ffd93d">cd ~/Projects/ai/help && python3 -m http.server 8080</code><br>' +
+      'Затем открой <code style="color:#ffd93d">http://localhost:8080</code>' +
+      '</div>');
+  });
+</script>
+
+</body>
+</html>

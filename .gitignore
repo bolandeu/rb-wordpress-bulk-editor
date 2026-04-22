@@ -45,8 +45,14 @@ logs/
 *.xlsx
 *.csv
 
-# Environment variables
-.env
+# Environment variables (критические паттерны — секреты в Doppler)
+.env*
+!.env.example
+*.key
+*.pem
+*.p12
+*.db
+*.sqlite
 
 # OS
 .DS_Store
@@ -58,9 +64,9 @@ htmlcov/
 .pytest_cache/
 
 
-*.env
-.claude
-.calude/
+# Claude Code — эфемерное состояние; хуки/settings/rules коммитятся
+.claude/current-task.md
+SESSION_LOG.md
 
 *.jpg
 *.png
@@ -79,7 +85,7 @@ data/**
 !data/**/
 !data/**/.gitkeep
 
-credentials/*
+credentials*
 !credentials/.gitkeep
 
 projects/*

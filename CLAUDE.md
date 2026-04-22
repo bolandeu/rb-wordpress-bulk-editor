@@ -9,15 +9,19 @@ WordPress Bulk Editor — CLI tool for bidirectional Excel ↔ WordPress synchro
 ## Commands
 
 ```bash
-# Install in dev mode
-pip install -e .
+# Install in dev mode (uv)
+uv venv
+uv pip install -e .
+# Добавить зависимость: uv add <pkg>   (обновит pyproject.toml)
+# Регенерировать lock: uv lock
+# Синхронизировать окружение с lock: uv sync
 
-# Run CLI
+# Run CLI (alias wp-bulk → .venv/bin/wp-bulk есть в ~/.zshrc)
 wp-bulk --help
 wp-bulk <command> --help
 
-# Run as module (without install)
-python -m src.cli
+# Run as module (без установки)
+uv run python -m src.cli
 
 # Typical usage with project context
 wp-bulk sync --project mysite
