@@ -1213,3 +1213,62 @@ def reshape(
             wb.save(output)
 
         console.print(f"\n[bold green]SUCCESS! Файл создан: {output}[/bold green]\n")
+
+
+@app.command()
+def taxonomies(
+    ctx: typer.Context,
+    env_file: Optional[Path] = typer.Option(
+        None,
+        "--env-file",
+        help="Путь к .env (по умолчанию projects/<name>/.env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    include_system: bool = typer.Option(
+        False,
+        "--include-system",
+        help="Включать служебные таксономии (nav_menu, link_category, post_format)",
+    ),
+):
+    """
+    Вывести список таксономий сайта в формате для копирования в .env проекта.
+
+    Пример:
+        wp-bulk taxonomies --project mysite
+        → WP_TAXONOMIES=product_cat,brand,regions
+    """
+    env_file = resolve_env_file(ctx, env_file)
+    setup_command_logging(ctx, "taxonomies")
+
+    with handle_command_errors():
+        domain, username, password = load_and_print_credentials(env_file=env_file)
+        wp_config = _make_wp_config(domain, username, password)
+
+        slugs = asyncio.run(_discover_taxonomy_slugs(wp_config, include_system))
+
+        if not slugs:
+            console.print("[yellow]Таксономии не обнаружены.[/yellow]\n")
+            return
+
+        line = f"WP_TAXONOMIES={','.join(slugs)}"
+        console.print(f"\n[dim]# Скопируй в .env проекта:[/dim]")
+        console.print(line)
+        console.print()
+
+
+async def _discover_taxonomy_slugs(
+    wp_config: WordPressConfig, include_system: bool
+) -> List[str]:
+    """Запросить таксономии через WP REST и вернуть отфильтрованный список slug-ов."""
+    from ..wordpress.discovery import WordPressDiscovery
+    from ..config import Settings
+
+    settings = Settings()
+    async with WordPressClient(wp_config) as client:
+        await client.test_connection()
+        skip_patterns = [] if include_system else settings.get_skip_taxonomy_patterns()
+        discovery = WordPressDiscovery(client, skip_taxonomy_patterns=skip_patterns)
+        return await discovery.discover_taxonomies()

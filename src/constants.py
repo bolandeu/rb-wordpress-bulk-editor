@@ -2,6 +2,8 @@
 Константы для WordPress Bulk Editor
 """
 
+from typing import Any, Dict, Iterable, Optional
+
 # Служебные колонки (не передаются в API)
 SYSTEM_COLUMNS = {
     "action",
@@ -40,6 +42,15 @@ ACF_PREFIX = "acf_"
 # Таксономия суффикс
 TAXONOMY_SUFFIX = "-cat"
 
+# Поля, которые всегда отправляются как bool.
+# Если колонка присутствует в Excel — значение парсится (пустое = True),
+# отсутствие колонки = не отправляем (WP сохраняет текущее значение).
+BOOL_FIELDS_DEFAULT_TRUE = frozenset({
+    "seo.robots.index",
+    "seo.robots.follow",
+    "seo.sitemap.include",
+})
+
 # WordPress REST API базовый path
 WP_API_BASE = "/wp-json/wp/v2"
 
@@ -47,14 +58,71 @@ WP_API_BASE = "/wp-json/wp/v2"
 DEFAULT_TIMEOUT = 30
 
 
-def is_taxonomy_column(col: str) -> bool:
-    """Проверяет является ли колонка (или имя листа) таксономией."""
+def is_taxonomy_column(col: str, known_taxonomies: Optional[Iterable[str]] = None) -> bool:
+    """Проверяет является ли колонка (или имя листа) таксономией.
+
+    Args:
+        col: Имя колонки/листа.
+        known_taxonomies: Явный список slug-ов таксономий (из .env или WP discovery).
+            Если задан — имя колонки сравнивается по этому списку; fallback на
+            STANDARD_TAXONOMIES и суффикс TAXONOMY_SUFFIX сохраняется.
+    """
     col_lower = col.lower()
+    if known_taxonomies:
+        known_lower = {t.lower() for t in known_taxonomies}
+        if col_lower in known_lower:
+            return True
     if col_lower in STANDARD_TAXONOMIES:
         return True
     if col.endswith(TAXONOMY_SUFFIX):
         return True
     return False
+
+
+def is_dot_notation_column(col: str) -> bool:
+    """Признак новой dot-нотации: `seo.title`, `meta._yoast_wpseo_title`, `acf.group.subfield`.
+
+    Пустые сегменты (`seo..title`) — невалидны, такие колонки остаются плоскими.
+    """
+    if "." not in col:
+        return False
+    parts = col.split(".")
+    return all(p for p in parts)
+
+
+def build_nested_payload(dot_path: str, value: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Положить значение в payload по dot-пути, создавая вложенные dict-ы.
+
+    Пример:
+        build_nested_payload("seo.og.title", "X", {}) -> {"seo": {"og": {"title": "X"}}}
+
+    Если по пути уже есть не-dict значение — оно перезаписывается (последний wins).
+    Мутирует и возвращает `payload`.
+    """
+    if not dot_path:
+        return payload
+    parts = dot_path.split(".")
+    cursor = payload
+    for key in parts[:-1]:
+        existing = cursor.get(key)
+        if not isinstance(existing, dict):
+            existing = {}
+            cursor[key] = existing
+        cursor = existing
+    cursor[parts[-1]] = value
+    return payload
+
+
+def read_nested_value(dot_path: str, source: Dict[str, Any]) -> Any:
+    """Прочитать значение из вложенного dict по dot-пути. None если путь отсутствует."""
+    if not dot_path:
+        return None
+    cursor: Any = source
+    for key in dot_path.split("."):
+        if not isinstance(cursor, dict) or key not in cursor:
+            return None
+        cursor = cursor[key]
+    return cursor
 
 # Максимум параллельных запросов
 DEFAULT_CONCURRENCY = 5

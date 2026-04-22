@@ -138,3 +138,57 @@ class TestMapTermToExcel:
         assert "_links" not in row
         assert "taxonomy" not in row
         assert "count" not in row
+
+
+# ── nested_paths (dot-notation при fetch) ─────────────────────────────
+
+class TestNestedPathsExtraction:
+    def _post(self, **extras):
+        base = {
+            "id": 1,
+            "title": {"rendered": "T"},
+            "content": {"rendered": ""},
+            "excerpt": {"rendered": ""},
+        }
+        base.update(extras)
+        return base
+
+    def test_single_nested_path(self):
+        mapper = ResponseMapper(nested_paths=["seo.title"])
+        row = mapper.map_post_to_excel(self._post(seo={"title": "SEO T"}))
+        assert row["seo.title"] == "SEO T"
+
+    def test_deep_nested_path(self):
+        mapper = ResponseMapper(nested_paths=["seo.og.image"])
+        row = mapper.map_post_to_excel(self._post(seo={"og": {"image": "img.jpg"}}))
+        assert row["seo.og.image"] == "img.jpg"
+
+    def test_multiple_paths(self):
+        mapper = ResponseMapper(nested_paths=["seo.title", "seo.description", "seo.h1"])
+        row = mapper.map_post_to_excel(self._post(
+            seo={"title": "T", "description": "D", "h1": "H"}
+        ))
+        assert row["seo.title"] == "T"
+        assert row["seo.description"] == "D"
+        assert row["seo.h1"] == "H"
+
+    def test_missing_path_not_written(self):
+        mapper = ResponseMapper(nested_paths=["seo.missing"])
+        row = mapper.map_post_to_excel(self._post(seo={"title": "T"}))
+        assert "seo.missing" not in row
+
+    def test_dict_leaf_skipped(self):
+        """Если путь ведёт к dict — не пишем (ячейка не примет сложный объект)."""
+        mapper = ResponseMapper(nested_paths=["seo"])
+        row = mapper.map_post_to_excel(self._post(seo={"title": "T"}))
+        assert "seo" not in row
+
+    def test_bool_leaf_extracted(self):
+        mapper = ResponseMapper(nested_paths=["seo.robots.index"])
+        row = mapper.map_post_to_excel(self._post(seo={"robots": {"index": False}}))
+        assert row["seo.robots.index"] is False
+
+    def test_empty_paths_list_is_noop(self):
+        mapper = ResponseMapper()  # nested_paths=None
+        row = mapper.map_post_to_excel(self._post(seo={"title": "T"}))
+        assert "seo.title" not in row

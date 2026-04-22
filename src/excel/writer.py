@@ -14,6 +14,20 @@ from ..constants import TAXONOMY_DELIMITER
 from ..utils.wp_helpers import convert_taxonomy_ids_to_names
 
 
+def _coerce_for_column(column: pd.Series, value: Any) -> Any:
+    """Привести значение к типу колонки DataFrame перед записью.
+
+    pandas 2.x по умолчанию выводит `StringDtype` для колонок-строк и падает
+    при попытке записать int/float. Кастим к строке только для строковых колонок;
+    NaN/None сохраняются как NaN.
+    """
+    if pd.api.types.is_string_dtype(column):
+        if value is None or (not isinstance(value, (list, dict)) and pd.isna(value)):
+            return pd.NA
+        return str(value)
+    return value
+
+
 def normalize_api_value(value: Any) -> Any:
     """
     Нормализовать значение из WordPress API для записи в Excel.
@@ -108,7 +122,7 @@ class ExcelWriter:
         # Обновляем значения
         for column, value in data.items():
             if column in df.columns:
-                df.at[row_index, column] = value
+                df.at[row_index, column] = _coerce_for_column(df[column], value)
             else:
                 logger.warning(f"Column {column} not found in sheet {sheet_name}")
 

@@ -7,6 +7,33 @@ from typing import Any
 import pandas as pd
 
 
+_FALSY_STRINGS = {"0", "нет", "no", "false", "f", "n"}
+
+
+def parse_bool_default_true(value: Any) -> bool:
+    """Преобразовать значение Excel в bool для полей «по умолчанию true».
+
+    Правила:
+        - NaN / None / пустая строка → True
+        - bool → как есть
+        - число 0 → False, любое ненулевое → True
+        - строка "0"/"нет"/"no"/"false"/"f"/"n" (регистр/пробелы игнорируются) → False
+        - всё остальное (включая непонятные значения) → True
+    """
+    if pd.isna(value) or value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    s = str(value).strip().lower()
+    if not s:
+        return True
+    if s in _FALSY_STRINGS:
+        return False
+    return True
+
+
 def convert_acf_value(value: Any) -> Any:
     """
     Конвертирует значение ACF поля в правильный тип.

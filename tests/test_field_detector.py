@@ -55,7 +55,59 @@ class TestFieldDetectorAnalyze:
     def test_empty_columns(self):
         fd = FieldDetector([])
         r = fd.analyze()
-        assert r == {"system": [], "acf": [], "taxonomies": [], "content": []}
+        assert r == {"system": [], "acf": [], "taxonomies": [], "nested": [], "content": []}
+
+
+# ── Dot-notation (вложенные поля) ────────────────────────────────────
+
+class TestDotNotationDetection:
+    def test_single_dot_to_nested(self):
+        fd = FieldDetector(["seo.title", "seo.description"])
+        assert set(fd.analyze()["nested"]) == {"seo.title", "seo.description"}
+
+    def test_deep_dot_to_nested(self):
+        fd = FieldDetector(["seo.og.image"])
+        assert fd.analyze()["nested"] == ["seo.og.image"]
+
+    def test_legacy_seo_stays_in_content(self):
+        """Плоские seo_title не превращаются в nested."""
+        fd = FieldDetector(["seo_title", "seo_description"])
+        r = fd.analyze()
+        assert r["nested"] == []
+        assert set(r["content"]) == {"seo_title", "seo_description"}
+
+    def test_invalid_dot_stays_in_content(self):
+        fd = FieldDetector(["seo..bad", ".leading", "trailing."])
+        r = fd.analyze()
+        assert r["nested"] == []
+
+    def test_api_fields_includes_nested(self):
+        fd = FieldDetector(["title", "seo.title", "acf_foo", "id"])
+        api = fd.get_api_fields()
+        assert set(api) == {"title", "seo.title"}
+
+
+# ── known_taxonomies override ────────────────────────────────────────
+
+class TestTaxonomyOverride:
+    def test_custom_taxonomy_recognized_without_suffix(self):
+        fd = FieldDetector(["brand", "regions"], known_taxonomies=["brand", "regions"])
+        assert set(fd.analyze()["taxonomies"]) == {"brand", "regions"}
+
+    def test_override_wins_over_dot_notation(self):
+        """Таксономия из override приоритетнее чем dot-nested."""
+        fd = FieldDetector(["seo.title"], known_taxonomies=["seo.title"])
+        r = fd.analyze()
+        assert r["taxonomies"] == ["seo.title"]
+        assert r["nested"] == []
+
+    def test_override_does_not_break_standard_and_suffix(self):
+        fd = FieldDetector(["categories", "x-cat", "brand"], known_taxonomies=["brand"])
+        assert set(fd.analyze()["taxonomies"]) == {"categories", "x-cat", "brand"}
+
+    def test_no_override_brand_stays_content(self):
+        fd = FieldDetector(["brand"])
+        assert fd.analyze()["content"] == ["brand"]
 
 
 # ── convert_acf_value() ─────────────────────────────────────────────

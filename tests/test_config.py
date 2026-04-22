@@ -5,7 +5,8 @@ Tests for src/config.py Pydantic models.
 import pytest
 from pathlib import Path
 
-from src.config import WordPressConfig, SyncConfig, LoggingConfig, PathsConfig
+from src.config import WordPressConfig, SyncConfig, LoggingConfig, PathsConfig, Settings
+from src.constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY_PATTERNS
 
 
 # ── WordPressConfig ─────────────────────────────────────────────────
@@ -109,3 +110,54 @@ class TestPathsConfig:
         cfg = PathsConfig(excel_file=tmp_excel_file)
         assert cfg.media_folder == Path("data/media")
         assert cfg.logs_folder == Path("logs")
+
+
+# ── Settings (переменные окружения WP_*) ─────────────────────────────
+
+class TestSettingsParseCsv:
+    def test_basic(self):
+        assert Settings._parse_csv("a,b,c") == ["a", "b", "c"]
+
+    def test_trims_whitespace(self):
+        assert Settings._parse_csv(" a , b ,  c ") == ["a", "b", "c"]
+
+    def test_skips_empty_items(self):
+        assert Settings._parse_csv("a,,b,  ,c") == ["a", "b", "c"]
+
+    def test_empty_input(self):
+        assert Settings._parse_csv("") == []
+
+
+class TestSettingsTaxonomies:
+    def test_explicit_list(self):
+        s = Settings(taxonomies="brand,product_cat,regions")
+        assert s.get_taxonomies() == ["brand", "product_cat", "regions"]
+
+    def test_empty_returns_none(self):
+        """None = «override не задан», вызывающий код использует fallback."""
+        assert Settings(taxonomies="").get_taxonomies() is None
+
+
+class TestSettingsSeoFields:
+    def test_explicit_list(self):
+        s = Settings(seo_fields="seo.title,seo.description")
+        assert s.get_seo_fields() == ["seo.title", "seo.description"]
+
+    def test_empty_returns_none(self):
+        assert Settings(seo_fields="").get_seo_fields() is None
+
+
+class TestSettingsSkipPatterns:
+    def test_skip_post_type_fallback_to_defaults(self):
+        assert Settings(skip_post_type_patterns="").get_skip_post_type_patterns() == list(
+            DEFAULT_SKIP_POST_TYPE_PATTERNS
+        )
+
+    def test_skip_taxonomy_fallback_to_defaults(self):
+        assert Settings(skip_taxonomy_patterns="").get_skip_taxonomy_patterns() == list(
+            DEFAULT_SKIP_TAXONOMY_PATTERNS
+        )
+
+    def test_override_wins(self):
+        s = Settings(skip_post_type_patterns="custom1,custom2")
+        assert s.get_skip_post_type_patterns() == ["custom1", "custom2"]

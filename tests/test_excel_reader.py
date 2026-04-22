@@ -85,7 +85,7 @@ class TestReadSheet:
         """По умолчанию все данные читаются как строки."""
         with ExcelReader(excel_with_sheets) as r:
             df = r.read_sheet("posts")
-        assert df["id"].dtype == object  # строка
+        assert pd.api.types.is_string_dtype(df["id"])  # object или StringDtype
         assert df.loc[0, "id"] == "1"
 
     def test_fillna_empty_string(self, excel_with_sheets):
@@ -203,3 +203,38 @@ class TestValidateActions:
             df = r.read_sheet("posts")
             invalid = r.validate_actions(df, "posts")
         assert "badaction" in invalid
+
+
+# ── known_taxonomies override ────────────────────────────────────────
+
+class TestKnownTaxonomiesOverride:
+    @pytest.fixture
+    def sheets_path(self, tmp_path) -> Path:
+        path = tmp_path / "multi.xlsx"
+        wb = Workbook()
+        wb.remove(wb.active)
+        for name in ["posts", "brand", "categories", "random_sheet", "product-cat"]:
+            ws = wb.create_sheet(name)
+            ws.append(["id", "action"])
+        wb.save(path)
+        return path
+
+    def test_without_override_brand_is_content(self, sheets_path):
+        with ExcelReader(sheets_path) as r:
+            by_type = r.get_sheets_by_type()
+        assert "brand" in by_type["content"]
+        assert "categories" in by_type["taxonomy"]
+        assert "product-cat" in by_type["taxonomy"]
+
+    def test_with_override_brand_becomes_taxonomy(self, sheets_path):
+        with ExcelReader(sheets_path, known_taxonomies=["brand"]) as r:
+            by_type = r.get_sheets_by_type()
+        assert "brand" in by_type["taxonomy"]
+        assert "categories" in by_type["taxonomy"]
+        assert "posts" in by_type["content"]
+
+    def test_override_does_not_break_fallback(self, sheets_path):
+        with ExcelReader(sheets_path, known_taxonomies=["brand"]) as r:
+            by_type = r.get_sheets_by_type()
+        assert "categories" in by_type["taxonomy"]
+        assert "product-cat" in by_type["taxonomy"]

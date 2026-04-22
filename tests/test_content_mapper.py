@@ -169,3 +169,112 @@ class TestExtractMediaPath:
         mapper = ContentMapper(["id", "action"])
         row = make_row(id="", action="add")
         assert mapper.extract_media_path(row) is None
+
+
+# ── Dot-notation (вложенный payload) ─────────────────────────────────
+
+class TestDotNotationPayload:
+    def test_single_nesting(self):
+        mapper = ContentMapper(["seo.title", "id", "action"])
+        payload = mapper.map_row(make_row(**{"seo.title": "X", "id": "", "action": "add"}))
+        assert payload["seo"] == {"title": "X"}
+
+    def test_multiple_nested_merged(self):
+        mapper = ContentMapper(["seo.title", "seo.description", "id", "action"])
+        payload = mapper.map_row(make_row(**{
+            "seo.title": "T", "seo.description": "D", "id": "", "action": "add"
+        }))
+        assert payload["seo"] == {"title": "T", "description": "D"}
+
+    def test_deep_nesting(self):
+        mapper = ContentMapper(["seo.og.image", "id", "action"])
+        payload = mapper.map_row(make_row(**{
+            "seo.og.image": "img.jpg", "id": "", "action": "add"
+        }))
+        assert payload == {"seo": {"og": {"image": "img.jpg"}}}
+
+    def test_empty_dot_value_skipped(self):
+        mapper = ContentMapper(["seo.title", "id", "action"])
+        payload = mapper.map_row(make_row(**{"seo.title": "", "id": "", "action": "add"}))
+        assert "seo" not in payload
+
+    def test_legacy_seo_flat_and_dot_coexist(self):
+        """seo_title (flat) и seo.title (nested) живут в разных ключах payload."""
+        mapper = ContentMapper(["seo_title", "seo.title", "id", "action"])
+        payload = mapper.map_row(make_row(**{
+            "seo_title": "flat", "seo.title": "nested", "id": "", "action": "add"
+        }))
+        assert payload["seo_title"] == "flat"
+        assert payload["seo"]["title"] == "nested"
+
+    def test_acf_legacy_and_dot_merge(self):
+        mapper = ContentMapper(["acf_old", "acf.new", "id", "action"])
+        payload = mapper.map_row(make_row(**{
+            "acf_old": "O", "acf.new": "N", "id": "", "action": "add"
+        }))
+        assert payload["acf"] == {"old": "O", "new": "N"}
+
+    def test_filter_by_dot_path(self):
+        mapper = ContentMapper(
+            ["seo.title", "seo.description", "id", "action"],
+            allowed_columns=["seo.title"],
+        )
+        payload = mapper.map_row(make_row(**{
+            "seo.title": "X", "seo.description": "Y", "id": "", "action": "update"
+        }))
+        assert payload == {"seo": {"title": "X"}}
+
+
+# ── Bool-поля «по умолчанию true» ────────────────────────────────────
+
+class TestBoolDefaultTrueFields:
+    BOOL_COLS = ["seo.robots.index", "seo.robots.follow", "seo.sitemap.include"]
+
+    def _cm(self):
+        return ContentMapper(self.BOOL_COLS + ["id", "action"])
+
+    def test_empty_defaults_to_true(self):
+        payload = self._cm().map_row(make_row(**{
+            "seo.robots.index": "",
+            "seo.robots.follow": "",
+            "seo.sitemap.include": "",
+            "id": "", "action": "update",
+        }))
+        assert payload["seo"]["robots"] == {"index": True, "follow": True}
+        assert payload["seo"]["sitemap"] == {"include": True}
+
+    def test_falsy_values_parsed(self):
+        payload = self._cm().map_row(make_row(**{
+            "seo.robots.index": "нет",
+            "seo.robots.follow": "false",
+            "seo.sitemap.include": "0",
+            "id": "", "action": "update",
+        }))
+        assert payload["seo"]["robots"] == {"index": False, "follow": False}
+        assert payload["seo"]["sitemap"] == {"include": False}
+
+    def test_column_absent_not_sent(self):
+        """Отсутствие колонки = preserve-existing (не шлём)."""
+        mapper = ContentMapper(["title", "id", "action"])
+        payload = mapper.map_row(make_row(title="T", id="", action="add"))
+        assert "robots" not in payload.get("seo", {})
+        assert "sitemap" not in payload.get("seo", {})
+
+
+# ── known_taxonomies override ────────────────────────────────────────
+
+class TestKnownTaxonomies:
+    def test_custom_taxonomy_excluded_from_content(self):
+        """`brand` с override — таксономия, не попадает в content и payload как поле."""
+        mapper = ContentMapper(["title", "brand", "id", "action"], known_taxonomies=["brand"])
+        payload = mapper.map_row(make_row(title="T", brand="BMW", id="", action="add"))
+        assert "brand" not in payload
+        assert payload["title"] == "T"
+
+    def test_custom_taxonomy_ids_injected(self):
+        mapper = ContentMapper(["title", "brand", "id", "action"], known_taxonomies=["brand"])
+        payload = mapper.map_row(
+            make_row(title="T", brand="BMW", id="", action="add"),
+            taxonomy_ids={"brand": [7]},
+        )
+        assert payload["brand"] == [7]

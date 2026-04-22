@@ -7,8 +7,14 @@ import pandas as pd
 from loguru import logger
 
 from .field_detector import FieldDetector
-from .value_converter import convert_acf_value
-from ..constants import SYSTEM_COLUMNS, ACF_PREFIX
+from .value_converter import convert_acf_value, parse_bool_default_true
+from ..constants import (
+    ACF_PREFIX,
+    BOOL_FIELDS_DEFAULT_TRUE,
+    SYSTEM_COLUMNS,
+    build_nested_payload,
+    read_nested_value,
+)
 
 
 class ContentMapper:
@@ -16,14 +22,20 @@ class ContentMapper:
     Преобразует строки Excel в payload для WordPress REST API.
     """
 
-    def __init__(self, columns: List[str], allowed_columns: Optional[List[str]] = None):
+    def __init__(
+        self,
+        columns: List[str],
+        allowed_columns: Optional[List[str]] = None,
+        known_taxonomies: Optional[List[str]] = None,
+    ):
         """
         Args:
             columns: Список колонок из Excel
             allowed_columns: Если задан — отправлять в API только эти поля
+            known_taxonomies: Явный список таксономий проекта (из .env или WP discovery)
         """
         self.columns = columns
-        self.detector = FieldDetector(columns)
+        self.detector = FieldDetector(columns, known_taxonomies=known_taxonomies)
         self.analysis = self.detector.analyze()
         self.allowed_columns: Optional[Set[str]] = set(allowed_columns) if allowed_columns else None
 
@@ -104,11 +116,32 @@ class ContentMapper:
                     payload[field] = ""
                     logger.debug(f"Field '{field}': sending empty value to reset on server")
 
-        # 2. ACF поля
+        # 2a. Dot-notation поля — строим вложенный payload по путям a.b.c
+        nested_cols = self.analysis.get("nested", [])
+        if nested_cols:
+            for col in nested_cols:
+                if col not in row.index:
+                    continue
+                value = row[col]
+                # bool-поля с дефолтом true: пустое → True, парсим всегда
+                if col in BOOL_FIELDS_DEFAULT_TRUE:
+                    build_nested_payload(col, parse_bool_default_true(value), payload)
+                    continue
+                # Обычные nested-поля: пустые значения пропускаем
+                if pd.isna(value) or value == "":
+                    continue
+                build_nested_payload(col, self._convert_value(value), payload)
+            logger.debug(f"Nested fields (dot-notation): {nested_cols}")
+
+        # 2b. ACF поля (legacy acf_* колонки)
         acf_data = self._extract_acf_from_row(row)
         if acf_data:
-            payload["acf"] = acf_data
-            logger.debug(f"ACF fields: {list(acf_data.keys())}")
+            # Если dot-нотация уже положила что-то в payload["acf"], мержим
+            if isinstance(payload.get("acf"), dict):
+                payload["acf"].update(acf_data)
+            else:
+                payload["acf"] = acf_data
+            logger.debug(f"ACF fields (legacy prefix): {list(acf_data.keys())}")
 
         # 3. Таксономии (уже преобразованные в term IDs)
         if taxonomy_ids:
@@ -128,18 +161,24 @@ class ContentMapper:
 
         # --- Фильтрация по allowed_columns ---
         if self.allowed_columns:
-            filtered = {}
-            for key, value in payload.items():
-                if key in self.allowed_columns:
-                    filtered[key] = value
-                elif key == "acf" and isinstance(value, dict):
-                    # Фильтруем ACF: acf_field_name -> оставляем если acf_field_name в allowed
-                    acf_filtered = {
-                        k: v for k, v in value.items()
-                        if f"acf_{k}" in self.allowed_columns
-                    }
-                    if acf_filtered:
-                        filtered["acf"] = acf_filtered
+            filtered: Dict[str, Any] = {}
+            for col in self.allowed_columns:
+                # Dot-notation: читаем по пути, пишем по пути
+                if "." in col:
+                    val = read_nested_value(col, payload)
+                    if val is not None:
+                        build_nested_payload(col, val, filtered)
+                    continue
+                # Legacy ACF prefix
+                if col.startswith(ACF_PREFIX):
+                    acf_key = col[len(ACF_PREFIX):]
+                    acf_src = payload.get("acf")
+                    if isinstance(acf_src, dict) and acf_key in acf_src:
+                        filtered.setdefault("acf", {})[acf_key] = acf_src[acf_key]
+                    continue
+                # Плоский ключ
+                if col in payload:
+                    filtered[col] = payload[col]
             payload = filtered
             logger.debug(f"Columns filter active: {self.allowed_columns} -> payload keys: {list(payload.keys())}")
 

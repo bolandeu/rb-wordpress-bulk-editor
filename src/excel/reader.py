@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 import pandas as pd
 from loguru import logger
 
@@ -17,8 +17,15 @@ SheetType = Literal["profile", "options", "content", "taxonomy", "media"]
 class ExcelReader:
     """Читает и классифицирует листы Excel файла"""
 
-    def __init__(self, excel_file: Path):
+    def __init__(self, excel_file: Path, known_taxonomies: Optional[List[str]] = None):
+        """
+        Args:
+            excel_file: Путь к xlsx.
+            known_taxonomies: Явный список таксономий проекта (из .env/discovery).
+                Листы с такими именами классифицируются как taxonomy даже без `-cat` суффикса.
+        """
         self.excel_file = excel_file
+        self.known_taxonomies = known_taxonomies
         self._excel_file_obj = None
         self._sheets_cache: Dict[str, pd.DataFrame] = {}
 
@@ -58,8 +65,8 @@ class ExcelReader:
         if sheet_name == "media":
             return "media"
 
-        # Таксономии (стандартные + кастомные с суффиксом -cat)
-        if is_taxonomy_column(sheet_name):
+        # Таксономии: явный список проекта, иначе стандартные + `-cat` суффикс
+        if is_taxonomy_column(sheet_name, self.known_taxonomies):
             return "taxonomy"
 
         # Все остальное - контент

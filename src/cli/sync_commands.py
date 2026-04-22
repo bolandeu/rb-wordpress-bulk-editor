@@ -117,7 +117,8 @@ async def _run_sync_engine(
     }
 
     try:
-        with ExcelReader(config.paths.excel_file) as reader:
+        from ..config import Settings
+        with ExcelReader(config.paths.excel_file, known_taxonomies=Settings().get_taxonomies()) as reader:
             sheets_by_type = reader.get_sheets_by_type()
 
             logger.info(f"Найдено листов:")

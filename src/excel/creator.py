@@ -171,7 +171,7 @@ class ExcelCreator:
 
         Порядок:
         1. BASE_COLUMNS
-        2. SEO_COLUMNS
+        2. SEO колонки: WP_SEO_FIELDS из .env, иначе POST_SEO_COLUMNS (legacy)
         3. STANDARD_TAXONOMIES
         4. custom_taxonomies
         5. acf_* fields
@@ -185,7 +185,7 @@ class ExcelCreator:
         """
         columns = (
             self.POST_BASE_COLUMNS.copy() +
-            self.POST_SEO_COLUMNS.copy() +
+            self._seo_columns(self.POST_SEO_COLUMNS) +
             self.POST_STANDARD_TAXONOMIES.copy() +
             custom_taxonomies +
             [f"acf_{field}" for field in acf_fields]
@@ -194,13 +194,19 @@ class ExcelCreator:
         logger.debug(f"Построен список колонок для записей: {len(columns)} колонок")
         return columns
 
+    @staticmethod
+    def _seo_columns(legacy_default: List[str]) -> List[str]:
+        """SEO-колонки: WP_SEO_FIELDS из .env, fallback на переданный legacy-список."""
+        from ..config import Settings
+        return Settings().get_seo_fields() or legacy_default.copy()
+
     def _build_taxonomy_columns(self, acf_fields: List[str]) -> List[str]:
         """
         Построить список колонок для таксономии.
 
         Порядок:
         1. BASE_COLUMNS
-        2. SEO_COLUMNS
+        2. SEO колонки: WP_SEO_FIELDS из .env, иначе TAXONOMY_SEO_COLUMNS (legacy)
         3. acf_* fields
 
         Args:
@@ -211,7 +217,7 @@ class ExcelCreator:
         """
         columns = (
             self.TAXONOMY_BASE_COLUMNS.copy() +
-            self.TAXONOMY_SEO_COLUMNS.copy() +
+            self._seo_columns(self.TAXONOMY_SEO_COLUMNS) +
             [f"acf_{field}" for field in acf_fields]
         )
 

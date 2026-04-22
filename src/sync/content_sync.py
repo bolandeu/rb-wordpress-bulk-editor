@@ -41,7 +41,12 @@ class ContentSync(ContentSyncBase):
         media_endpoint = self._make_media_endpoint()
 
         # Создаем mapper и content processor
-        mapper = ContentMapper(df.columns.tolist(), allowed_columns=self.config.sync.columns_filter)
+        from ..config import Settings
+        mapper = ContentMapper(
+            df.columns.tolist(),
+            allowed_columns=self.config.sync.columns_filter,
+            known_taxonomies=Settings().get_taxonomies(),
+        )
         content_processor = ContentProcessor(self.config.paths.content_folder)
 
         # Обрабатываем в порядке: delete → update → add

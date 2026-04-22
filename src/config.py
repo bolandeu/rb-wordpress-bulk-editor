@@ -231,14 +231,33 @@ class Settings(BaseSettings):
     skip_post_type_patterns: str = ""
     skip_taxonomy_patterns: str = ""
 
+    # Override списка таксономий проекта (через запятую).
+    # Если пусто — работает авто-discovery + STANDARD_TAXONOMIES/`-cat` fallback.
+    taxonomies: str = ""
+
+    # Список SEO-полей для этого проекта/плагина.
+    # Dot-путь = вложенность в WP payload: `seo.title`, `meta._yoast_wpseo_title` и т.д.
+    seo_fields: str = ""
+
+    @staticmethod
+    def _parse_csv(value: str) -> List[str]:
+        """Разобрать CSV-строку в список, отбрасывая пробелы и пустые элементы."""
+        if not value:
+            return []
+        return [s.strip() for s in value.split(",") if s.strip()]
+
     def get_skip_post_type_patterns(self) -> List[str]:
-        """Список паттернов для пропуска типов записей."""
-        if self.skip_post_type_patterns:
-            return [s.strip() for s in self.skip_post_type_patterns.split(",") if s.strip()]
-        return list(DEFAULT_SKIP_POST_TYPE_PATTERNS)
+        """Паттерны для пропуска типов записей (с fallback на DEFAULT_*)."""
+        return self._parse_csv(self.skip_post_type_patterns) or list(DEFAULT_SKIP_POST_TYPE_PATTERNS)
 
     def get_skip_taxonomy_patterns(self) -> List[str]:
-        """Список паттернов для пропуска таксономий."""
-        if self.skip_taxonomy_patterns:
-            return [s.strip() for s in self.skip_taxonomy_patterns.split(",") if s.strip()]
-        return list(DEFAULT_SKIP_TAXONOMY_PATTERNS)
+        """Паттерны для пропуска таксономий (с fallback на DEFAULT_*)."""
+        return self._parse_csv(self.skip_taxonomy_patterns) or list(DEFAULT_SKIP_TAXONOMY_PATTERNS)
+
+    def get_taxonomies(self) -> Optional[List[str]]:
+        """Явный override списка таксономий. None если не задан — сигнал для fallback."""
+        return self._parse_csv(self.taxonomies) or None
+
+    def get_seo_fields(self) -> Optional[List[str]]:
+        """Список SEO dot-путей. None если не задан."""
+        return self._parse_csv(self.seo_fields) or None

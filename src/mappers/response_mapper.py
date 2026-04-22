@@ -2,10 +2,11 @@
 Преобразование ответов WordPress API в формат Excel
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from loguru import logger
 import re
 
+from ..constants import read_nested_value
 from ..utils.wp_helpers import wp_rendered, convert_taxonomy_ids_to_names
 
 
@@ -14,12 +15,20 @@ class ResponseMapper:
     Преобразует ответы WordPress REST API в формат для записи в Excel.
     """
 
-    def __init__(self, taxonomy_cache: Optional[Dict[str, Dict[int, str]]] = None):
+    def __init__(
+        self,
+        taxonomy_cache: Optional[Dict[str, Dict[int, str]]] = None,
+        nested_paths: Optional[List[str]] = None,
+    ):
         """
         Args:
             taxonomy_cache: Словарь {taxonomy_name: {term_id: term_name}}
+            nested_paths: Dot-пути к вложенным полям, которые надо извлечь из ответа
+                и записать в Excel-колонки с теми же именами (например, `seo.title`).
+                Источник — обычно WP_SEO_FIELDS из .env проекта.
         """
         self.taxonomy_cache = taxonomy_cache or {}
+        self.nested_paths = nested_paths or []
 
     def map_post_to_excel(self, post: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -79,6 +88,12 @@ class ResponseMapper:
         if isinstance(acf, dict):
             for key, value in acf.items():
                 row[f"acf_{key}"] = value
+
+        # Dot-notation вложенные поля (например, WP_SEO_FIELDS=seo.title,seo.description)
+        for path in self.nested_paths:
+            value = read_nested_value(path, post)
+            if value is not None and not isinstance(value, (dict, list)):
+                row[path] = value
 
         # SEO и другие кастомные поля
         # Добавляем все остальные поля которые не обработали
@@ -146,6 +161,8 @@ class ResponseMapper:
                 row[f"acf_{key}"] = value
 
         # SEO и другие кастомные поля
+        # (nested_paths не применяются к terms — они per-instance, решит вызывающий код если нужно)
+
         # Пропускаем уже обработанные и системные поля API
         skip_fields = {
             "id", "name", "slug", "description", "link", "acf",

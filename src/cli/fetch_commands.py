@@ -144,7 +144,7 @@ def fetch(
                 console.print("[yellow]Листы будут определены автоматически[/yellow]\n")
         else:
             console.print("[yellow]Чтение структуры Excel файла...[/yellow]")
-            with ExcelReader(file) as reader:
+            with ExcelReader(file, known_taxonomies=Settings().get_taxonomies()) as reader:
                 sheets_by_type = reader.get_sheets_by_type()
 
                 if sheets:
@@ -315,7 +315,10 @@ async def fetch_and_append(
 
             logger.info(f"Кэш таксономий: {len(taxonomy_cache)} таксономий")
 
-            mapper = ResponseMapper(taxonomy_cache=taxonomy_cache)
+            mapper = ResponseMapper(
+                taxonomy_cache=taxonomy_cache,
+                nested_paths=Settings().get_seo_fields(),
+            )
 
             for sheet_name, sheet_meta in sheets_data.items():
                 logger.info(f"Запись данных в лист '{sheet_name}'...")
@@ -343,7 +346,7 @@ async def fetch_and_append(
 
         taxonomies_to_load = set(["categories", "tags"])
 
-        excel_reader = ExcelReader(excel_file)
+        excel_reader = ExcelReader(excel_file, known_taxonomies=Settings().get_taxonomies())
         for sheet_name in sheets:
             try:
                 df = excel_reader.read_sheet(sheet_name)
@@ -372,7 +375,10 @@ async def fetch_and_append(
                 logger.warning(f"Не удалось загрузить таксономию '{taxonomy}': {e}")
                 taxonomy_cache_data[taxonomy] = {}
 
-        mapper = ResponseMapper(taxonomy_cache=taxonomy_cache_data)
+        mapper = ResponseMapper(
+            taxonomy_cache=taxonomy_cache_data,
+            nested_paths=Settings().get_seo_fields(),
+        )
 
         excel_writer = ExcelWriter(excel_file)
         excel_writer.load()
