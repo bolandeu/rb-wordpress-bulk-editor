@@ -1,0 +1,78 @@
+{
+  "sections": [
+    {
+      "id": "wp-bulk",
+      "title": "wp-bulk — Формат вызова команд",
+      "subtitle": "Единая точка входа для всех команд WordPress Bulk Editor",
+      "blocks": [
+        { "type": "info", "title": "Общий формат", "text": "Все команды вызываются через единый CLI." },
+        { "type": "code", "code": "wp-bulk [ГЛОБАЛЬНЫЕ ОПЦИИ] КОМАНДА [ПАРАМЕТРЫ КОМАНДЫ]" },
+        { "type": "h", "text": "Глобальные опции" },
+        { "type": "list", "items": [
+          "`--project` / `-P` — имя проекта из папки `projects/` (опционально, env `WP_PROJECT`)"
+        ]},
+        { "type": "warn", "title": "Важно", "text": "Глобальные опции (--project) указываются ДО имени команды, параметры команды — ПОСЛЕ." },
+        { "type": "h", "text": "Примеры вызова" },
+        { "type": "example", "cmd": "wp-bulk sync --file example.xlsx", "note": "Без проекта — используется глобальный .env из корня репозитория" },
+        { "type": "example", "cmd": "wp-bulk -P mysite sync --file example.xlsx", "note": "С проектом — используется projects/mysite/.env и пути проекта" },
+        { "type": "example", "cmd": "wp-bulk --project ost fetch", "note": "Полная форма флага --project" }
+      ]
+    },
+    {
+      "id": "projects",
+      "title": "Работа с проектами (--project / -P)",
+      "subtitle": "Управление несколькими WordPress сайтами из одной установки",
+      "blocks": [
+        { "type": "info", "title": "Назначение", "text": "Система проектов позволяет работать с несколькими WordPress сайтами, храня конфигурацию, данные и логи каждого сайта в изолированной папке projects/<name>/." },
+        { "type": "h", "text": "Структура папки проекта" },
+        { "type": "code", "code": "projects/\n├── mysite/                    # Проект \"mysite\"\n│   ├── .env                   # Credentials и настройки этого сайта\n│   ├── mysite.xlsx            # Excel файл (авто-обнаружение)\n│   ├── media/                 # Медиафайлы проекта\n│   ├── content/               # Экспортированный контент\n│   └── logs/                  # Логи операций\n├── blog/                      # Проект \"blog\"\n│   ├── .env\n│   ├── data.xlsx\n│   ├── media/\n│   ├── content/\n│   └── logs/\n└── ..." },
+        { "type": "h", "text": "Создание нового проекта" },
+        { "type": "example", "cmd": "mkdir projects/mysite", "note": "1. Создайте папку проекта" },
+        { "type": "example", "cmd": "cp .env.example projects/mysite/.env", "note": "2. Скопируйте шаблон .env и заполните credentials" },
+        { "type": "h", "text": "Три способа указать проект" },
+        { "type": "table", "headers": ["Способ", "Пример", "Описание"], "rows": [
+          ["Флаг -P", "wp-bulk -P mysite sync", "Короткая форма (рекомендуется)"],
+          ["Флаг --project", "wp-bulk --project mysite sync", "Полная форма"],
+          ["Переменная окружения", "export WP_PROJECT=mysite", "Через переменную WP_PROJECT"]
+        ]},
+        { "type": "h", "text": "Что меняется при работе с проектом" },
+        { "type": "table", "headers": ["Ресурс", "Без проекта", "С проектом (-P mysite)"], "rows": [
+          [".env файл", ".env (корень)", "projects/mysite/.env"],
+          ["Excel файл", "Указывается через --file", "Авто-обнаружение в projects/mysite/"],
+          ["Логи", "logs/", "projects/mysite/logs/"],
+          ["Медиа", "data/media/", "projects/mysite/media/"],
+          ["Контент", "data/content/", "projects/mysite/content/"],
+          ["Export output", "Указывается через --output", "projects/mysite/exported_content/"]
+        ]},
+        { "type": "success", "title": "Авто-обнаружение Excel файла (только для fetch)", "items": [
+          "Команда fetch без --file автоматически ищет .xlsx в папке проекта",
+          "Если в папке один .xlsx файл — он используется автоматически",
+          "Если файлов несколько — приоритет у файла с именем проекта (например mysite.xlsx)",
+          "Если файл не найден — создаётся fetch.xlsx в папке проекта"
+        ]},
+        { "type": "warn", "title": "Важно", "text": "Команды sync, async, validate, fetch-media, llm ВСЕГДА требуют параметр --file. Проект влияет на расположение .env, логов, медиа и output — но не подставляет файл автоматически для этих команд." },
+        { "type": "h", "text": "Примеры работы с проектами" },
+        { "type": "p", "text": "Выгрузка данных (fetch автоматически найдёт/создаст файл):" },
+        { "type": "example", "cmd": "wp-bulk -P ost fetch", "note": "Авто-режим: создаст projects/ost/fetch.xlsx с данными сайта" },
+        { "type": "example", "cmd": "wp-bulk -P ost fetch --sheets posts,pages --status publish", "note": "Выгрузить только опубликованные посты и страницы" },
+        { "type": "p", "text": "Синхронизация (--file обязателен):" },
+        { "type": "example", "cmd": "wp-bulk -P ost sync --file projects/ost/fetch.xlsx", "note": "Синхронизация: .env из проекта, логи в projects/ost/logs/" },
+        { "type": "example", "cmd": "wp-bulk -P ost async --file projects/ost/ost.xlsx --sheets posts --concurrency 10", "note": "Async синхронизация постов проекта 'ost'" },
+        { "type": "p", "text": "Экспорт (output авто-направляется в папку проекта):" },
+        { "type": "example", "cmd": "wp-bulk -P ost export", "note": "Экспорт в projects/ost/exported_content/ (авто-определение output)" },
+        { "type": "example", "cmd": "wp-bulk -P ost export-media", "note": "Экспорт медиа в projects/ost/export_media/" },
+        { "type": "p", "text": "Утилиты:" },
+        { "type": "example", "cmd": "wp-bulk -P ost llm --file projects/ost/ost.xlsx --column excerpt", "note": "LLM генерация: LLM_ENDPOINT, LLM_TOKEN берутся из projects/ost/.env" },
+        { "type": "example", "cmd": "wp-bulk -P tzm bulk-delete --post-type posts --status draft --dry-run", "note": "Показать черновики постов проекта 'tzm' (--file не нужен)" },
+        { "type": "example", "cmd": "wp-bulk -P ost counter --type posts --output stats.csv", "note": "Подсчёт слов: CSV сохранится в projects/ost/counter_output.csv" },
+        { "type": "h", "text": "Пример .env файла проекта" },
+        { "type": "code", "code": "# projects/mysite/.env\nWP_URL=https://mysite.com\nWP_USERNAME=admin\nWP_PASSWORD=xxxx xxxx xxxx xxxx\n\n# SSL для локального Docker (self-signed сертификат)\nWP_VERIFY_SSL=false\n\n# Таксономии сайта (авто: wp-bulk taxonomies)\nWP_TAXONOMIES=category,post_tag,service-cat\n\n# SEO поля для dot-нотации\nWP_SEO_FIELDS=seo.title,seo.description,seo.robots.index,seo.robots.follow,seo.sitemap.include\n\n# Google Sheets (опционально)\nGOOGLE_SHEET_ID=1B5gj1nxzVhQ...\nGOOGLE_SHEET_CREDENTIALS_PATH=credentials/google.json\n\n# LLM (опционально)\nLLM_ENDPOINT=http://localhost:8317/v1/chat/completions\nLLM_TOKEN=your-api-key\nLLM_MODELS=gpt-4,claude-3\nLLM_PROMPT=Напиши текст для [title]\n\n# Async тюнинг (опционально)\nWP_SYNC_CONCURRENCY=5\nWP_API_TIMEOUT=30\nWP_MEDIA_TIMEOUT=120\nWP_MAX_RETRIES=3\nWP_RETRY_DELAY=1\nWP_CIRCUIT_BREAKER_THRESHOLD=10\nWP_CIRCUIT_BREAKER_RECOVERY=60" },
+        { "type": "warn", "title": "Приоритет настроек", "ordered": [
+          "Параметры командной строки (--domain, --file, --env-file) — наивысший приоритет",
+          ".env файл проекта (projects/<name>/.env)",
+          "Глобальный .env файл (корень репозитория)"
+        ]}
+      ]
+    }
+  ]
+}

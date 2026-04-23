@@ -168,3 +168,108 @@ h1 { font-size: 1.6rem; font-weight: 600; margin-bottom: .25rem; }
   .tabs { gap: .3rem; }
   .tab { padding: .3rem .6rem; font-size: .7rem; }
 }
+
+/* ===== Args list (карточки команд) ===== */
+.args-list, .examples-list { list-style: none; padding-left: 0; margin: .35rem 0 .75rem; }
+.args-list > li, .examples-list > li {
+  padding: .35rem .5rem; margin-bottom: .25rem;
+  border-left: 2px solid var(--border); line-height: 1.5;
+}
+.args-list code, .examples-list code { color: var(--accent); }
+.args-options {
+  list-style: none; padding-left: 1rem; margin-top: .25rem;
+  font-size: .75rem; color: var(--text2);
+}
+.args-options li { margin-bottom: .15rem; }
+
+/* Badges рядом с именем аргумента */
+.badge-req, .badge-type, .badge-default, .badge-env {
+  display: inline-block; padding: .05rem .35rem; border-radius: 3px;
+  font-size: .65rem; font-weight: 600; margin-left: .2rem;
+  text-transform: uppercase; letter-spacing: .04em; vertical-align: middle;
+}
+.badge-req { background: #3a1f1f; color: var(--danger); }
+.badge-type { background: var(--surface2); color: var(--text2); text-transform: lowercase; font-weight: 500; }
+.badge-default { background: #1f2a1f; color: var(--accent2); }
+.badge-env { background: #2a251a; color: var(--warn); }
+
+.example-note {
+  color: var(--text2); font-size: .72rem; font-style: italic;
+  margin-top: .2rem; padding-left: .1rem;
+}
+
+/* ===== Docs tab (Основы) ===== */
+.doc-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+}
+.doc-title {
+  font-size: 1.15rem; font-weight: 600; color: var(--accent);
+  margin-bottom: .2rem;
+}
+.doc-subtitle {
+  color: var(--text2); font-size: .82rem; margin-bottom: 1rem;
+}
+.doc-h {
+  font-size: .9rem; font-weight: 600; color: var(--text);
+  margin: 1rem 0 .35rem; padding-bottom: .2rem;
+  border-bottom: 1px solid var(--border);
+}
+.doc-p { font-size: .85rem; color: var(--text2); margin-bottom: .5rem; }
+
+.doc-info, .doc-success, .doc-warn {
+  padding: .6rem .8rem; border-radius: 6px;
+  margin: .5rem 0; font-size: .8rem; line-height: 1.5;
+  border-left: 3px solid;
+}
+.doc-info { background: #15222e; border-left-color: var(--accent); color: var(--text); }
+.doc-success { background: #15241a; border-left-color: var(--accent2); color: var(--text); }
+.doc-warn { background: #2a2218; border-left-color: var(--warn); color: var(--text); }
+.doc-info ul, .doc-success ul, .doc-warn ul,
+.doc-info ol, .doc-success ol, .doc-warn ol {
+  margin: .35rem 0 0 1.25rem; font-size: .78rem; color: var(--text2);
+}
+.doc-info li, .doc-success li, .doc-warn li { margin-bottom: .2rem; }
+.doc-box-title { font-weight: 600; color: var(--text); margin-bottom: .2rem; }
+
+.doc-code {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: .6rem .8rem; margin: .5rem 0;
+  font-family: 'SF Mono', Menlo, monospace; font-size: .78rem;
+  color: var(--text); overflow-x: auto; white-space: pre;
+}
+.doc-example {
+  background: var(--surface2); border-left: 3px solid var(--accent);
+  border-radius: 4px; padding: .5rem .75rem; margin: .4rem 0;
+}
+.doc-example > code {
+  display: block; font-family: 'SF Mono', Menlo, monospace;
+  font-size: .8rem; color: var(--accent);
+  word-break: break-all;
+}
+
+.doc-table {
+  width: 100%; border-collapse: collapse; margin: .5rem 0;
+  font-size: .78rem;
+}
+.doc-table th, .doc-table td {
+  padding: .4rem .55rem; text-align: left;
+  border: 1px solid var(--border);
+}
+.doc-table th {
+  background: var(--surface2); color: var(--text2);
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+}
+.doc-table td { color: var(--text2); }
+.doc-table td:first-child { color: var(--text); }
+.doc-table code {
+  background: var(--bg); padding: .05rem .3rem; border-radius: 3px;
+  color: var(--accent); font-size: .75rem;
+}
+
+.doc-list {
+  margin: .35rem 0 .5rem 1.25rem;
+  font-size: .8rem; color: var(--text2);
+}
+.doc-list li { margin-bottom: .2rem; }
+.doc-list code { color: var(--accent); }
