@@ -11,7 +11,7 @@ from loguru import logger
 
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_output, require_excel_file
+from .helpers import get_project, resolve_env_file, resolve_excel_file, resolve_output, require_excel_file
 from .project import find_repo_root
 from ..config import WordPressConfig
 from ..excel.reader import ExcelReader
@@ -112,6 +112,10 @@ def options(
     С --fetch: выгрузка настроек из WordPress в Excel
     """
     env_file = resolve_env_file(ctx, env_file)
+    # Если активен --project и --file не указан — берём xlsx из папки проекта.
+    # Без проекта это даёт None, и каждая ветка ниже сама решает что делать.
+    if file is None:
+        file = resolve_excel_file(ctx, file)
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
 

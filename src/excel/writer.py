@@ -77,6 +77,9 @@ class ExcelWriter:
         self._dataframes: Dict[str, pd.DataFrame] = {}
         self._locks: Dict[str, asyncio.Lock] = {}  # NEW: Lock per sheet
         self._taxonomy_cache = taxonomy_cache
+        # Dirty-флаг: save() переписывает весь файл через pd.ExcelWriter и
+        # теряет формат/комментарии/мердж-ячейки. Не пишем, если ничего не меняли.
+        self._dirty: bool = False
 
     def load(self):
         """Загрузить Excel файл для редактирования."""
@@ -123,6 +126,7 @@ class ExcelWriter:
         for column, value in data.items():
             if column in df.columns:
                 df.at[row_index, column] = _coerce_for_column(df[column], value)
+                self._dirty = True
             else:
                 logger.warning(f"Column {column} not found in sheet {sheet_name}")
 
@@ -165,6 +169,7 @@ class ExcelWriter:
             [df, new_df],
             ignore_index=True
         )
+        self._dirty = True
 
         logger.info(f"Appended {len(rows)} rows to sheet {sheet_name}")
 
@@ -203,6 +208,7 @@ class ExcelWriter:
 
         # Заменяем все строки новыми данными
         self._dataframes[sheet_name] = new_df
+        self._dirty = True
 
         logger.info(f"Replaced all rows in sheet {sheet_name} with {len(rows)} new rows")
 
@@ -421,7 +427,15 @@ class ExcelWriter:
     def save(self):
         """
         Сохранить изменения в Excel файл.
+
+        No-op, если ни один update_row/append/replace не был вызван — иначе
+        pd.ExcelWriter переписал бы файл «в холостую», теряя форматирование
+        исходного xlsx (read-only команды не должны трогать файл).
         """
+        if not self._dirty:
+            logger.info("Excel файл не изменён — save() пропущен")
+            return
+
         logger.info(f"Saving changes to Excel file: {self.excel_file}")
 
         try:
@@ -439,6 +453,7 @@ class ExcelWriter:
                     )
 
             logger.info(f"Successfully saved Excel file")
+            self._dirty = False
 
         except Exception as e:
             logger.error(f"Failed to save Excel file: {e}")

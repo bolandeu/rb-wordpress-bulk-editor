@@ -132,9 +132,15 @@ class ExcelReader:
                     dtype=dtype or str
                 )
 
+            # Игнорируем колонки без заголовка (pandas: "Unnamed: N") и служебные `__*`
+            df = self._drop_ignored_columns(df, sheet_name)
+
             # Заполнение NaN
             if fillna:
                 df = df.fillna("")
+
+            # Игнорируем пустые строки и строки без минимума (action / title / name)
+            df = self._drop_ignored_rows(df, sheet_name)
 
             # Кэшируем
             self._sheets_cache[sheet_name] = df.copy()
@@ -145,6 +151,79 @@ class ExcelReader:
             if "Worksheet named" in str(e) and "not found" in str(e):
                 raise ExcelError(f"Лист '{sheet_name}' не найден в файле {self.excel_file}")
             raise
+
+    @staticmethod
+    def _is_ignored_column(name: object) -> bool:
+        """Колонка игнорируется: пустой заголовок (pandas → `Unnamed: N`) или префикс `__`."""
+        if name is None:
+            return True
+        if not isinstance(name, str):
+            name = str(name)
+        stripped = name.strip()
+        if not stripped:
+            return True
+        if stripped.startswith("__"):
+            return True
+        if stripped.startswith("Unnamed:"):
+            return True
+        return False
+
+    def _drop_ignored_columns(self, df: pd.DataFrame, sheet_name: str) -> pd.DataFrame:
+        """Удаляет колонки с пустым заголовком и `__*`. Логирует только если что-то отфильтровано."""
+        ignored = [c for c in df.columns if self._is_ignored_column(c)]
+        if not ignored:
+            return df
+        logger.debug(
+            f"Лист '{sheet_name}': игнорируются колонки без заголовка/служебные: {ignored}"
+        )
+        return df.drop(columns=ignored)
+
+    @staticmethod
+    def _is_blank_value(v: object) -> bool:
+        """Пустая ячейка: None, NaN или строка из одних пробелов."""
+        if v is None:
+            return True
+        try:
+            if pd.isna(v):
+                return True
+        except (TypeError, ValueError):
+            pass
+        if isinstance(v, str):
+            return v.strip() == ""
+        return False
+
+    # Минимально достаточный набор полей: хотя бы одно из них должно быть заполнено.
+    # `action` нужен для sync; `title`/`name` — для контента/таксономий соответственно.
+    _MINIMAL_ROW_COLUMNS = ("action", "title", "name")
+
+    def _drop_ignored_rows(self, df: pd.DataFrame, sheet_name: str) -> pd.DataFrame:
+        """Удаляет полностью пустые строки и строки без минимума (action/title/name).
+
+        Индекс не сбрасываем: writer полагается на исходные позиции строк
+        (см. `ContentSync.iterrows()` → `ExcelWriter.update_row`).
+        """
+        if df.empty:
+            return df
+
+        blank = df.map(self._is_blank_value) if hasattr(df, "map") else df.applymap(self._is_blank_value)
+
+        fully_empty = blank.all(axis=1)
+
+        minimal_cols = [c for c in self._MINIMAL_ROW_COLUMNS if c in df.columns]
+        if minimal_cols:
+            no_minimal = blank[minimal_cols].all(axis=1)
+        else:
+            no_minimal = pd.Series(False, index=df.index)
+
+        drop_mask = fully_empty | no_minimal
+        if not drop_mask.any():
+            return df
+
+        logger.debug(
+            f"Лист '{sheet_name}': пропущено {int(drop_mask.sum())} строк "
+            f"(пустые / без {'/'.join(minimal_cols) or 'данных'})"
+        )
+        return df[~drop_mask]
 
     def validate_sheet_structure(
         self,

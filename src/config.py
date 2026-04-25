@@ -198,10 +198,10 @@ class AppConfig(BaseModel):
             paths_kwargs["project_root"] = project_root
 
         return cls(
-            wordpress=WordPressConfig(
+            wordpress=WordPressConfig.from_credentials(
                 url=wp_url,
                 username=wp_username,
-                password=wp_password
+                password=wp_password,
             ),
             paths=PathsConfig(**paths_kwargs),
             **kwargs

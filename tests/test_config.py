@@ -5,7 +5,7 @@ Tests for src/config.py Pydantic models.
 import pytest
 from pathlib import Path
 
-from src.config import WordPressConfig, SyncConfig, LoggingConfig, PathsConfig, Settings
+from src.config import AppConfig, WordPressConfig, SyncConfig, LoggingConfig, PathsConfig, Settings
 from src.constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY_PATTERNS
 
 
@@ -39,6 +39,26 @@ class TestWordPressConfig:
     def test_verify_ssl_default(self):
         cfg = WordPressConfig(url="https://x.com")
         assert cfg.verify_ssl is True
+
+    def test_from_credentials_reads_verify_ssl_from_env(self, monkeypatch):
+        """`from_credentials` должен забирать WP_VERIFY_SSL из окружения (для локального Docker)."""
+        monkeypatch.setenv("WP_VERIFY_SSL", "false")
+        cfg = WordPressConfig.from_credentials("https://x.com", "u", "p")
+        assert cfg.verify_ssl is False
+
+
+# ── AppConfig ───────────────────────────────────────────────────────
+
+class TestAppConfigFromExcel:
+    def test_propagates_verify_ssl_from_env(self, monkeypatch, tmp_path):
+        """Регрессия: AppConfig.from_excel должен пробрасывать WP_VERIFY_SSL в WordPressConfig."""
+        monkeypatch.setenv("WP_VERIFY_SSL", "false")
+        excel = tmp_path / "f.xlsx"
+        excel.touch()
+        cfg = AppConfig.from_excel(
+            excel_file=excel, wp_url="https://x.com", wp_username="u", wp_password="p",
+        )
+        assert cfg.wordpress.verify_ssl is False
 
 
 # ── SyncConfig ──────────────────────────────────────────────────────

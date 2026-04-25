@@ -87,6 +87,37 @@ class TestUpdateRow:
         writer.update_row("nonexistent_sheet", 0, {"id": "1"})
 
 
+# ── ExcelWriter dirty-флаг ─────────────────────────────────────────────
+
+class TestDirtyFlag:
+    def test_save_is_noop_without_changes(self, excel_file_with_posts):
+        """Регрессия: read-only сценарий не должен переписывать файл (теряя форматирование)."""
+        original_mtime = excel_file_with_posts.stat().st_mtime_ns
+
+        writer = ExcelWriter(excel_file_with_posts)
+        writer.load()
+        writer.save()  # никаких update_row до этого — файл не должен быть тронут
+
+        assert excel_file_with_posts.stat().st_mtime_ns == original_mtime
+
+    def test_save_writes_after_update(self, excel_file_with_posts):
+        writer = ExcelWriter(excel_file_with_posts)
+        writer.load()
+        writer.update_row("posts", 0, {"id": "777"})
+        writer.save()
+
+        # Перечитываем — изменения должны быть на диске
+        import pandas as pd
+        df = pd.read_excel(excel_file_with_posts, sheet_name="posts", dtype=str)
+        assert df.at[0, "id"] == "777"
+
+    def test_update_nonexistent_column_does_not_dirty(self, excel_file_with_posts):
+        writer = ExcelWriter(excel_file_with_posts)
+        writer.load()
+        writer.update_row("posts", 0, {"nonexistent_col": "value"})
+        assert writer._dirty is False
+
+
 # ── ExcelWriter.update_from_api_response() ───────────────────────────
 
 class TestUpdateFromApiResponse:
