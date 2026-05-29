@@ -32,7 +32,7 @@ class WordPressDiscovery:
         self.skip_post_type_patterns = skip_post_type_patterns or DEFAULT_SKIP_POST_TYPE_PATTERNS
         self.skip_taxonomy_patterns = skip_taxonomy_patterns or DEFAULT_SKIP_TAXONOMY_PATTERNS
 
-    async def discover_post_types(self) -> List[str]:
+    async def discover_post_types(self, include_skipped: bool = False) -> List[str]:
         """
         Обнаружение всех типов записей через /wp-json/wp/v2/types
 
@@ -47,8 +47,13 @@ class WordPressDiscovery:
 
             post_types = []
             for type_key, type_data in response.items():
-                # Пропускаем служебные типы по паттернам
-                should_skip = any(pattern in type_key for pattern in self.skip_post_type_patterns)
+                original_type_key = type_key
+
+                # Пропускаем служебные типы по паттернам, кроме режима явного выбора.
+                should_skip = (
+                    not include_skipped
+                    and any(pattern in type_key for pattern in self.skip_post_type_patterns)
+                )
 
                 if should_skip:
                     logger.debug(f"Пропускаем тип записи: {type_key} (служебный тип)")
@@ -60,7 +65,10 @@ class WordPressDiscovery:
                         type_key = "pages"
 
                     post_types.append(type_key)
-                    logger.debug(f"Найден тип записи: {type_key} - {type_data.get('name', 'N/A')}")
+                    if include_skipped and any(pattern in original_type_key for pattern in self.skip_post_type_patterns):
+                        logger.debug(f"Найден тип записи: {type_key} - {type_data.get('name', 'N/A')} (явно выбран)")
+                    else:
+                        logger.debug(f"Найден тип записи: {type_key} - {type_data.get('name', 'N/A')}")
 
             logger.info(f"Обнаружено {len(post_types)} типов записей: {', '.join(post_types)}")
             return post_types
@@ -71,7 +79,7 @@ class WordPressDiscovery:
             logger.warning("Используем fallback к стандартным типам: posts, pages")
             return ["posts", "pages"]
 
-    async def discover_taxonomies(self) -> List[str]:
+    async def discover_taxonomies(self, include_skipped: bool = False) -> List[str]:
         """
         Обнаружение всех таксономий через /wp-json/wp/v2/taxonomies
 
@@ -86,8 +94,11 @@ class WordPressDiscovery:
 
             taxonomies = []
             for tax_key, tax_data in response.items():
-                # Пропускаем служебные таксономии по паттернам
-                should_skip = any(pattern in tax_key for pattern in self.skip_taxonomy_patterns)
+                # Пропускаем служебные таксономии по паттернам, кроме режима явного выбора.
+                should_skip = (
+                    not include_skipped
+                    and any(pattern in tax_key for pattern in self.skip_taxonomy_patterns)
+                )
 
                 if should_skip:
                     logger.debug(f"Пропускаем таксономию: {tax_key} (служебная таксономия)")

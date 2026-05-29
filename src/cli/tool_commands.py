@@ -223,7 +223,7 @@ def options(
 async def _update_options(wp_config: WordPressConfig, site_options: dict):
     """Отправка настроек в WordPress."""
     async with WordPressClient(wp_config) as client:
-        await client.test_connection()
+        await client.test_connection(authenticated=True)
         options_endpoint = OptionsEndpoint(client)
         await options_endpoint.update(site_options)
 
@@ -231,7 +231,7 @@ async def _update_options(wp_config: WordPressConfig, site_options: dict):
 async def _fetch_options(wp_config: WordPressConfig) -> dict:
     """Получение настроек из WordPress."""
     async with WordPressClient(wp_config) as client:
-        await client.test_connection()
+        await client.test_connection(authenticated=True)
         options_endpoint = OptionsEndpoint(client)
         return await options_endpoint.get()
 

@@ -55,6 +55,20 @@ class TestMapPostToExcel:
         mapper = ResponseMapper()
         row = mapper.map_post_to_excel(full_post)
         assert row["content"] == "<p>Body text</p>"
+        assert row["content_path"] == ""
+
+    def test_long_content_saved_to_file(self, tmp_path):
+        mapper = ResponseMapper(content_output_dir=tmp_path)
+        long_content = "<p>" + ("x" * 33000) + "</p>"
+        row = mapper.map_post_to_excel({
+            "id": 42,
+            "slug": "hello-world",
+            "content": {"rendered": long_content},
+        })
+
+        assert row["content"] == ""
+        assert row["content_path"] == "42-hello-world.html"
+        assert (tmp_path / "42-hello-world.html").read_text(encoding="utf-8") == long_content
 
     def test_excerpt_stripped_of_html(self, full_post):
         mapper = ResponseMapper()

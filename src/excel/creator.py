@@ -28,6 +28,7 @@ class ExcelCreator:
         "featured_media",
         "image_url",
         "excerpt",
+        "content_path",
         "content"
     ]
 

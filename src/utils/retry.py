@@ -132,7 +132,11 @@ def async_retry(config: Optional[RetryConfig] = None):
                     if not is_retryable_error(e):
                         # Для ошибки "превышение страниц" используем DEBUG (это нормальная ситуация при пагинации)
                         error_msg = str(e)
-                        if "превышает количество имеющихся страниц" in error_msg or "exceeds the number of pages" in error_msg.lower():
+                        if kwargs.get("suppress_non_retryable_log"):
+                            logger.debug(
+                                f"{func.__name__}: Suppressed non-retryable error: {e}"
+                            )
+                        elif "превышает количество имеющихся страниц" in error_msg or "exceeds the number of pages" in error_msg.lower():
                             logger.debug(
                                 f"{func.__name__}: Pagination limit reached: {e}"
                             )

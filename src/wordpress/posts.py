@@ -6,7 +6,10 @@ from typing import Dict, List, Optional, Any
 from loguru import logger
 
 from .client import WordPressClient
-from ..exceptions import NotFoundError
+from ..exceptions import NotFoundError, WordPressError
+
+
+FETCH_ALL_STATUSES = ("publish", "draft", "pending", "private", "future")
 
 
 class PostsEndpoint:
@@ -91,7 +94,8 @@ class PostsEndpoint:
         self,
         per_page: int = 100,
         page: int = 1,
-        status: str = "any",
+        status: Optional[str] = None,
+        suppress_non_retryable_log: bool = False,
         **params
     ) -> List[Dict[str, Any]]:
         """
@@ -100,7 +104,7 @@ class PostsEndpoint:
         Args:
             per_page: Количество на странице (max 100)
             page: Номер страницы
-            status: Статус (publish, draft, any, etc.)
+            status: Статус (publish, draft, etc.). None/any = не передавать status.
             **params: Дополнительные параметры
 
         Returns:
@@ -109,11 +113,19 @@ class PostsEndpoint:
         query_params = {
             "per_page": min(per_page, 100),
             "page": page,
-            "status": status,
             **params
         }
 
-        result = await self.client.get(self.endpoint, query_params)
+        # WordPress REST API не везде принимает status=any, хотя это привычное
+        # значение из WP_Query. Для одиночного списка просто используем дефолт API.
+        if status and status != "any":
+            query_params["status"] = status
+
+        result = await self.client.get(
+            self.endpoint,
+            query_params,
+            suppress_non_retryable_log=suppress_non_retryable_log,
+        )
 
         # WordPress API может вернуть dict или list
         if isinstance(result, list):
@@ -146,12 +158,69 @@ class PostsEndpoint:
         Returns:
             Список всех записей
         """
+        if status in ("any", "", None):
+            posts_by_id: Dict[int, Dict[str, Any]] = {}
+
+            for current_status in FETCH_ALL_STATUSES:
+                try:
+                    status_posts = await self._get_all_for_status(
+                        current_status,
+                        suppress_non_retryable_log=current_status != "publish",
+                    )
+                except WordPressError as e:
+                    if "status" in str(e).lower():
+                        logger.warning(
+                            f"Статус '{current_status}' не поддерживается для {self.post_type}, пропускаем: {e}"
+                        )
+                        continue
+                    raise
+
+                for post in status_posts:
+                    post_id = post.get("id")
+                    if post_id is not None:
+                        posts_by_id[post_id] = post
+
+            all_posts = list(posts_by_id.values())
+            logger.info(
+                f"Fetched {len(all_posts)} {self.post_type} "
+                f"(all statuses: {', '.join(FETCH_ALL_STATUSES)})"
+            )
+            return all_posts
+
+        return await self._get_all_for_status(status)
+
+    async def _get_all_for_status(
+        self,
+        status: str,
+        context: Optional[str] = None,
+        suppress_non_retryable_log: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Получить все записи одного REST-совместимого статуса."""
         all_posts = []
         page = 1
         per_page = 100
 
         while True:
-            posts = await self.list(per_page=per_page, page=page, status=status)
+            params = {"context": context} if context else {}
+            try:
+                posts = await self.list(
+                    per_page=per_page,
+                    page=page,
+                    status=status,
+                    suppress_non_retryable_log=suppress_non_retryable_log,
+                    **params,
+                )
+            except WordPressError as e:
+                if context is None and "status" in str(e).lower():
+                    logger.debug(
+                        f"Retrying {self.post_type} status='{status}' with context=edit"
+                    )
+                    return await self._get_all_for_status(
+                        status,
+                        context="edit",
+                        suppress_non_retryable_log=True,
+                    )
+                raise
 
             if not posts:
                 break

@@ -82,9 +82,14 @@ class WordPressClient:
     def _handle_error(self, response: httpx.Response):
         """Обработка ошибок HTTP"""
         if response.status_code == 401:
+            try:
+                error_data = response.json()
+                message = error_data.get("message", response.text[:200])
+            except Exception:
+                message = response.text[:200]
             raise AuthenticationError(
                 f"Ошибка аутентификации. Проверьте credentials. "
-                f"URL: {response.url}"
+                f"URL: {response.url}. {message}"
             )
 
         if response.status_code == 404:
@@ -146,7 +151,8 @@ class WordPressClient:
     async def _get_with_retry(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None
+        params: Optional[Dict[str, Any]] = None,
+        suppress_non_retryable_log: bool = False,
     ) -> Dict[str, Any]:
         """Внутренний GET метод с retry."""
         if self._client is None:
@@ -234,9 +240,19 @@ class WordPressClient:
     # Public methods with circuit breaker
     # ========================================
 
-    async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        suppress_non_retryable_log: bool = False,
+    ) -> Dict[str, Any]:
         """GET запрос с retry и circuit breaker."""
-        return await self._with_circuit_breaker(self._get_with_retry, endpoint, params)
+        return await self._with_circuit_breaker(
+            self._get_with_retry,
+            endpoint,
+            params,
+            suppress_non_retryable_log=suppress_non_retryable_log,
+        )
 
     async def post(self, endpoint: str, data: Dict[str, Any], files: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """POST запрос с retry и circuit breaker."""
@@ -250,7 +266,7 @@ class WordPressClient:
         """DELETE запрос с retry и circuit breaker."""
         return await self._with_circuit_breaker(self._delete_with_retry, endpoint, params)
 
-    async def test_connection(self) -> bool:
+    async def test_connection(self, authenticated: bool = False) -> bool:
         """
         Проверка подключения к WordPress API.
 
@@ -261,8 +277,12 @@ class WordPressClient:
             AuthenticationError, NetworkError
         """
         try:
-            await self.get("/wp-json/wp/v2/")
-            logger.info(f"✓ Подключение к WordPress API успешно: {self.base_url}")
+            if authenticated:
+                await self.get("/wp-json/wp/v2/users/me")
+                logger.info(f"✓ Авторизованное подключение к WordPress API успешно: {self.base_url}")
+            else:
+                await self.get("/wp-json/wp/v2/")
+                logger.info(f"✓ Подключение к WordPress API успешно: {self.base_url}")
             return True
         except Exception as e:
             logger.error(f"✗ Ошибка подключения к WordPress API: {e}")

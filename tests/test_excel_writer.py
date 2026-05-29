@@ -8,6 +8,7 @@ from pathlib import Path
 from openpyxl import Workbook
 
 from src.excel.writer import ExcelWriter, normalize_api_value
+from src.exceptions import ExcelError
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
@@ -85,6 +86,32 @@ class TestUpdateRow:
         writer.load()
         # Не должно падать при несуществующем листе
         writer.update_row("nonexistent_sheet", 0, {"id": "1"})
+
+
+class TestSaveLimits:
+    def test_save_rejects_values_that_excel_would_truncate(self, excel_file_with_posts):
+        writer = ExcelWriter(excel_file_with_posts)
+        writer.load()
+        writer.update_row("posts", 0, {"title": "x" * 32768})
+
+        with pytest.raises(ExcelError, match="Excel cell limit exceeded"):
+            writer.save()
+
+
+class TestReplaceRows:
+    def test_replace_rows_preserves_new_columns(self, excel_file_with_posts):
+        writer = ExcelWriter(excel_file_with_posts)
+        writer.load()
+
+        writer.replace_rows("posts", [{
+            "id": "1",
+            "action": "skip",
+            "title": "Hello",
+            "new_field": "kept",
+        }])
+
+        assert "new_field" in writer._dataframes["posts"].columns
+        assert writer._dataframes["posts"].at[0, "new_field"] == "kept"
 
 
 # ── ExcelWriter dirty-флаг ─────────────────────────────────────────────

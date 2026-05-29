@@ -173,7 +173,8 @@ def fetch(
             status=status,
             limit=limit,
             auto_mode=auto_mode,
-            exclude=exclude
+            exclude=exclude,
+            content_output_dir=proj.content_folder if proj.active else Path("data/content"),
         ))
 
         console.print(f"\n[bold green]SUCCESS! Данные добавлены в Excel![/bold green]\n")
@@ -186,7 +187,8 @@ async def fetch_and_append(
     status: str,
     limit: Optional[int],
     auto_mode: bool = False,
-    exclude: Optional[str] = None
+    exclude: Optional[str] = None,
+    content_output_dir: Optional[Path] = None,
 ):
     """
     Получить данные из WordPress и добавить в Excel.
@@ -208,11 +210,12 @@ async def fetch_and_append(
 
             # 1. Обнаружение типов записей
             logger.info("Обнаружение типов записей...")
-            all_post_types = await discovery.discover_post_types()
+            explicit_sheets = bool(sheets)
+            all_post_types = await discovery.discover_post_types(include_skipped=explicit_sheets)
 
             # 2. Обнаружение таксономий
             logger.info("Обнаружение таксономий...")
-            all_taxonomies = await discovery.discover_taxonomies()
+            all_taxonomies = await discovery.discover_taxonomies(include_skipped=explicit_sheets)
 
             # 3. Если указан --sheets, фильтруем
             if sheets:
@@ -314,6 +317,7 @@ async def fetch_and_append(
             mapper = ResponseMapper(
                 taxonomy_cache=taxonomy_cache,
                 nested_paths=Settings().get_seo_fields(),
+                content_output_dir=content_output_dir,
             )
 
             for sheet_name, sheet_meta in sheets_data.items():
@@ -374,6 +378,7 @@ async def fetch_and_append(
         mapper = ResponseMapper(
             taxonomy_cache=taxonomy_cache_data,
             nested_paths=Settings().get_seo_fields(),
+            content_output_dir=content_output_dir,
         )
 
         excel_writer = ExcelWriter(excel_file)

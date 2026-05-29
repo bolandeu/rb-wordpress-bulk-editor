@@ -105,8 +105,21 @@ class TestGet:
                 transport=transport,
                 follow_redirects=True,
             )
-            with pytest.raises(AuthenticationError):
+            with pytest.raises(AuthenticationError, match="URL: https://example.com/wp-json/wp/v2/posts"):
                 await client.get("/wp-json/wp/v2/posts")
+
+    async def test_authenticated_connection_checks_current_user(self):
+        config = make_config()
+        transport = mock_transport({
+            "GET https://example.com/wp-json/wp/v2/users/me": httpx.Response(200, json={"id": 1})
+        })
+        async with WordPressClient(config) as client:
+            client._client = httpx.AsyncClient(
+                base_url="https://example.com",
+                transport=transport,
+                follow_redirects=True,
+            )
+            assert await client.test_connection(authenticated=True) is True
 
     async def test_get_raises_server_error(self):
         config = make_config()

@@ -11,7 +11,11 @@ from openpyxl import load_workbook
 from loguru import logger
 
 from ..constants import TAXONOMY_DELIMITER
+from ..exceptions import ExcelError
 from ..utils.wp_helpers import convert_taxonomy_ids_to_names
+
+
+EXCEL_CELL_CHAR_LIMIT = 32767
 
 
 def _coerce_for_column(column: pd.Series, value: Any) -> Any:
@@ -26,6 +30,26 @@ def _coerce_for_column(column: pd.Series, value: Any) -> Any:
             return pd.NA
         return str(value)
     return value
+
+
+def _find_oversized_cells(
+    dataframes: Dict[str, pd.DataFrame],
+    limit: int = EXCEL_CELL_CHAR_LIMIT,
+) -> List[str]:
+    """Найти значения, которые Excel всё равно обрежет при сохранении."""
+    problems = []
+
+    for sheet_name, df in dataframes.items():
+        for column in df.columns:
+            series = df[column].dropna()
+            for index, value in series.items():
+                if isinstance(value, str) and len(value) > limit:
+                    excel_row = int(index) + 2  # +1 header, +1 zero-based index
+                    problems.append(
+                        f"{sheet_name}!{column}{excel_row}: {len(value)} chars"
+                    )
+
+    return problems
 
 
 def normalize_api_value(value: Any) -> Any:
@@ -156,13 +180,17 @@ class ExcelWriter:
         # Создаем DataFrame из новых строк
         new_df = pd.DataFrame(rows)
 
-        # Убеждаемся что все колонки существуют
+        # Убеждаемся что все старые колонки существуют
         for col in df.columns:
             if col not in new_df.columns:
                 new_df[col] = ""
 
-        # Сохраняем порядок колонок как в исходном листе
-        new_df = new_df[df.columns]
+        # Сохраняем старый порядок и добавляем новые колонки из fetch/мапперов.
+        # Это важно для content_path: старые Excel-файлы могли быть без этой колонки.
+        ordered_columns = list(df.columns) + [
+            col for col in new_df.columns if col not in df.columns
+        ]
+        new_df = new_df[ordered_columns]
 
         # Добавляем новые строки
         self._dataframes[sheet_name] = pd.concat(
@@ -198,13 +226,17 @@ class ExcelWriter:
         # Создаем новый DataFrame из новых строк
         new_df = pd.DataFrame(rows)
 
-        # Убеждаемся что все колонки существуют
+        # Убеждаемся что все старые колонки существуют
         for col in df.columns:
             if col not in new_df.columns:
                 new_df[col] = ""
 
-        # Сохраняем порядок колонок как в исходном листе
-        new_df = new_df[df.columns]
+        # Сохраняем старый порядок и добавляем новые колонки из fetch/мапперов.
+        # Это важно для content_path: старые Excel-файлы могли быть без этой колонки.
+        ordered_columns = list(df.columns) + [
+            col for col in new_df.columns if col not in df.columns
+        ]
+        new_df = new_df[ordered_columns]
 
         # Заменяем все строки новыми данными
         self._dataframes[sheet_name] = new_df
@@ -439,6 +471,16 @@ class ExcelWriter:
         logger.info(f"Saving changes to Excel file: {self.excel_file}")
 
         try:
+            oversized_cells = _find_oversized_cells(self._dataframes)
+            if oversized_cells:
+                details = "; ".join(oversized_cells[:20])
+                extra = "" if len(oversized_cells) <= 20 else f"; ... and {len(oversized_cells) - 20} more"
+                raise ExcelError(
+                    "Excel cell limit exceeded. Values longer than "
+                    f"{EXCEL_CELL_CHAR_LIMIT} characters must be moved to files "
+                    f"before saving: {details}{extra}"
+                )
+
             # Используем ExcelWriter из pandas для записи всех листов
             with pd.ExcelWriter(
                 self.excel_file,

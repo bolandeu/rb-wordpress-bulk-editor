@@ -2,12 +2,16 @@
 Преобразование ответов WordPress API в формат Excel
 """
 
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from loguru import logger
 import re
 
 from ..constants import read_nested_value
 from ..utils.wp_helpers import wp_rendered, convert_taxonomy_ids_to_names
+
+
+LONG_CONTENT_THRESHOLD = 32000
 
 
 class ResponseMapper:
@@ -19,6 +23,7 @@ class ResponseMapper:
         self,
         taxonomy_cache: Optional[Dict[str, Dict[int, str]]] = None,
         nested_paths: Optional[List[str]] = None,
+        content_output_dir: Optional[Path] = None,
     ):
         """
         Args:
@@ -26,9 +31,12 @@ class ResponseMapper:
             nested_paths: Dot-пути к вложенным полям, которые надо извлечь из ответа
                 и записать в Excel-колонки с теми же именами (например, `seo.title`).
                 Источник — обычно WP_SEO_FIELDS из .env проекта.
+            content_output_dir: Папка для HTML файлов, если content не помещается
+                в одну Excel ячейку.
         """
         self.taxonomy_cache = taxonomy_cache or {}
         self.nested_paths = nested_paths or []
+        self.content_output_dir = content_output_dir
 
     def map_post_to_excel(self, post: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -57,6 +65,8 @@ class ResponseMapper:
         # Title, Content, Excerpt (могут быть объектами с 'rendered')
         row["title"] = wp_rendered(post.get("title", {}))
         row["content"] = wp_rendered(post.get("content", {}))
+        row["content_path"] = ""
+        self._move_long_content_to_file(row, post)
         row["excerpt"] = wp_rendered(post.get("excerpt", {}))
         if row["excerpt"]:
             row["excerpt"] = re.sub(r"<[^>]+>", "", row["excerpt"]).strip()
@@ -131,6 +141,34 @@ class ResponseMapper:
         logger.debug(f"Mapped post ID={post.get('id')} to Excel row")
         return row
 
+    def _move_long_content_to_file(self, row: Dict[str, Any], post: Dict[str, Any]):
+        """Сохранить слишком длинный HTML в файл, чтобы Excel не обрезал ячейку."""
+        content = row.get("content")
+        if not isinstance(content, str) or len(content) <= LONG_CONTENT_THRESHOLD:
+            return
+
+        if not self.content_output_dir:
+            logger.warning(
+                f"Content for post ID={post.get('id')} is too long for Excel "
+                f"({len(content)} chars) and may be truncated"
+            )
+            return
+
+        self.content_output_dir.mkdir(parents=True, exist_ok=True)
+        post_id = post.get("id") or "no-id"
+        slug = str(post.get("slug") or f"post-{post_id}")
+        safe_slug = re.sub(r"[^A-Za-z0-9._-]+", "-", slug).strip("-") or f"post-{post_id}"
+        filename = f"{post_id}-{safe_slug}.html"
+        content_file = self.content_output_dir / filename
+
+        content_file.write_text(content, encoding="utf-8")
+        row["content"] = ""
+        row["content_path"] = filename
+        logger.info(
+            f"Content for post ID={post_id} saved to {content_file} "
+            f"({len(content)} chars)"
+        )
+
     @staticmethod
     def map_term_to_excel(term: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -178,4 +216,3 @@ class ResponseMapper:
 
         logger.debug(f"Mapped term ID={term.get('id')} to Excel row")
         return row
-
