@@ -233,9 +233,12 @@ class RoutingClient:
         self.next_term_id = 100
         self.created_posts = []
         self.put_calls = []
+        self.term_queries = []
 
     async def get(self, endpoint, params=None, **kwargs):
         params = params or {}
+        if endpoint == self.TERMS_ENDPOINT:
+            self.term_queries.append(params)
         result = self.terms
         if "search" in params:
             result = [t for t in result if params["search"].lower() in t["name"].lower()]
@@ -313,6 +316,90 @@ class TestTaxonomyHierarchyEndToEnd:
         assert report.created == 1
         assert report.errors == []
         assert client.created_posts[0]["services_cat"] == [100]
+
+
+class TestTaxonomyDryRunDoesNotCreate:
+    """--dry-run не должен создавать реальные термины таксономии на сайте."""
+
+    async def test_missing_term_not_created(self, dry_run_config):
+        """Термин, которого ещё нет на сайте: под dry-run — только поиск, без create."""
+        client = RoutingClient()
+        records = [Record(
+            discriminator="posts",
+            is_taxonomy=False,
+            data={"id": "", "action": "add", "title": "Post", "services_cat": "Новая категория"},
+            write_key=0,
+        )]
+
+        sync = ContentSync(client, dry_run_config, TaxonomyCache())
+        report = await sync.sync_records("posts", records, writer=None)
+
+        assert report.created == 1
+        # Ни один термин не был создан на сайте
+        assert client.terms == []
+        # Поиск (read-only) всё же выполнялся — превью остаётся точным
+        assert any("search" in q for q in client.term_queries)
+        # И сам пост не создавался (dry-run вообще без записи)
+        assert client.created_posts == []
+        assert client.put_calls == []
+
+    async def test_existing_term_still_looked_up(self, dry_run_config):
+        """Уже существующий термин находится под dry-run как обычно (без create)."""
+        client = RoutingClient()
+        client.terms.append({"id": 100, "name": "Портьеры", "parent": 0})
+        records = [Record(
+            discriminator="posts",
+            is_taxonomy=False,
+            data={"id": "", "action": "add", "title": "Post", "services_cat": "Портьеры"},
+            write_key=0,
+        )]
+
+        sync = ContentSync(client, dry_run_config, TaxonomyCache())
+        report = await sync.sync_records("posts", records, writer=None)
+
+        assert report.created == 1
+        # Термин не задублировался и не был "создан" повторно
+        assert client.terms == [{"id": 100, "name": "Портьеры", "parent": 0}]
+        assert any("search" in q for q in client.term_queries)
+
+    async def test_hierarchy_missing_ancestors_not_created(self, dry_run_config):
+        """Иерархический термин с несуществующими предками: под dry-run ничего не создаётся."""
+        client = RoutingClient()
+        records = [Record(
+            discriminator="posts",
+            is_taxonomy=False,
+            data={
+                "id": "",
+                "action": "add",
+                "title": "Post",
+                "services_cat": "термин1; термин2>термин2.1",
+            },
+            write_key=0,
+        )]
+
+        sync = ContentSync(client, dry_run_config, TaxonomyCache())
+        report = await sync.sync_records("posts", records, writer=None)
+
+        assert report.created == 1
+        assert client.terms == []
+        assert client.put_calls == []
+
+    async def test_primary_term_meta_not_written(self, dry_run_config):
+        """Primary-термин под dry-run не пишется в мета-поле (нет реального PUT)."""
+        client = RoutingClient()
+        records = [Record(
+            discriminator="posts",
+            is_taxonomy=False,
+            data={"id": "", "action": "add", "title": "Post", "services_cat": "термин1"},
+            write_key=0,
+        )]
+
+        sync = ContentSync(client, dry_run_config, TaxonomyCache())
+        report = await sync.sync_records("posts", records, writer=None)
+
+        assert report.created == 1
+        assert client.terms == []
+        assert client.put_calls == []
 
 
 # ── SyncReport.from_stats() ───────────────────────────────────────────

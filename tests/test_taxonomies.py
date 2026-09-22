@@ -258,6 +258,98 @@ class TestHierarchyWithCache:
         assert nested_ids != flat_ids
 
 
+# ── dry_run: не создаёт термины на сайте ────────────────────────────
+
+class TestProcessTaxonomyStringDryRun:
+    async def test_missing_term_not_created(self):
+        """Несуществующий термин под dry_run не создаётся, возвращается ID=0."""
+        client = FakeTermsClient()
+        endpoint = TaxonomiesEndpoint(client, "categories")
+
+        term_ids, primary = await endpoint.process_taxonomy_string(
+            "Новая категория", dry_run=True
+        )
+
+        assert client.created == []
+        assert term_ids == [0]
+        assert primary == 0
+
+    async def test_existing_term_still_found(self):
+        """Уже существующий термин находится под dry_run как обычно (без create)."""
+        client = FakeTermsClient([{"id": 5, "name": "Портьеры", "parent": 0}])
+        endpoint = TaxonomiesEndpoint(client, "categories")
+
+        term_ids, primary = await endpoint.process_taxonomy_string(
+            "Портьеры", dry_run=True
+        )
+
+        assert client.created == []
+        assert term_ids == [5]
+        assert primary == 5
+
+    async def test_mixed_existing_and_missing(self):
+        """Смесь существующего и нового термина: create только не бывает вовсе."""
+        client = FakeTermsClient([{"id": 5, "name": "Портьеры", "parent": 0}])
+        endpoint = TaxonomiesEndpoint(client, "categories")
+
+        term_ids, primary = await endpoint.process_taxonomy_string(
+            "Портьеры; Новая", dry_run=True
+        )
+
+        assert client.created == []
+        assert term_ids == [5, 0]
+        assert primary == 5
+
+    async def test_hierarchy_missing_ancestors_not_created(self):
+        """Иерархия с несуществующими предками: под dry_run ничего не создаётся."""
+        client = FakeTermsClient()
+        endpoint = TaxonomiesEndpoint(client, "services_cat")
+
+        term_ids, primary = await endpoint.process_taxonomy_string(
+            "Родитель>Ребёнок", dry_run=True
+        )
+
+        assert client.created == []
+        assert client.terms == []
+        assert term_ids == [0]
+        assert primary == 0
+
+    async def test_hierarchy_existing_ancestor_still_found(self):
+        """Существующий предок находится, только недостающий потомок — placeholder."""
+        client = FakeTermsClient([{"id": 7, "name": "Родитель", "parent": 0}])
+        endpoint = TaxonomiesEndpoint(client, "services_cat")
+
+        term_ids, primary = await endpoint.process_taxonomy_string(
+            "Родитель>Ребёнок", dry_run=True
+        )
+
+        assert client.created == []
+        assert term_ids == [0]
+        assert primary == 0
+
+    async def test_dry_run_does_not_pollute_cache(self):
+        """Плейсхолдер отсутствующего термина не кэшируется как настоящий."""
+        client = FakeTermsClient()
+        cache = TaxonomyCache()
+        endpoint = TaxonomiesEndpoint(client, "categories")
+
+        first_ids, _ = await endpoint.process_taxonomy_string(
+            "Новая", taxonomy_cache=cache, dry_run=True
+        )
+        assert first_ids == [0]
+        assert client.created == []
+        # Кэш не должен думать, что термин уже существует под ID=0
+        assert cache.find("categories", "Новая") is None
+
+        # Следующий (уже не dry_run) прогон реально создаёт термин
+        second_ids, _ = await endpoint.process_taxonomy_string(
+            "Новая", taxonomy_cache=cache, dry_run=False
+        )
+        assert len(client.created) == 1
+        assert second_ids != [0]
+        assert cache.find("categories", "Новая") is not None
+
+
 # ── normalize_taxonomy_name (регресс) ───────────────────────────────
 
 class TestNormalizeTaxonomyName:

@@ -264,6 +264,7 @@ class TaxonomiesEndpoint:
         self,
         name: str,
         parent: Optional[int] = None,
+        dry_run: bool = False,
         **extra_data
     ) -> Dict[str, Any]:
         """
@@ -274,16 +275,23 @@ class TaxonomiesEndpoint:
             parent: ID родителя (0 — корневой уровень). Если задан — поиск
                 существующего термина тоже ограничен этим родителем, чтобы
                 не склеить одноимённые термины из разных веток.
+            dry_run: если True — при отсутствии термина не создавать его на
+                сайте, а вернуть плейсхолдер с ID=0 ("термин будет создан").
+                Поиск существующего термина всё равно выполняется.
             **extra_data: Дополнительные данные для создания
 
         Returns:
-            Термин (существующий или новый)
+            Термин (существующий или новый/плейсхолдер при dry_run)
         """
         # Пытаемся найти
         existing = await self.find_by_name(name, parent=parent)
         if existing:
             logger.debug(f"Found existing {self.taxonomy}: {name} (ID={existing['id']})")
             return existing
+
+        if dry_run:
+            logger.info(f"[DRY-RUN] Would create {self.taxonomy} term: {name}")
+            return {"id": 0, "name": name, "parent": parent or 0}
 
         # Создаем новый
         data = {"name": name, **extra_data}
@@ -294,7 +302,8 @@ class TaxonomiesEndpoint:
     async def resolve_term_spec(
         self,
         names: Sequence[str],
-        taxonomy_cache: Optional["TaxonomyCache"] = None
+        taxonomy_cache: Optional["TaxonomyCache"] = None,
+        dry_run: bool = False
     ) -> int:
         """
         Разрешить одну спецификацию термина (возможно, иерархическую) в ID.
@@ -305,15 +314,22 @@ class TaxonomiesEndpoint:
         Args:
             names: Цепочка имён, например ["Термин2", "Термин2.1"]
             taxonomy_cache: Опциональный кэш терминов
+            dry_run: если True — термины не создаются на сайте (см.
+                get_or_create/get_or_create_cached). Как только в цепочке
+                встретился ещё не существующий предок (ID=0), дальнейшие
+                уровни не имеет смысла искать по API под несуществующим
+                parent — они тоже считаются "будущими" термина-ми.
 
         Returns:
-            ID последнего термина цепочки (он и присваивается записи)
+            ID последнего термина цепочки (он и присваивается записи;
+            0 — если термин(ы) ещё не существуют и dry_run их не создал)
 
         Raises:
             ValidationError: таксономия неиерархическая — WordPress молча
                 игнорирует `parent`, и термин создаётся на верхнем уровне
         """
         parent_id: Optional[int] = None
+        pending_ancestor = False  # dry-run: предок ещё не существует на сайте
 
         for depth, name in enumerate(names):
             # Плоская спецификация (один уровень) — поиск без ограничения по
@@ -326,10 +342,16 @@ class TaxonomiesEndpoint:
             else:
                 parent = parent_id
 
-            if taxonomy_cache:
-                term = await self.get_or_create_cached(name, taxonomy_cache, parent=parent)
+            if pending_ancestor:
+                # Родитель сам ещё не существует — искать под ним нечего,
+                # термин тоже будет создан
+                term = {"id": 0, "name": name, "parent": parent or 0}
+            elif taxonomy_cache:
+                term = await self.get_or_create_cached(
+                    name, taxonomy_cache, parent=parent, dry_run=dry_run
+                )
             else:
-                term = await self.get_or_create(name, parent=parent)
+                term = await self.get_or_create(name, parent=parent, dry_run=dry_run)
 
             # Для неиерархической таксономии WordPress игнорирует `parent` при
             # создании: термин уезжает на верхний уровень, и на следующем запуске
@@ -343,6 +365,9 @@ class TaxonomiesEndpoint:
                     f"Уберите иерархию '{TAXONOMY_HIERARCHY_DELIMITER}' из '{spec_label}'"
                 )
 
+            if dry_run and term.get("id") == 0:
+                pending_ancestor = True
+
             parent_id = int(term["id"])
 
         return parent_id
@@ -350,7 +375,8 @@ class TaxonomiesEndpoint:
     async def process_taxonomy_string(
         self,
         taxonomy_string: str,
-        taxonomy_cache: Optional["TaxonomyCache"] = None
+        taxonomy_cache: Optional["TaxonomyCache"] = None,
+        dry_run: bool = False
     ) -> Tuple[List[int], Optional[int]]:
         """
         Обработать строку с таксономиями из Excel/JSON.
@@ -363,6 +389,9 @@ class TaxonomiesEndpoint:
         Args:
             taxonomy_string: Строка с терминами через разделитель
             taxonomy_cache: Опциональный кэш для обновления при создании новых терминов
+            dry_run: если True — термины только ищутся, реальных create-запросов
+                к API не будет; отсутствующий термин возвращается с ID=0
+                (см. resolve_term_spec)
 
         Returns:
             (список ID терминов, ID основного термина или None)
@@ -384,7 +413,7 @@ class TaxonomiesEndpoint:
 
         for index, names in enumerate(term_specs):
             try:
-                term_id = await self.resolve_term_spec(names, taxonomy_cache)
+                term_id = await self.resolve_term_spec(names, taxonomy_cache, dry_run=dry_run)
             except ValidationError:
                 # Ошибка описания таксономии в данных — не глушим, пусть запись
                 # упадёт с понятной причиной
@@ -407,6 +436,7 @@ class TaxonomiesEndpoint:
         name: str,
         taxonomy_cache: "TaxonomyCache",
         parent: Optional[int] = None,
+        dry_run: bool = False,
         **extra_data
     ) -> Dict[str, Any]:
         """
@@ -419,10 +449,14 @@ class TaxonomiesEndpoint:
             parent: ID родителя (0 — корневой уровень). Если задан — используется
                 отдельный индекс кэша по (parent, имя), чтобы одноимённые термины
                 из разных веток не склеивались.
+            dry_run: если True — при отсутствии термина не создавать его на
+                сайте, а вернуть плейсхолдер с ID=0 ("термин будет создан").
+                Плейсхолдер в кэш не кладётся — иначе следующая запись того же
+                запуска приняла бы фиктивный ID за уже существующий термин.
             **extra_data: Дополнительные данные для создания
 
         Returns:
-            Термин (существующий или новый)
+            Термин (существующий или новый/плейсхолдер при dry_run)
         """
         # Блокируем для предотвращения race condition при создании
         async with taxonomy_cache._get_lock():
@@ -442,6 +476,10 @@ class TaxonomiesEndpoint:
                 # Добавляем в кэш (внутри lock)
                 self._cache_term(taxonomy_cache, existing, parent)
                 return existing
+
+            if dry_run:
+                logger.info(f"[DRY-RUN] Would create {self.taxonomy} term: {name}")
+                return {"id": 0, "name": name, "parent": parent or 0}
 
             # Создаем новый
             data = {"name": name, **extra_data}

@@ -175,6 +175,17 @@ json в корне проекта, внутри формата приорите�
 тестами `test_dry_run_does_not_touch_the_file` (json, побайтово) и
 `test_dry_run_does_not_touch_the_excel_file` (xlsx, по значениям ячеек).
 
+**`--dry-run` больше не создаёт реальные термины таксономии.** Раньше
+`_process_taxonomies` вызывал `get_or_create`/`get_or_create_cached` безусловно,
+и превью «без изменений» на самом деле создавало на сайте недостающие термины
+(включая предков иерархии `>` и мета-поле primary-термина). Теперь `dry_run`
+пробрасывается до `TaxonomiesEndpoint.get_or_create`/`get_or_create_cached`:
+поиск существующего термина выполняется как обычно (для точного превью), а
+create-запрос — нет; отсутствующий термин возвращается плейсхолдером с ID=0
+и не кладётся в кэш как настоящий. Тесты — `TestProcessTaxonomyStringDryRun`
+(`tests/test_taxonomies.py`) и `TestTaxonomyDryRunDoesNotCreate`
+(`tests/test_content_sync.py`).
+
 ---
 
 ## Обнаружение полей (FieldDetector)

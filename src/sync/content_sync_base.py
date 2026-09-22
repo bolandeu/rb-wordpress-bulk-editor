@@ -385,6 +385,10 @@ class ContentSyncBase(BaseSync):
         """
         Обработать таксономии из записи.
 
+        Уважает self.config.sync.dry_run: термины по-прежнему ищутся (это
+        безопасно и нужно для точного превью), но не создаются — отсутствующий
+        термин возвращается с ID=0 (см. TaxonomiesEndpoint.process_taxonomy_string).
+
         Args:
             row: Запись (Mapping поле → значение)
             mapper: ContentMapper
@@ -421,9 +425,12 @@ class ContentSyncBase(BaseSync):
             tax_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_tax_field)
 
             # Обрабатываем строку с таксономиями (передаем кэш для обновления)
+            # dry_run пробрасывается до create-веток get_or_create*: поиск
+            # существующих терминов выполняется как обычно, но ничего не создаётся
             term_ids, primary_id = await tax_endpoint.process_taxonomy_string(
                 str(value),
-                taxonomy_cache=self.taxonomy_cache
+                taxonomy_cache=self.taxonomy_cache,
+                dry_run=self.config.sync.dry_run
             )
 
             if term_ids:
@@ -446,6 +453,9 @@ class ContentSyncBase(BaseSync):
         Best-effort: если мета-поле не зарегистрировано в REST или запрос упал —
         логируем предупреждение и продолжаем, привязка терминов к записи уже
         выполнена и от этого вызова не зависит.
+
+        Вызывается только из не-dry-run веток _add_item/_update_item (dry-run
+        уходит на return раньше) — под --dry-run реального PUT не будет.
 
         Args:
             posts_endpoint: PostsEndpoint
