@@ -9,13 +9,13 @@ CLI синхронизации WordPress ↔ данные проекта (Excel 
 ## Установка
 
 ```bash
-uv tool install "git+https://github.com/<owner>/<repo>.git"
+uv tool install "git+https://github.com/bolandeu/worppress-bulk-editor.git"
 uv tool upgrade wp-bulk-editor
 ```
 
 Репозиторий приватный: `uv tool install` ходит через git, авторизация — та же,
 что у `git clone` (credential helper после `gh auth login`, либо форма
-`git+ssh://git@github.com/<owner>/<repo>.git`).
+`git+ssh://git@github.com/bolandeu/worppress-bulk-editor.git`).
 
 ## Вывод
 

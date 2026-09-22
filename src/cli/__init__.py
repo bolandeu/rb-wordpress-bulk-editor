@@ -18,7 +18,7 @@ from typing import Optional
 
 import typer
 
-from .project import check_cli_compat, resolve_project
+from .project import PACKAGE_NAME, check_cli_compat, installed_version, resolve_project
 from .. import output
 from ..data import read_skill_doc
 from ..exceptions import CliTooOld, ConfigurationError
@@ -42,6 +42,15 @@ def _print_skill_doc(value: bool) -> None:
     if not value:
         return
     typer.echo(read_skill_doc())
+    raise typer.Exit()
+
+
+def _print_version(value: bool) -> None:
+    """--version: напечатать `<имя> <версия> — <описание>` и выйти."""
+    if not value:
+        return
+    version = installed_version() or "0.0.0-src (запущено из исходников, не установлен как пакет)"
+    typer.echo(f"{PACKAGE_NAME} {version} — WordPress Bulk Editor: Excel <-> WordPress sync")
     raise typer.Exit()
 
 
@@ -69,6 +78,13 @@ def app_callback(
         help="Напечатать бандленный SKILL.md (соглашения CLI) и выйти.",
         is_eager=True,
         callback=_print_skill_doc,
+    ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        help="Напечатать версию и выйти.",
+        is_eager=True,
+        callback=_print_version,
     ),
 ):
     """WordPress Bulk Editor - Excel <-> WordPress sync"""
