@@ -54,16 +54,17 @@ def resolve_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Optional
     return get_project(ctx).find_excel()
 
 
-def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
+def _require_file(ctx: typer.Context, explicit: Optional[Path], finder, label: str, hint: str) -> Path:
     """
-    Разрешить Excel файл с обязательным результатом.
+    Общая логика require_*_file: явный путь > путь от корня проекта > авто-поиск.
 
-    Порядок поиска:
-    1. explicit путь (абсолютный или существующий относительный)
-    2. explicit путь относительно project root (если --project активен)
-    3. Авто-поиск xlsx в папке проекта
-    4. Ошибка с подсказкой
+    Args:
+        finder: функция ProjectContext -> Optional[Path] для авто-поиска
+        label: как называть файл в подсказках
+        hint: текст ошибки, если ничего не нашлось
     """
+    from ..exceptions import ValidationError
+
     proj = get_project(ctx)
 
     if explicit is not None:
@@ -76,7 +77,7 @@ def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
         if proj.active:
             project_path = proj.root / explicit
             if project_path.exists():
-                _note(ctx, f"Excel файл: {project_path.name} (из проекта {proj.name})")
+                _note(ctx, f"{label}: {project_path.name} (из проекта {proj.name})")
                 return project_path
         # Файл не найден
         checked = f" Проверены пути: {explicit}, {proj.root / explicit}." if proj.active else ""
@@ -84,12 +85,49 @@ def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
 
     # Авто-поиск в проекте
     if proj.active:
-        found = proj.find_excel()
-        if found:
-            _note(ctx, f"Excel файл (авто): {found.name}")
-            return found
+        try:
+            found = finder(proj)
+        except ValidationError as e:
+            # Неоднозначность (несколько форматов данных) — обычная ошибка аргументов.
+            _fail(ctx, e.message)
+        else:
+            if found:
+                _note(ctx, f"{label} (авто): {found.name}")
+                return found
 
-    _fail(ctx, "Укажите --file или используйте --project с xlsx-файлом в папке проекта")
+    _fail(ctx, hint)
+
+
+def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
+    """
+    Разрешить Excel файл с обязательным результатом.
+
+    Только для команд, которые по своей природе работают с Excel
+    (fetch-media, export, google-*, reshape и т.п.).
+    """
+    return _require_file(
+        ctx,
+        explicit,
+        lambda proj: proj.find_excel(),
+        "Excel файл",
+        "Укажите --file или используйте --project с xlsx-файлом в папке проекта",
+    )
+
+
+def require_data_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
+    """
+    Разрешить файл данных (xlsx или json) с обязательным результатом.
+
+    Для команд, умеющих оба источника (sync/async): конкретный источник
+    выбирается дальше по расширению файла.
+    """
+    return _require_file(
+        ctx,
+        explicit,
+        lambda proj: proj.find_data_file(),
+        "Файл данных",
+        "Укажите --file или используйте --project с xlsx/json-файлом в папке проекта",
+    )
 
 
 def resolve_logs_folder(ctx: typer.Context) -> Path:

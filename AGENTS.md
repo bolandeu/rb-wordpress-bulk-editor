@@ -1,6 +1,6 @@
 # AGENTS.md — WordPress Bulk Editor
 
-Bidirectional CLI: Excel ↔ WordPress. Async-first, project-aware, опциональный Pillow.
+Bidirectional CLI: Excel/JSON ↔ WordPress. Async-first, project-aware, опциональный Pillow.
 
 ---
 
@@ -46,6 +46,9 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 перезапись xlsx); `fetch` (перезапись существующего xlsx); `sync`/`async` —
 только необратимые пути (`media`-строки с `action=delete` и `--delete-media`:
 там `force=True`, мимо корзины), см. `_confirm_irreversible` в `sync_commands.py`.
+`--delete-media` **не зависит от источника** (featured-изображения удаляются у
+любой записи с `action=delete`, хоть из Excel, хоть из JSON) — гейт вызывается в
+обеих ветках `_open_plan`; Excel-специфичен только подсчёт media-строк.
 Удаление контента идёт в корзину (`force=False`) и подтверждения не требует.
 
 **Цепочка credentials — одна реализация.**
@@ -87,6 +90,90 @@ fetch:
     → ResponseMapper
     → ExcelWriter (создаёт или обновляет листы)
 ```
+
+---
+
+## Источники данных: Excel и JSON
+
+`sync`/`async` читают либо xlsx, либо json — **источник выбирается по расширению
+`--file`**, отдельного `--format` нет. Дальше пайплайн общий: `RecordSource` →
+группировка по дискриминатору (`sync_record_groups`) → content/taxonomy sync →
+`RecordWriter`.
+
+| | Excel (`.xlsx`) | JSON (`.json`) |
+| --- | --- | --- |
+| Набор данных | лист | ключ в `tabs` |
+| Тип записи | имя листа на весь лист | поле `type`/`taxonomy` у каждой записи |
+| Имя записи | `title` / `name` | так же |
+| Ключ writeback | label строки pandas | `_row_num` (иначе позиция в массиве) |
+| Классы | `ExcelRecordSource/Writer` | `JsonRecordSource/Writer` |
+
+Форма JSON-файла:
+
+```json
+{"project": "mw", "tabs": {
+  "options":  [{"_row_num": 2, "key": "phone", "value": "+7"}],
+  "mw.ru":    [{"_row_num": 2, "action": "add", "type": "rb_services",
+                "title": "…", "seo.title": "…", "acf.f1": "…",
+                "rb_services_cat": "Перевозки"}]}}
+```
+
+`_row_num`/`type`/`taxonomy` — метаданные источника: в payload WordPress не
+уходят, но в файле остаются. Запись, где заполнены оба или ни одного из
+`type`/`taxonomy`, — ошибка (`RecordSourceError`, exit 2) с указанием таба и
+номера записи; весь таб проверяется до отправки первой записи.
+
+**Авто-поиск файла данных** (`ProjectContext.find_data_file()`): xlsx **или**
+json в корне проекта, внутри формата приоритет у файла с именем проекта. Если в
+папке лежат оба формата — ошибка со списком кандидатов и требованием `--file`:
+молча выбирать источник нельзя.
+
+Кандидаты отбирает общий `_candidates()` (им же пользуется `find_excel()`):
+`~$*.xlsx` (локи Excel) отбрасываются, а json проверяется на форму
+(`json_source.is_data_file()` — парсится и есть объект `tabs`). Посторонний json
+в папке проекта (service-account Google и т.п.) не становится ни «данными», ни
+поводом объявить форматы неоднозначными.
+
+**Только Excel** (JSON-эквивалента нет): `fetch`, `fetch-media`, `options`,
+`validate`, `reshape`, `llm`, `export*`, `google-*`, `vlookup`. Медиа-лист
+(`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
+
+### Выбор набора данных: `--sheets`
+
+Один и тот же флаг для обоих источников: листы Excel или табы JSON через запятую.
+
+- Excel: не указан → все content-листы (+ taxonomy, если нет `--skip-tax`).
+- JSON: **обязателен**. Значения по умолчанию нет — рядом с контентом в файле
+  лежат служебные табы (`options`, `company` из `{key,label,value}`), синхронизировать
+  «всё» небезопасно. Без флага — ошибка (exit 2) со списком табов файла.
+  Несколько табов за прогон разрешены: обрабатываются по очереди, каждый со
+  своим writer'ом (файл перечитывается перед табом и сохраняется после — в том
+  числе на пути ошибки, через `finally`: иначе id уже созданных в WordPress
+  записей пропали бы и повтор создал бы их заново).
+- Выбор наборов проверяется **до** загрузки credentials: «какие табы есть в
+  файле» — вопрос к файлу, ответ не должен требовать доступа к сайту.
+- Пустой разбор (`--sheets ","`) — ошибка аргументов, а не «нечего делать, всё ок».
+
+Служебный таб, выбранный по ошибке, валится на валидации (`type`/`taxonomy` не
+заполнены) до подключения к сайту. Отдельной синхронизации настроек из JSON нет.
+
+### Фильтр записей: `--filter field=value`
+
+Повторяемый, условия объединяются по И, применяется после чтения записи и до
+маппинга — одинаково для Excel и JSON. Сравнение точное строковое по сырому
+значению поля. Dot-нотация — обычное имя поля (`--filter acf.f1=да`), понимать
+вложенность payload не требуется. `type`/`taxonomy` берутся из дискриминатора
+записи (в `Record.data` их нет). Отфильтрованные записи попадают в отчёт как
+`skipped`. Реализация — `src/records/filters.py`, подключён к `sync`/`async`.
+
+**`--dry-run` не открывает writer'ы — исправление реальной порчи файлов.**
+До этого dry-run проходил полный путь обратной записи и заливал в файл проекта
+заглушки dry-run-ответов: `id=0`, `action` у всех строк → `skip`, часть колонок
+затиралась. То есть прогон «без изменений» молча портил и xlsx, и (после
+подключения JSON) испортил бы json. Теперь `_writeback_enabled()` выключает
+обратную запись и при `--dry-run`, и при `--no-update-excel`. Регрессия закрыта
+тестами `test_dry_run_does_not_touch_the_file` (json, побайтово) и
+`test_dry_run_does_not_touch_the_excel_file` (xlsx, по значениям ячеек).
 
 ---
 
@@ -192,7 +279,10 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 
 Приоритет: CLI флаги > `.env` проекта > глобальный `.env`.
 
-**Авто-обнаружение Excel** — только для `fetch`. Остальные команды (`sync`, `async`, `llm`, `validate`, `fetch-media`) требуют явный `--file`.
+**Авто-обнаружение файла данных** — `sync`/`async` ищут xlsx **или** json в папке
+проекта (`find_data_file()`, см. «Источники данных»), Excel-специфичные команды —
+только xlsx (`find_excel()`). Явный `--file` всегда в приоритете и обязателен,
+когда в папке лежат оба формата.
 
 **Авто-обнаружение output** — `export` → `projects/<name>/exported_content/`, `export-media` → `projects/<name>/export_media/`.
 

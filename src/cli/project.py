@@ -13,7 +13,8 @@ from dataclasses import dataclass
 
 from dotenv import dotenv_values
 
-from ..exceptions import CliTooOld
+from ..exceptions import CliTooOld, ValidationError
+from ..records.json_source import is_data_file
 
 # Имя пакета и команды — для importlib.metadata и подсказки об обновлении.
 PACKAGE_NAME = "wp-bulk-editor"
@@ -25,6 +26,9 @@ MIN_VERSION_KEY = "WP_BULK_MIN_VERSION"
 # уровней даже если домашняя директория не достигнута — защита от случайного
 # .env где-нибудь совсем не по теме (например, смонтированная сетевая ФС).
 _CWD_WALK_MAX_DEPTH = 15
+
+# Расширения файлов данных проекта: источник записей выбирается по ним.
+DATA_SUFFIXES = (".xlsx", ".json")
 
 
 def find_repo_root() -> Path:
@@ -94,20 +98,68 @@ class ProjectContext:
         return value or None
 
     def find_excel(self) -> Optional[Path]:
-        """Найти xlsx файл в папке проекта."""
+        """Найти xlsx файл в папке проекта (тот же отбор, что и у find_data_file)."""
+        return self._pick(self._candidates(".xlsx"))
+
+    def _candidates(self, suffix: str) -> list:
+        """
+        Файлы проекта с данным расширением, годные в источники данных.
+
+        Отсекаются `~$*.xlsx` — временные файлы самого Excel, а не данные
+        проекта. Для json дополнительно проверяется форма (`tabs`): посторонний
+        json в папке (например, service-account Google) не должен ни
+        выбираться как данные, ни создавать мнимую неоднозначность форматов.
+        """
         if not self.root:
+            return []
+        files = sorted(
+            p for p in self.root.glob(f"*{suffix}") if not p.name.startswith("~$")
+        )
+        if suffix == ".json":
+            files = [p for p in files if is_data_file(p)]
+        return files
+
+    def _pick(self, files: list) -> Optional[Path]:
+        """Из кандидатов одного формата: единственный, иначе названный по имени проекта."""
+        if not files:
             return None
-        xlsx_files = sorted(self.root.glob("*.xlsx"))
-        if not xlsx_files:
-            return None
-        # Если один файл — он и есть
-        if len(xlsx_files) == 1:
-            return xlsx_files[0]
-        # Если есть файл с именем проекта — приоритет
-        for f in xlsx_files:
+        if len(files) == 1:
+            return files[0]
+        for f in files:
             if f.stem == self.name:
                 return f
-        return xlsx_files[0]
+        return files[0]
+
+    def find_data_file(self) -> Optional[Path]:
+        """
+        Найти файл данных проекта: xlsx или json.
+
+        Источник записей выбирается по расширению, поэтому двусмысленность
+        разруливать молча нельзя: если в папке лежат файлы обоих форматов —
+        ошибка со списком кандидатов, нужен явный `--file`. Внутри одного
+        формата приоритет у файла, названного по имени проекта.
+
+        Raises:
+            ValidationError: в папке проекта есть и xlsx, и json (exit 2).
+        """
+        if not self.root:
+            return None
+
+        by_suffix = {suffix: self._candidates(suffix) for suffix in DATA_SUFFIXES}
+        present = [suffix for suffix, files in by_suffix.items() if files]
+
+        if not present:
+            return None
+
+        if len(present) > 1:
+            names = ", ".join(f.name for suffix in present for f in by_suffix[suffix])
+            raise ValidationError(
+                f"В папке проекта {self.root} есть файлы данных разных форматов: {names}. "
+                "Формат источника определяется по расширению — укажите нужный файл явно "
+                "через --file."
+            )
+
+        return self._pick(by_suffix[present[0]])
 
     def resolve_output(self, default_name: str) -> Path:
         """Разрешить путь для export-команд."""

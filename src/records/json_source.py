@@ -64,11 +64,44 @@ def _load_tabs(path: Path) -> Dict[str, Any]:
     return document
 
 
-def _get_tab(document: Dict[str, Any], path: Path, tab_name: str) -> List[Dict[str, Any]]:
-    """Достать массив записей одного таба."""
+def _tabs_of(document: Dict[str, Any], path: Path) -> Dict[str, Any]:
+    """Объект 'tabs' файла."""
     tabs = document.get("tabs")
     if not isinstance(tabs, dict):
         raise RecordSourceError(f"В файле {path} отсутствует объект 'tabs'")
+    return tabs
+
+
+def is_data_file(path: Path) -> bool:
+    """
+    Файл годится в источник записей: парсится как JSON и содержит объект `tabs`.
+
+    Рядом с данными в папке проекта лежат посторонние json (service-account
+    Google и прочее) — авто-поиск файла данных обязан их отличать, а не
+    считать кандидатами.
+    """
+    path = Path(path)
+    try:
+        _tabs_of(_load_tabs(path), path)
+    except RecordSourceError:
+        return False
+    return True
+
+
+def tab_names(path: Path) -> List[str]:
+    """
+    Названия всех табов файла, включая служебные (`options`, `company`).
+
+    Нужно для выбора набора данных в CLI: подсказать доступные имена можно
+    ещё до того, как станет известно, какие из табов вообще синхронизируемы.
+    """
+    path = Path(path)
+    return list(_tabs_of(_load_tabs(path), path).keys())
+
+
+def _get_tab(document: Dict[str, Any], path: Path, tab_name: str) -> List[Dict[str, Any]]:
+    """Достать массив записей одного таба."""
+    tabs = _tabs_of(document, path)
 
     if tab_name not in tabs:
         available = ", ".join(tabs.keys()) or "нет"
