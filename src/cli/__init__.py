@@ -51,7 +51,8 @@ def app_callback(
     project: Optional[str] = typer.Option(
         None,
         "--project", "-P",
-        help="Имя проекта (загружает .env и пути из projects/<name>/)",
+        help="Путь к директории проекта или её имя внутри projects/ (по умолчанию — "
+        "автопоиск .env вверх от текущей директории)",
         envvar="WP_PROJECT",
     ),
     json_output: bool = typer.Option(False, "--json", help="Машиночитаемый JSON-вывод."),
