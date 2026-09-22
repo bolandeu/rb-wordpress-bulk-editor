@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "wp-bulk-editor"
 version = "1.0.0"
 description = "WordPress Bulk Editor - Excel <-> WordPress sync"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2.0",
     "openpyxl>=3.1.0",
@@ -27,6 +27,7 @@ dependencies = [
     "google-auth>=2.23.0",
     "google-auth-oauthlib>=1.1.0",
     "google-auth-httplib2>=0.1.1",
+    "llmkit",
 ]
 
 [project.scripts]
@@ -46,7 +47,7 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 # S — bandit-правила безопасности (обязательны протоколом cli-builder).
@@ -66,11 +67,14 @@ omit = ["src/__main__.py", "src/cli/__main__.py"]
 fail_under = 40
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[tool.uv.sources]
+llmkit = { git = "https://github.com/bolandeu/llmkit" }
 
 [dependency-groups]
 dev = [

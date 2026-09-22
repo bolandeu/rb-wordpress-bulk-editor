@@ -1,5 +1,6 @@
 """
-LLM Client для массовой генерации контента через OpenAI-compatible API
+LLM Client: текст — через общую библиотеку llmkit, изображения — свой
+OpenAI-compatible вызов (в llmkit генерации картинок нет).
 """
 
 import re
@@ -10,6 +11,7 @@ import requests
 from loguru import logger
 import markdown
 from bs4 import BeautifulSoup
+from llmkit import LlmKit
 
 
 class LLMError(Exception):
@@ -22,92 +24,92 @@ _PLACEHOLDER_RE = re.compile(r'\[([^\]]+)\]')
 
 class LLMClient:
     """
-    Клиент для работы с LLM API (OpenAI-compatible).
+    Клиент для генерации контента.
 
-    Поддерживает:
-    - Streaming ответы
-    - Fallback между моделями
-    - Retry с exponential backoff
-    - Гибкий парсинг ответа
+    Текст (`generate`) уходит в llmkit: цепочки моделей с фолбэком, ретраи по
+    типу ошибки, кэш и учёт стоимости — всё это настроено в конфиге llmkit
+    (`~/Library/Application Support/llmkit/config.toml`), ключи провайдеров
+    берутся оттуда же / из связки ключей ОС, а не из .env этого инструмента.
+
+    Изображения (`generate_image`) идут старым путём: endpoint + token +
+    fallback между моделями вручную.
     """
 
     def __init__(
         self,
-        endpoint: str,
-        token: str,
-        timeout: int = 120,
+        endpoint: Optional[str] = None,
+        token: Optional[str] = None,
         image_timeout: int = 300,
         connect_timeout: int = 10,
+        tags: Optional[Dict[str, str]] = None,
+        kit: Optional[LlmKit] = None,
     ):
         """
         Args:
-            endpoint: URL LLM API endpoint
-            token: API token
-            timeout: Read timeout для текстовых запросов (секунды)
+            endpoint: URL LLM API endpoint (только для генерации изображений)
+            token: API token (только для генерации изображений)
             image_timeout: Read timeout для генерации изображений (секунды)
             connect_timeout: Connect timeout (секунды)
+            tags: Метки для учёта расходов в llmkit (`llm cost --by tool`)
+            kit: Готовый экземпляр LlmKit (для тестов); иначе создаётся лениво
         """
         self.endpoint = endpoint
         self.token = token
-        self.timeout = timeout
         self.image_timeout = image_timeout
         self.connect_timeout = connect_timeout
+        self.tags = tags or {"tool": "wp-bulk-editor"}
+        self._kit = kit
+
+    @property
+    def kit(self) -> LlmKit:
+        """Экземпляр llmkit (создаётся при первом обращении)."""
+        if self._kit is None:
+            self._kit = LlmKit(tags=self.tags)
+        return self._kit
 
     async def generate(
         self,
         prompt: str,
-        models: List[str],
-        max_retries: int = 3
+        models: Optional[List[str]] = None,
+        level: Optional[str] = None,
     ) -> str:
         """
-        Генерировать текст с fallback между моделями.
+        Генерировать текст через llmkit.
 
         Args:
             prompt: Промпт для генерации
-            models: Список моделей (будут пробоваться по очереди)
-            max_retries: Количество попыток для каждой модели
+            models: Явная цепочка моделей "провайдер/модель" (перекрывает level)
+            level: Именованный уровень из конфига llmkit (cheap/judge/strong/...)
+
+        Если не задано ни models, ни level — llmkit берёт свой уровень по
+        умолчанию (`[defaults] level`). Ретраи и фолбэк — внутри llmkit,
+        по его секции `[retry]`.
 
         Returns:
             Сгенерированный текст
 
         Raises:
-            LLMError: Если все модели и попытки исчерпаны
+            LLMError: Если ответа нет (все модели цепочки упали)
         """
-        last_error = None
+        task_kw: Dict[str, Any] = {}
+        if models:
+            task_kw["chain"] = list(models)
+        if level:
+            task_kw["level"] = level
 
-        for model_idx, model in enumerate(models):
-            logger.info(f"Пробуем модель {model} ({model_idx + 1}/{len(models)})")
+        target = ", ".join(models) if models else (level or "уровень по умолчанию llmkit")
+        logger.info(f"Генерация текста через llmkit ({target})")
 
-            for attempt in range(max_retries):
-                try:
-                    logger.debug(f"Попытка {attempt + 1}/{max_retries} для модели {model}")
+        result = await self.kit.generate(prompt, **task_kw)
 
-                    result = await self._call_api(prompt, model)
+        if result is None or not result.strip():
+            raise LLMError(
+                f"llmkit не вернул текст ({target}): все модели цепочки упали "
+                f"или ответ пуст. Подробности — в логах llmkit."
+            )
 
-                    # Успех!
-                    logger.info(f"✓ Модель {model} успешно сгенерировала текст (попытка {attempt + 1})")
-                    return result
-
-                except (KeyboardInterrupt, SystemExit):
-                    raise
-                except Exception as e:
-                    last_error = e
-                    logger.warning(f"✗ Модель {model}, попытка {attempt + 1}/{max_retries}: {e}")
-
-                    # Если это не последняя попытка, ждем перед retry
-                    if attempt < max_retries - 1:
-                        delay = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                        logger.debug(f"Ждем {delay}s перед повтором...")
-                        await asyncio.sleep(delay)
-
-            # Все попытки для этой модели исчерпаны
-            logger.error(f"✗ Модель {model} не смогла сгенерировать текст после {max_retries} попыток")
-
-        # Все модели исчерпаны
-        raise LLMError(
-            f"Все модели ({', '.join(models)}) не смогли сгенерировать текст. "
-            f"Последняя ошибка: {last_error}"
-        )
+        logger.info(f"✓ llmkit сгенерировал текст ({len(result)} символов)")
+        return result.strip()
 
     async def generate_image(
         self,
@@ -244,132 +246,6 @@ class LLMClient:
         except Exception as e:
             logger.exception("[IMG] Full traceback:")
             raise LLMError(f"[IMG] Unexpected error: {type(e).__name__} - {str(e)}")
-
-    async def _call_api(self, prompt: str, model: str) -> str:
-        """
-        Вызвать LLM API и получить ответ (используя requests через asyncio.to_thread).
-
-        Args:
-            prompt: Промпт
-            model: Название модели
-
-        Returns:
-            Сгенерированный текст
-
-        Raises:
-            LLMError: При ошибке API
-        """
-        # Запускаем sync запрос в отдельном потоке для async совместимости
-        return await asyncio.to_thread(self._call_api_sync, prompt, model)
-
-    def _call_api_sync(self, prompt: str, model: str) -> str:
-        """
-        Синхронный вызов LLM API через requests (решает проблемы с httpx+asyncio на Windows).
-
-        Args:
-            prompt: Промпт
-            model: Название модели
-
-        Returns:
-            Сгенерированный текст
-
-        Raises:
-            LLMError: При ошибке API
-        """
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False  # Без streaming
-        }
-
-        try:
-            # Отключаем системный прокси, который вызывает ошибки
-            session = requests.Session()
-            session.trust_env = False  # Игнорируем системные прокси
-
-            response = session.post(
-                self.endpoint,
-                headers=headers,
-                json=payload,
-                timeout=(self.connect_timeout, self.timeout)
-            )
-
-            if response.status_code != 200:
-                error_text = response.text
-                logger.error(f"API returned error {response.status_code}: {error_text}")
-                raise LLMError(
-                    f"API error {response.status_code}: {error_text[:500]}"
-                )
-
-            # Парсим JSON ответ
-            result = response.json()
-
-            # Извлекаем контент из ответа (OpenAI формат)
-            if "choices" in result and len(result["choices"]) > 0:
-                message = result["choices"][0].get("message", {})
-                content = message.get("content", "")
-
-                if not content.strip():
-                    raise LLMError("API вернул пустой ответ")
-
-                return content.strip()
-            else:
-                raise LLMError(f"Неожиданный формат ответа: {str(result)[:200]}")
-
-        except requests.exceptions.Timeout as e:
-            logger.error(f"Timeout exception details: {type(e).__name__}: {str(e)}")
-            raise LLMError(f"Timeout при запросе к {self.endpoint}: {str(e)}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error details: {type(e).__name__}: {str(e)}")
-            raise LLMError(f"Network error при подключении к {self.endpoint}: {str(e)}")
-        except LLMError:
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error details: {type(e).__name__}: {str(e)}")
-            logger.exception("Full traceback:")
-            raise LLMError(f"Unexpected error при запросе к {self.endpoint}: {type(e).__name__} - {str(e)}")
-
-    def _extract_content_from_chunk(self, chunk: Dict[str, Any]) -> Optional[str]:
-        """
-        Извлечь текст из chunk ответа.
-        Поддерживает разные форматы ответа.
-
-        Args:
-            chunk: JSON chunk от API
-
-        Returns:
-            Текст или None
-        """
-        # Стандартный OpenAI формат (streaming)
-        if "choices" in chunk:
-            choices = chunk["choices"]
-            if choices and len(choices) > 0:
-                delta = choices[0].get("delta", {})
-                if "content" in delta:
-                    return delta["content"]
-
-        # Альтернативные форматы
-        # Формат 1: прямо в корне
-        if "content" in chunk:
-            return chunk["content"]
-
-        # Формат 2: в message
-        if "message" in chunk and isinstance(chunk["message"], dict):
-            if "content" in chunk["message"]:
-                return chunk["message"]["content"]
-
-        # Формат 3: в text
-        if "text" in chunk:
-            return chunk["text"]
-
-        return None
 
     @staticmethod
     def replace_placeholders(template: str, row_data: Dict[str, Any]) -> str:

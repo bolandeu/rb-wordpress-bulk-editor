@@ -819,7 +819,20 @@ def llm(
         None,
         "--model",
         "-m",
-        help="Модели через запятую (model1,model2,model3). Если не указано, используется LLM_MODELS из .env"
+        help=(
+            "Модели через запятую. Текст: цепочка llmkit ('провайдер/модель'), "
+            "по умолчанию LLM_MODELS из .env. Картинки (--column img_path): "
+            "модели endpoint'а, по умолчанию LLM_IMG_MODELS/LLM_MODELS"
+        )
+    ),
+    level: Optional[str] = typer.Option(
+        None,
+        "--level",
+        help=(
+            "Уровень llmkit (cheap/judge/strong — что настроено в его конфиге). "
+            "Только для текста, по умолчанию LLM_LEVEL из .env. Если не задан "
+            "ни --level, ни --model — llmkit берёт свой уровень по умолчанию"
+        )
     ),
     prompt: Optional[str] = typer.Option(
         None,
@@ -830,12 +843,12 @@ def llm(
     endpoint: Optional[str] = typer.Option(
         None,
         "--endpoint",
-        help="LLM API endpoint (по умолчанию из .env: LLM_ENDPOINT)"
+        help="LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_ENDPOINT"
     ),
     token: Optional[str] = typer.Option(
         None,
         "--token",
-        help="LLM API token (по умолчанию из .env: LLM_TOKEN)"
+        help="LLM API token — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_TOKEN"
     ),
     overwrite: bool = typer.Option(
         False,
@@ -880,20 +893,36 @@ def llm(
     )
 ):
     """
-    Массовая генерация контента через LLM API.
+    Массовая генерация контента через LLM.
 
     Обрабатывает строки где action=update и генерирует контент в указанную колонку.
     Поддерживает подстановку значений из других колонок через [column_name].
 
+    ТЕКСТ идёт через общую библиотеку llmkit: цепочки моделей с фолбэком, ретраи,
+    кэш и учёт стоимости. Ключи провайдеров llmkit берёт из своего конфига
+    (~/Library/Application Support/llmkit/config.toml) или связки ключей ОС —
+    НЕ из .env проекта. Нужен свой OpenAI-совместимый сервер для текста — заведите
+    его там провайдером kind = "openai_compatible"; флаги --endpoint/--token
+    на текст больше не влияют.
+
+    КАРТИНКИ (--column img_path) llmkit не умеет — они по-прежнему идут своим
+    вызовом, и только для них нужны --endpoint/--token (LLM_ENDPOINT/LLM_TOKEN)
+    и модели LLM_IMG_MODELS.
+
     Примеры:
-        # Генерация excerpt на основе title
-        llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"
+        # Генерация excerpt уровнем llmkit
+        llm --column excerpt --level cheap --prompt "Напиши короткий lead абзац к услуге [title]"
 
-        # Несколько моделей с fallback
-        llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши [title]"
+        # Явная цепочка моделей с fallback (формат llmkit: провайдер/модель)
+        llm --column description --prompt "Опиши [title]" \
+            --model "ollama/gpt-oss:120b,openrouter/openai/gpt-4o-mini"
 
-        # С конвертацией Markdown в HTML
-        llm --column content --model "gpt-4" --prompt "Напиши статью про [title]" --md-to-html
+        # С конвертацией Markdown в HTML, уровень llmkit по умолчанию
+        llm --column content --prompt "Напиши статью про [title]" --md-to-html
+
+        # Картинка: нужен endpoint + token
+        llm --column img_path --model "some-image-model" \
+            --endpoint https://api.example/v1/chat/completions --token ...
     """
     file = require_excel_file(ctx, file)
     env_file = resolve_env_file(ctx, env_file)
@@ -912,42 +941,61 @@ def llm(
         else:
             load_dotenv()
 
+        is_img = (column == "img_path")
+
+        # endpoint/token нужны только картинкам: текст ходит через llmkit,
+        # который берёт ключи из своего конфига, а не из .env проекта.
         final_endpoint = endpoint or os.getenv("LLM_ENDPOINT")
         final_token = token or os.getenv("LLM_TOKEN")
 
         # Для img_path: приоритет LLM_IMG_PROMPT/LLM_IMG_MODELS, потом LLM_PROMPT/LLM_MODELS
-        if column == "img_path":
+        if is_img:
             final_prompt = prompt or os.getenv("LLM_IMG_PROMPT") or os.getenv("LLM_PROMPT")
             final_models = model or os.getenv("LLM_IMG_MODELS") or os.getenv("LLM_MODELS")
+            final_level = None
         else:
             final_prompt = prompt or os.getenv("LLM_PROMPT")
             final_models = model or os.getenv("LLM_MODELS")
+            final_level = level or os.getenv("LLM_LEVEL")
 
-        if not final_endpoint:
+        if is_img and not final_endpoint:
             console.print("[red]ERROR: LLM_ENDPOINT не указан (используйте --endpoint или .env)[/red]\n")
             raise typer.Exit(code=1)
 
-        if not final_token:
+        if is_img and not final_token:
             console.print("[red]ERROR: LLM_TOKEN не указан (используйте --token или .env)[/red]\n")
             raise typer.Exit(code=1)
 
         if not final_prompt:
-            env_hint = "LLM_IMG_PROMPT или LLM_PROMPT" if column == "img_path" else "LLM_PROMPT"
+            env_hint = "LLM_IMG_PROMPT или LLM_PROMPT" if is_img else "LLM_PROMPT"
             console.print(f"[red]ERROR: Промпт не указан (используйте --prompt или .env: {env_hint})[/red]\n")
             raise typer.Exit(code=1)
 
-        if not final_models:
-            env_hint = "LLM_IMG_MODELS или LLM_MODELS" if column == "img_path" else "LLM_MODELS"
-            console.print(f"[red]ERROR: Модели не указаны (используйте --model или .env: {env_hint})[/red]\n")
+        # Картинкам список моделей обязателен; тексту — нет: без --model/--level
+        # llmkit возьмёт свой уровень по умолчанию.
+        if is_img and not final_models:
+            console.print(
+                "[red]ERROR: Модели не указаны "
+                "(используйте --model или .env: LLM_IMG_MODELS или LLM_MODELS)[/red]\n"
+            )
             raise typer.Exit(code=1)
 
         # 2. Парсим список моделей
-        models = [m.strip() for m in final_models.split(",") if m.strip()]
-        logger.info(f"Модели для генерации: {models}")
+        models = [m.strip() for m in (final_models or "").split(",") if m.strip()]
+        logger.info(f"Модели для генерации: {models or 'по конфигу llmkit'}")
 
-        console.print(f"[green]OK[/green] LLM Endpoint: {final_endpoint}")
         console.print(f"[green]OK[/green] Колонка: {column}")
-        console.print(f"[green]OK[/green] Модели: {', '.join(models)}")
+        if is_img:
+            console.print(f"[green]OK[/green] LLM Endpoint (картинки): {final_endpoint}")
+            console.print(f"[green]OK[/green] Модели: {', '.join(models)}")
+        else:
+            console.print("[green]OK[/green] Текст: через llmkit (ключи — из конфига llmkit)")
+            if models:
+                console.print(f"[green]OK[/green] Цепочка моделей: {', '.join(models)}")
+            elif final_level:
+                console.print(f"[green]OK[/green] Уровень: {final_level}")
+            else:
+                console.print("[green]OK[/green] Модели: уровень по умолчанию llmkit")
         console.print(f"[green]OK[/green] Промпт: {final_prompt[:100]}...")
         if dry_run:
             console.print(f"[yellow]DRY-RUN режим: изменения не будут сохранены[/yellow]")
@@ -964,9 +1012,11 @@ def llm(
             sheets=sheets,
             column=column,
             models=models,
+            level=final_level,
             prompt_template=final_prompt,
             endpoint=final_endpoint,
             token=final_token,
+            project_name=proj.name,
             overwrite=overwrite,
             dry_run=dry_run,
             strip_tags=strip_tags,
@@ -984,8 +1034,8 @@ async def _run_llm_generation(
     column: str,
     models: List[str],
     prompt_template: str,
-    endpoint: str,
-    token: str,
+    endpoint: Optional[str],
+    token: Optional[str],
     overwrite: bool,
     dry_run: bool,
     strip_tags: bool,
@@ -993,14 +1043,21 @@ async def _run_llm_generation(
     html_to_md: bool,
     log_file: Path,
     content_folder: Path = Path("data/content"),
-    media_folder: Path = Path("data/media")
+    media_folder: Path = Path("data/media"),
+    level: Optional[str] = None,
+    project_name: Optional[str] = None,
 ):
     """Основная логика генерации через LLM."""
     from ..utils.llm_client import LLMClient
     from ..excel.reader import ExcelReader
     from ..excel.writer import ExcelWriter
 
-    llm_client = LLMClient(endpoint=endpoint, token=token)
+    # Метки уезжают в журнал llmkit: `llm cost --by tool,project`
+    tags = {"tool": "wp-bulk-editor"}
+    if project_name:
+        tags["project"] = project_name
+
+    llm_client = LLMClient(endpoint=endpoint, token=token, tags=tags)
 
     # Определяем режим работы по имени колонки
     is_content_path = (column == "content_path")
@@ -1112,7 +1169,7 @@ async def _run_llm_generation(
                     generated_text = await llm_client.generate(
                         prompt=filled_prompt,
                         models=models,
-                        max_retries=3
+                        level=level,
                     )
 
                     # Применяем постобработку к тексту
@@ -1151,7 +1208,7 @@ async def _run_llm_generation(
                     generated_text = await llm_client.generate(
                         prompt=filled_prompt,
                         models=models,
-                        max_retries=3
+                        level=level,
                     )
 
                     if strip_tags:

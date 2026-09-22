@@ -264,9 +264,33 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | `WP_API_TIMEOUT` / `WP_MEDIA_TIMEOUT` | таймауты httpx |
 | `WP_MAX_RETRIES` / `WP_RETRY_DELAY` | retry параметры |
 | `WP_CIRCUIT_BREAKER_THRESHOLD` / `WP_CIRCUIT_BREAKER_RECOVERY` | CB настройки |
-| `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_MODELS` / `LLM_PROMPT` | LLM генерация |
+| `LLM_PROMPT` | промпт команды `llm` |
+| `LLM_LEVEL` / `LLM_MODELS` | ТЕКСТ: уровень или цепочка моделей llmkit |
+| `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_IMG_PROMPT` / `LLM_IMG_MODELS` | ТОЛЬКО картинки (`--column img_path`) |
 | `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_CREDENTIALS_PATH` | Google Sheets |
 | `WP_BULK_MIN_VERSION=1.2.0` | минимальная версия CLI для этого проекта |
+
+### Команда `llm`: текст через llmkit, картинки — свои
+
+Генерация **текста** идёт через общую библиотеку
+[llmkit](https://github.com/bolandeu/llmkit) (`LLMClient.generate` → `LlmKit.generate`):
+цепочки моделей с фолбэком, ретраи по типу ошибки, кэш и учёт стоимости — её,
+а не наши. Ключи провайдеров llmkit берёт из **своего** конфига
+(`~/Library/Application Support/llmkit/config.toml`) → переменной окружения →
+связки ключей ОС; `.env` проекта на это не влияет. Расходы смотреть её же CLI:
+`llm cost --by tool` (вызовы помечаются `tool=wp-bulk-editor`, `project=<имя>`).
+
+- `--level`/`LLM_LEVEL` — именованный уровень из конфига llmkit (`cheap`/`judge`/…).
+- `--model`/`LLM_MODELS` — явная цепочка `провайдер/модель` через запятую, перекрывает уровень.
+- Не задано ни то, ни другое — берётся `[defaults] level` конфига llmkit.
+- **`--endpoint`/`--token` на текст больше не действуют** (раньше — действовали).
+  Нужен свой OpenAI-совместимый сервер для текста: провайдер
+  `kind = "openai_compatible"` в конфиге llmkit, не флаг этого CLI.
+
+Генерация **картинок** (`--column img_path`) в llmkit отсутствует, поэтому
+осталась своим вызовом в `src/utils/llm_client.py::generate_image`: ей и только
+ей нужны `--endpoint`/`--token` (`LLM_ENDPOINT`/`LLM_TOKEN`), модели из
+`LLM_IMG_MODELS` и промпт из `LLM_IMG_PROMPT`.
 
 ---
 
