@@ -2,7 +2,6 @@
 Загрузка медиафайлов в WordPress
 """
 
-import base64
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -11,7 +10,8 @@ import mimetypes
 from loguru import logger
 
 from .client import WordPressClient
-from ..exceptions import MediaUploadError
+from ..config import Settings
+from ..exceptions import MediaUploadError, ValidationError, WPBulkEditorError
 
 
 class MediaEndpoint:
@@ -22,16 +22,11 @@ class MediaEndpoint:
         self.endpoint = "/wp-json/wp/v2/media"
 
     def _build_upload_headers(self, filename: str, mime_type: str) -> Dict[str, str]:
-        """Собрать заголовки для загрузки файла (авторизация + Content-Disposition)."""
-        headers = {
+        """Заголовки конкретно для загрузки файла (авторизацию добавит провайдер)."""
+        return {
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": mime_type,
         }
-        if self.client.config.username and self.client.config.password:
-            auth_string = f"{self.client.config.username}:{self.client.config.password}"
-            auth_b64 = base64.b64encode(auth_string.encode("utf-8")).decode("ascii")
-            headers["Authorization"] = f"Basic {auth_b64}"
-        return headers
 
     def _parse_upload_response(self, response: httpx.Response, fallback_filename: str = "") -> Dict[str, Any]:
         """
@@ -75,28 +70,29 @@ class MediaEndpoint:
         )
 
     async def _upload_data(self, file_data: bytes, filename: str, mime_type: str) -> Dict[str, Any]:
-        """Отправить бинарные данные в WordPress Media API через httpx."""
-        url = f"{self.client.config.url.rstrip('/')}{self.endpoint}"
-        headers = self._build_upload_headers(filename, mime_type)
+        """
+        Отправить бинарные данные в WordPress Media API.
 
-        logger.debug(f"Sending POST request to {url}")
+        Идёт через общий провайдер — то есть с теми же авторизацией, verify_ssl,
+        retry и circuit breaker, что и остальные запросы. Разбор ответа остаётся
+        терпимым (`_parse_upload_response`), потому что PHP-хостинги любят
+        подмешать warnings перед JSON.
+        """
+        headers = self._build_upload_headers(filename, mime_type)
+        logger.debug(f"Sending POST request to {self.endpoint}")
         logger.debug(f"Headers: {headers}")
 
-        async with httpx.AsyncClient(
-            verify=self.client.config.verify_ssl,
-            timeout=120.0,
-        ) as http_client:
-            response = await http_client.post(url, content=file_data, headers=headers)
-
-        logger.debug(f"Response status: {response.status_code}")
-        logger.debug(f"Response headers: {dict(response.headers)}")
-
-        if response.status_code >= 400:
-            raise MediaUploadError(
-                f"WordPress API error ({response.status_code}): {response.text[:500]}"
-            )
-
-        return self._parse_upload_response(response, fallback_filename=filename)
+        # Осознанный компромисс: под общим retry 502/504 после того, как
+        # WordPress уже сохранил вложение, приведёт к повторной загрузке и
+        # дублю в медиатеке. Единообразие auth/retry/CB важнее — так решено
+        # протоколом; идемпотентного upload у WP REST API нет.
+        return await self.client.provider.upload_binary(
+            self.endpoint,
+            content=file_data,
+            headers=headers,
+            parse=lambda response: self._parse_upload_response(response, fallback_filename=filename),
+            timeout=float(Settings().media_timeout),
+        )
 
     async def upload_file(
         self,
@@ -118,10 +114,13 @@ class MediaEndpoint:
             Данные загруженного медиафайла с ID
 
         Raises:
+            ValidationError: Если локального файла нет
             MediaUploadError: Если загрузка не удалась
         """
         if not file_path.exists():
-            raise MediaUploadError(f"Файл не найден: {file_path}")
+            # Локального файла нет — это ошибка аргументов (exit 2), а не отказ
+            # WordPress: повторять позже бессмысленно.
+            raise ValidationError(f"Файл не найден: {file_path}")
 
         logger.debug(f"Uploading media file: {file_path}")
 
@@ -148,7 +147,9 @@ class MediaEndpoint:
 
             return result
 
-        except MediaUploadError:
+        except WPBulkEditorError:
+            # Ошибки провайдера (401, 5xx, circuit breaker) уже имеют свой код —
+            # не заворачиваем их в MediaUploadError, чтобы не терять exit-код.
             raise
         except Exception as e:
             logger.error(f"Failed to upload media {file_path}: {e}")
@@ -207,7 +208,7 @@ class MediaEndpoint:
         except httpx.HTTPError as e:
             logger.error(f"Failed to download media from {url}: {e}")
             raise MediaUploadError(f"Ошибка скачивания медиафайла: {e}")
-        except MediaUploadError:
+        except WPBulkEditorError:
             raise
         except Exception as e:
             logger.error(f"Failed to upload media from URL {url}: {e}")

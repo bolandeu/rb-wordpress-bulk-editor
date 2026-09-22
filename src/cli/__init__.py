@@ -15,18 +15,22 @@ CLI интерфейс для WordPress Bulk Editor
 from typing import Optional
 
 import typer
-from rich.console import Console
 
 from .project import resolve_project
+from .. import output
+from ..exceptions import ConfigurationError
 
 app = typer.Typer(
     name="wp-bulk-editor",
-    help="WordPress Bulk Editor - Excel <-> WordPress sync"
+    help="WordPress Bulk Editor - Excel <-> WordPress sync",
+    # Голый `wp-bulk` печатает справку и выходит с 0 (см. app_callback),
+    # а не usage error с кодом 2, как делает click по умолчанию.
+    no_args_is_help=False,
 )
-console = Console()
+console = output.human.console
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def app_callback(
     ctx: typer.Context,
     project: Optional[str] = typer.Option(
@@ -35,19 +39,28 @@ def app_callback(
         help="Имя проекта (загружает .env и пути из projects/<name>/)",
         envvar="WP_PROJECT",
     ),
+    json_output: bool = typer.Option(False, "--json", help="Машиночитаемый JSON-вывод."),
+    quiet: bool = typer.Option(False, "--quiet", help="Только существенный вывод."),
+    verbose: bool = typer.Option(False, "--verbose", help="Подробная диагностика."),
 ):
     """WordPress Bulk Editor - Excel <-> WordPress sync"""
+    options = output.set_global_options(ctx, json=json_output, quiet=quiet, verbose=verbose)
+    output.configure_logging(options)
+
     try:
         project_ctx = resolve_project(project)
     except FileNotFoundError as e:
-        console.print(f"[bold red]ERROR: {e}[/bold red]")
-        raise typer.Exit(1)
+        output.emit_error(ctx, ConfigurationError(str(e)))
+        return
 
     ctx.ensure_object(dict)
     ctx.obj = project_ctx
 
-    if project_ctx.active:
-        console.print(f"[dim]Проект: {project_ctx.name} ({project_ctx.root})[/dim]")
+    if project_ctx.active and not options.json and not options.quiet:
+        # Диагностика — в stderr, чтобы не смешиваться с данными в stdout.
+        output.human.err_console.print(f"[dim]Проект: {project_ctx.name} ({project_ctx.root})[/dim]")
+
+    output.help_if_no_command(ctx)
 
 
 # Регистрируем команды из подмодулей

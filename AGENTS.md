@@ -24,6 +24,20 @@ Bidirectional CLI: Excel ↔ WordPress. Async-first, project-aware, опцион
 Кастомная реализация в `src/utils/retry.py`. Знает иерархию исключений проекта:
 ретраит `NetworkError`, `ServerError`, HTTP 429/502/503/504;
 никогда не ретраит `AuthenticationError`, `NotFoundError`.
+Если исключение несёт атрибут `retry_after` (его ставит провайдер из заголовка
+`Retry-After`), пауза берётся оттуда.
+
+**Весь HTTP идёт через `src/providers/`.**
+`HttpProvider` — общая база (маппинг статусов, ретраи, circuit breaker,
+User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
+`WordPressHttpProvider` — специфика WP (Basic Auth, `verify_ssl`, загрузка медиа).
+`WordPressClient` — тонкая обёртка над провайдером, интерфейс прежний.
+Не создавать свой `httpx.AsyncClient` в endpoint-ах: загрузка медиа тоже идёт
+через провайдер (`upload_binary`), иначе теряются авторизация, retry и CB.
+
+**Секреты — keychain или окружение, не файлы проекта.**
+`src/credentials/manager.py` (keyring, provider = домен сайта).
+Порядок: CLI-флаг → переменная окружения → keychain → `.env` (legacy).
 
 **pandas 2.x StringDtype.**
 При записи в колонку с `StringDtype` (`is_string_dtype()`) значение должно быть `str`.
@@ -63,7 +77,7 @@ fetch:
 | Категория | Признак | Куда идёт |
 | --- | --- | --- |
 | system | action, id, img_path, content_path, image_url, alt_text, caption | не в API |
-| taxonomy | slug из WP_TAXONOMIES / discovery / `*-cat` суффикс | terms endpoint |
+| taxonomy | slug из WP_TAXONOMIES / discovery / суффикс `_cat -cat _tag -tag _tax -tax` (суффикс не применяется к dot-нотации и `acf_`) | terms endpoint |
 | acf | префикс `acf_` | ACF meta |
 | nested | содержит `.` (dot-нотация) | `build_nested_payload()` |
 | legacy seo | `seo_*` без точки | Yoast-стиль, устарело но работает |
@@ -78,9 +92,18 @@ fetch:
 
 1. `WP_TAXONOMIES=slug1,slug2` в `.env` — абсолютный приоритет (override)
 2. `WordPressDiscovery` — опрос API сайта
-3. Стандартный набор (`category`, `post_tag`) + листы с суффиксом `-cat`
+3. Стандартный набор (`category`, `post_tag`) + колонки/листы с суффиксом
+   `_cat -cat _tag -tag _tax -tax` (регистронезависимо)
 
 `ExcelReader` умеет override имён листов: лист `categories` → таксономия `category`.
+
+**Значение поля таксономии:** термины разделены `"; "`, внутри одного термина
+уровни иерархии — `>`: `"термин1; термин2>термин2.1"`. Предки создаются слева
+направо, записи присваивается последний уровень. `>` допустим только для
+иерархических таксономий: если WP проигнорировал `parent` (таксономия плоская) —
+`ValidationError`, а не тихие дубликаты терминов на каждом прогоне. Первый термин строки — основной
+(primary), пишется в мету Yoast `_yoast_wpseo_primary_<taxonomy>` best-effort:
+ошибка этой записи не валит синхронизацию.
 
 ---
 
@@ -142,8 +165,11 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 ## Добавление новой команды
 
 1. Выбрать нужный файл в `src/cli/` по теме или создать новый.
-2. Обернуть тело в `handle_command_errors()` (context manager из `common.py`).
-3. Credentials грузить через `load_and_print_credentials()`.
+2. Навесить `@output.guard` под `@app.command()`, добавить `json_output: bool = output.JsonOption`
+   и `quiet: bool = output.QuietOption`, результат отдавать через `output.emit_success(ctx, payload, render)`.
+   (Ещё не переведённые команды используют `handle_command_errors(ctx)` из `common.py` — то же самое,
+   но context manager'ом.) В docstring указать exit-коды.
+3. Credentials грузить через `load_and_print_credentials(..., ctx=ctx)`.
 4. Если нужен файл: `resolve_excel_file(ctx, file)` — разруливает explicit > project xlsx > None.
 5. Если нужен `.env`: `resolve_env_file(ctx, env_file)`.
 6. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
@@ -152,21 +178,27 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 
 ## Исключения — иерархия
 
+Каждое исключение несёт `code` и `exit_code` (контракт cli-builder), их печатает
+`src/output/`. `CliError` — алиас `WPBulkEditorError`.
+
 ```
-WPBulkEditorError
-├── ConfigurationError
-├── ExcelError
+WPBulkEditorError                       UNEXPECTED (1)
+├── ConfigurationError                  INVALID_ARGUMENTS (2)
+├── ExcelError                          INVALID_ARGUMENTS (2)
 │   ├── ExcelStructureError
 │   ├── ExcelValidationError
 │   └── ProfileSheetMissingError
-├── WordPressError
-│   ├── AuthenticationError   ← не ретраить
+├── RecordSourceError                   INVALID_ARGUMENTS (2)
+├── WordPressError                      PROVIDER_ERROR (5)
+│   ├── AuthenticationError   ← не ретраить   AUTH_REQUIRED (3)
 │   ├── NotFoundError         ← не ретраить
 │   ├── ServerError           ← ретраить
 │   ├── NetworkError          ← ретраить
 │   └── MediaUploadError
-├── ValidationError
-└── ImageProcessingError
+├── ValidationError                     INVALID_ARGUMENTS (2)
+├── CredentialStoreUnavailable          CREDENTIAL_STORE_UNAVAILABLE (1)
+├── ImageProcessingError                UNEXPECTED (1)
+└── CircuitBreakerOpenError (utils/retry.py)   PROVIDER_ERROR (5)
 ```
 
 ---

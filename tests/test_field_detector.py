@@ -109,6 +109,14 @@ class TestTaxonomyOverride:
         fd = FieldDetector(["brand"])
         assert fd.analyze()["content"] == ["brand"]
 
+    def test_suffix_does_not_shadow_nested_and_acf(self):
+        """Колонки с таксономическим суффиксом, но явной разметкой поля payload."""
+        fd = FieldDetector(["acf.product_cat", "seo.meta_tag", "acf_service_cat", "genre_cat"])
+        r = fd.analyze()
+        assert r["taxonomies"] == ["genre_cat"]
+        assert set(r["nested"]) == {"acf.product_cat", "seo.meta_tag"}
+        assert r["acf"] == ["service_cat"]
+
 
 # ── convert_acf_value() ─────────────────────────────────────────────
 # (перенесено из FieldDetector в src/mappers/value_converter.py)

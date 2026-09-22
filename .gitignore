@@ -85,8 +85,8 @@ data/**
 !data/**/
 !data/**/.gitkeep
 
-credentials*
-!credentials/.gitkeep
+/credentials*
+!/credentials/.gitkeep
 
 projects/*
 !projects/.gitkeep

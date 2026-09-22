@@ -9,10 +9,27 @@ import typer
 
 from .project import ProjectContext
 
-# Импорт console откладываем до вызова функций, чтобы избежать циклических импортов
+# Импорт откладываем до вызова функций, чтобы избежать циклических импортов
 def _console():
     from . import console
     return console
+
+
+def _note(ctx: typer.Context, message: str):
+    """Подсказка о разрешении пути — диагностика, значит stderr."""
+    from .. import output
+
+    options = output.get_options(ctx)
+    if not options.json and not options.quiet:
+        output.human.err_console.print(f"[dim]{message}[/dim]")
+
+
+def _fail(ctx: typer.Context, message: str):
+    """Ошибка аргументов: конверт (human или --json) и exit 2."""
+    from .. import output
+    from ..exceptions import ValidationError
+
+    output.emit_error(ctx, ValidationError(message))
 
 
 def get_project(ctx: typer.Context) -> ProjectContext:
@@ -59,25 +76,20 @@ def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
         if proj.active:
             project_path = proj.root / explicit
             if project_path.exists():
-                _console().print(f"[dim]Excel файл: {project_path.name} (из проекта {proj.name})[/dim]")
+                _note(ctx, f"Excel файл: {project_path.name} (из проекта {proj.name})")
                 return project_path
         # Файл не найден
-        _console().print(f"[red]ERROR: Файл не найден: {explicit}[/red]")
-        if proj.active:
-            _console().print(f"[dim]Проверены пути: {explicit}, {proj.root / explicit}[/dim]")
-        raise typer.Exit(code=1)
+        checked = f" Проверены пути: {explicit}, {proj.root / explicit}." if proj.active else ""
+        _fail(ctx, f"Файл не найден: {explicit}.{checked}")
 
     # Авто-поиск в проекте
     if proj.active:
         found = proj.find_excel()
         if found:
-            _console().print(f"[dim]Excel файл (авто): {found.name}[/dim]")
+            _note(ctx, f"Excel файл (авто): {found.name}")
             return found
 
-    _console().print(
-        "[red]ERROR: Укажите --file или используйте --project с xlsx-файлом в папке проекта[/red]"
-    )
-    raise typer.Exit(code=1)
+    _fail(ctx, "Укажите --file или используйте --project с xlsx-файлом в папке проекта")
 
 
 def resolve_logs_folder(ctx: typer.Context) -> Path:

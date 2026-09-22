@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from ..output import log_stream
 from .common import handle_command_errors, load_and_print_credentials
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file, require_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
@@ -112,7 +113,7 @@ def fetch(
 
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         # 1. Настройка логирования
         logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
@@ -121,7 +122,8 @@ def fetch(
         log_file = setup_logger(
             logs_folder=logs_folder,
             config=logging_config,
-            command_name="fetch"
+            command_name="fetch",
+            console_stream=log_stream(ctx),
         )
         logger.info(f"Лог-файл создан: {log_file}")
 
@@ -464,7 +466,7 @@ def fetch_media(
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(
             env_file=env_file,
         )
@@ -478,7 +480,8 @@ def fetch_media(
         log_file = setup_logger(
             logs_folder=logs_folder,
             config=logging_config,
-            command_name="fetch_media"
+            command_name="fetch_media",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_fetch_media(wp_config, file))
@@ -644,7 +647,7 @@ def update_from_wp(
         console.print("[yellow]Режим TEST — только первые 3 строки[/yellow]")
     console.print()
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(env_file)
         wp_config = WordPressConfig.from_credentials(domain, username, password)
         sheets_filter = [s.strip() for s in sheets.split(",")] if sheets else None

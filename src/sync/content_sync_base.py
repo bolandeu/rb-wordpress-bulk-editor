@@ -12,7 +12,12 @@ from loguru import logger
 
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
-from ..wordpress.taxonomies import TaxonomiesEndpoint, TaxonomyCache, normalize_taxonomy_name
+from ..wordpress.taxonomies import (
+    TaxonomiesEndpoint,
+    TaxonomyCache,
+    normalize_taxonomy_name,
+    primary_term_meta_key,
+)
 from ..wordpress.media import MediaEndpoint
 from ..mappers.content_mapper import ContentMapper
 from ..config import AppConfig
@@ -66,13 +71,13 @@ class ContentSyncBase(BaseSync):
         """Создать новую запись."""
         # Dry-run: только логируем, не отправляем
         if self.config.sync.dry_run:
-            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            taxonomy_ids, _ = await self._process_taxonomies(row, mapper)
             payload = mapper.map_row(row, taxonomy_ids)
             logger.info(f"[DRY-RUN] Would CREATE post: {payload.get('title', 'No title')}")
             return {"id": 0, "link": "", "dry_run": True}
 
         # 1. Обрабатываем таксономии
-        taxonomy_ids = await self._process_taxonomies(row, mapper)
+        taxonomy_ids, primary_terms = await self._process_taxonomies(row, mapper)
 
         # 2. Создаем payload
         payload = mapper.map_row(row, taxonomy_ids)
@@ -127,7 +132,10 @@ class ContentSyncBase(BaseSync):
             result = await posts_endpoint.create(payload)
             post_id = result["id"]
 
-        # 6. Загружаем медиа (если есть img_path)
+        # 6. Основные (primary) термины таксономий — best-effort
+        await self._apply_primary_terms(posts_endpoint, post_id, primary_terms)
+
+        # 7. Загружаем медиа (если есть img_path)
         # Пропускаем если --skip-media или columns_filter активен и img_path/featured_media не в фильтре
         _should_media = not self.config.sync.skip_media and (not _cf or "img_path" in _cf or "featured_media" in _cf)
         if _should_media and mapper.should_upload_media(row):
@@ -181,13 +189,13 @@ class ContentSyncBase(BaseSync):
 
         # Dry-run: только логируем, не отправляем
         if self.config.sync.dry_run:
-            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            taxonomy_ids, _ = await self._process_taxonomies(row, mapper)
             payload = mapper.map_row(row, taxonomy_ids)
             logger.info(f"[DRY-RUN] Would UPDATE post ID={post_id}: {payload.get('title', 'No title')}")
             return {"id": post_id, "link": "", "dry_run": True}
 
         # 1. Обрабатываем таксономии
-        taxonomy_ids = await self._process_taxonomies(row, mapper)
+        taxonomy_ids, primary_terms = await self._process_taxonomies(row, mapper)
 
         # 2. Создаем payload
         payload = mapper.map_row(row, taxonomy_ids)
@@ -288,6 +296,9 @@ class ContentSyncBase(BaseSync):
         logger.info(f"Sending update for post ID={post_id}: payload keys={list(payload.keys())}, content={'yes (' + str(content_len) + ' chars)' if has_content else 'no'}")
         result = await posts_endpoint.update(post_id, payload)
 
+        # 6a. Основные (primary) термины таксономий — best-effort
+        await self._apply_primary_terms(posts_endpoint, post_id, primary_terms)
+
         # 7. Проверяем что content реально обновился (сравниваем хеши текста без тегов)
         if has_content:
             import hashlib, re
@@ -370,7 +381,7 @@ class ContentSyncBase(BaseSync):
         self,
         row: Mapping[str, Any],
         mapper: ContentMapper
-    ) -> Dict[str, list[int]]:
+    ) -> tuple[Dict[str, list[int]], Dict[str, int]]:
         """
         Обработать таксономии из записи.
 
@@ -379,11 +390,12 @@ class ContentSyncBase(BaseSync):
             mapper: ContentMapper
 
         Returns:
-            Dict {taxonomy_name: [term_ids]}
+            (Dict {taxonomy_name: [term_ids]},
+             Dict {taxonomy_name: primary_term_id} — первый термин строки)
         """
         # Если skip_tax=True, пропускаем обработку таксономий
         if self.config.sync.skip_tax:
-            return {}
+            return {}, {}
 
         taxonomy_fields = mapper.detector.get_taxonomy_fields()
 
@@ -391,9 +403,10 @@ class ContentSyncBase(BaseSync):
         if mapper.allowed_columns:
             taxonomy_fields = [f for f in taxonomy_fields if f in mapper.allowed_columns]
             if not taxonomy_fields:
-                return {}
+                return {}, {}
 
         taxonomy_ids = {}
+        primary_terms: Dict[str, int] = {}
 
         for tax_field in taxonomy_fields:
             if tax_field not in row:
@@ -408,7 +421,7 @@ class ContentSyncBase(BaseSync):
             tax_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_tax_field)
 
             # Обрабатываем строку с таксономиями (передаем кэш для обновления)
-            term_ids = await tax_endpoint.process_taxonomy_string(
+            term_ids, primary_id = await tax_endpoint.process_taxonomy_string(
                 str(value),
                 taxonomy_cache=self.taxonomy_cache
             )
@@ -416,7 +429,42 @@ class ContentSyncBase(BaseSync):
             if term_ids:
                 taxonomy_ids[tax_field] = term_ids
 
-        return taxonomy_ids
+            if primary_id is not None:
+                primary_terms[tax_field] = primary_id
+
+        return taxonomy_ids, primary_terms
+
+    async def _apply_primary_terms(
+        self,
+        posts_endpoint: PostsEndpoint,
+        post_id: int,
+        primary_terms: Dict[str, int]
+    ) -> None:
+        """
+        Записать основные (primary) термины в мета-поля Yoast SEO.
+
+        Best-effort: если мета-поле не зарегистрировано в REST или запрос упал —
+        логируем предупреждение и продолжаем, привязка терминов к записи уже
+        выполнена и от этого вызова не зависит.
+
+        Args:
+            posts_endpoint: PostsEndpoint
+            post_id: ID записи
+            primary_terms: {taxonomy_name: primary_term_id}
+        """
+        if not primary_terms:
+            return
+
+        meta = {
+            primary_term_meta_key(taxonomy): term_id
+            for taxonomy, term_id in primary_terms.items()
+        }
+
+        try:
+            await posts_endpoint.update(post_id, {"meta": meta})
+            logger.debug(f"Set primary terms for post ID={post_id}: {meta}")
+        except Exception as e:
+            logger.warning(f"Failed to set primary terms for post ID={post_id}: {e}")
 
     async def _upload_media(
         self,

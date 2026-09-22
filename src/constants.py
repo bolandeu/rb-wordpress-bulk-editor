@@ -36,11 +36,20 @@ DEFAULT_SKIP_TAXONOMY_PATTERNS = ["nav_menu", "link_category", "post_format"]
 # Разделитель таксономий в Excel
 TAXONOMY_DELIMITER = "; "
 
+# Разделитель уровней иерархии внутри одного термина: "Родитель>Ребёнок"
+TAXONOMY_HIERARCHY_DELIMITER = ">"
+
 # ACF префикс
 ACF_PREFIX = "acf_"
 
-# Таксономия суффикс
-TAXONOMY_SUFFIX = "-cat"
+# Суффиксы таксономии: корень (cat/tag/tax) × разделитель (_/-)
+TAXONOMY_SUFFIX_ROOTS = ("cat", "tag", "tax")
+TAXONOMY_SUFFIX_SEPARATORS = ("_", "-")
+TAXONOMY_SUFFIXES = tuple(
+    f"{sep}{root}"
+    for root in TAXONOMY_SUFFIX_ROOTS
+    for sep in TAXONOMY_SUFFIX_SEPARATORS
+)
 
 # Поля, которые всегда отправляются как bool.
 # Если колонка присутствует в Excel — значение парсится (пустое = True),
@@ -65,7 +74,17 @@ def is_taxonomy_column(col: str, known_taxonomies: Optional[Iterable[str]] = Non
         col: Имя колонки/листа.
         known_taxonomies: Явный список slug-ов таксономий (из .env или WP discovery).
             Если задан — имя колонки сравнивается по этому списку; fallback на
-            STANDARD_TAXONOMIES и суффикс TAXONOMY_SUFFIX сохраняется.
+            STANDARD_TAXONOMIES и суффиксы TAXONOMY_SUFFIXES сохраняется.
+
+    Суффикс распознаётся регистронезависимо для всех комбинаций
+    `_cat -cat _tag -tag _tax -tax` (реальные данные используют оба разделителя:
+    `genre-cat` в Excel, `rb_services_cat` в JSON).
+
+    Эвристика по суффиксу не применяется к dot-нотации (`acf.product_cat`,
+    `seo.meta_tag`) и к legacy ACF-префиксу (`acf_service_cat`): это явно
+    размеченные поля payload, а не таксономии. Явные списки
+    (`known_taxonomies`, STANDARD_TAXONOMIES) — осознанный override и работают
+    для любых имён.
     """
     col_lower = col.lower()
     if known_taxonomies:
@@ -74,7 +93,9 @@ def is_taxonomy_column(col: str, known_taxonomies: Optional[Iterable[str]] = Non
             return True
     if col_lower in STANDARD_TAXONOMIES:
         return True
-    if col.endswith(TAXONOMY_SUFFIX):
+    if is_dot_notation_column(col) or col_lower.startswith(ACF_PREFIX):
+        return False
+    if col_lower.endswith(TAXONOMY_SUFFIXES):
         return True
     return False
 

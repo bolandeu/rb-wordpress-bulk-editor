@@ -96,7 +96,7 @@ def vlook(
     excel_file = _resolve_vlook_excel(ctx, file)
     proj = get_project(ctx)
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         setup_command_logging(ctx, "vlook", verbose)
 
         console.print(f"\n[bold cyan]VLOOK[/bold cyan] — привязка файлов по ID")

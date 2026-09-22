@@ -12,6 +12,7 @@ from loguru import logger
 from . import app, console
 from .helpers import get_project, resolve_env_file, require_excel_file
 from .common import handle_command_errors, load_and_print_credentials, parse_comma_list
+from .. import output
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -228,6 +229,7 @@ async def _run_sync_engine(
         stats["duration_seconds"] = (finished_at - started_at).total_seconds()
 
         log_summary(stats, config.paths.logs_folder / f"{command_name}.log")
+        return stats
 
     except Exception as e:
         logger.exception(f"Ошибка {command_name}")
@@ -289,6 +291,7 @@ async def _process_sheet(
 # ============================================================
 
 @app.command()
+@output.guard
 def sync(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
@@ -313,47 +316,63 @@ def sync(
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"),
     columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
 ):
     """
-    Синхронизация Excel -> WordPress
+    Синхронизация Excel -> WordPress.
+
+    Exit-коды: 0 — успех, 2 — аргументы/структура файла, 3 — нет credentials,
+    5 — недоступен WordPress, 1 — непредвиденная ошибка.
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
     file = require_excel_file(ctx, file)
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
-    console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+    opts = output.get_options(ctx)
+    human_mode = not opts.json and not opts.quiet
+
+    if human_mode:
+        console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
+        console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
     _validate_test_mode(test_mode, sheets)
 
-    with handle_command_errors():
-        domain, username, password = load_and_print_credentials(
-            env_file=env_file, domain=domain, username=username, password=password,
-        )
+    domain, username, password = load_and_print_credentials(
+        env_file=env_file, domain=domain, username=username, password=password, ctx=ctx,
+    )
 
-        sync_config = _build_sync_config(
-            dry_run=dry_run, concurrency=concurrency,
-            skip_media=skip_media, skip_tax=skip_tax,
-            no_update_excel=no_update_excel, delete_media=delete_media,
-            skip_existing_media=skip_existing_media, columns=columns,
-        )
+    sync_config = _build_sync_config(
+        dry_run=dry_run, concurrency=concurrency,
+        skip_media=skip_media, skip_tax=skip_tax,
+        no_update_excel=no_update_excel, delete_media=delete_media,
+        skip_existing_media=skip_existing_media, columns=columns,
+    )
 
-        config = AppConfig.from_excel(
-            excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
-            project_root=proj.root, sync=sync_config,
-            logging=LoggingConfig(level="DEBUG" if verbose else "INFO"),
-        )
+    config = AppConfig.from_excel(
+        excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
+        project_root=proj.root, sync=sync_config,
+        logging=LoggingConfig(level="DEBUG" if (verbose or opts.verbose) else "INFO"),
+    )
 
-        if config.sync.columns_filter:
-            console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
+    if config.sync.columns_filter and human_mode:
+        console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
 
-        config.paths.ensure_dirs()
-        log_file = setup_logger(logs_folder=config.paths.logs_folder, config=config.logging, command_name="sync")
+    config.paths.ensure_dirs()
+    log_file = setup_logger(
+        logs_folder=config.paths.logs_folder,
+        config=config.logging,
+        command_name="sync",
+        console_stream=output.log_stream(ctx),
+    )
 
-        asyncio.run(_run_sync_engine(config, sheets, test_mode=test_mode, command_name="sync"))
+    stats = asyncio.run(_run_sync_engine(config, sheets, test_mode=test_mode, command_name="sync"))
 
+    def _render(payload: dict):
         console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")
-        console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
+        console.print(f"Лог-файл: [cyan]{payload['log_file']}[/cyan]\n")
+
+    output.emit_success(ctx, {**(stats or {}), "log_file": str(log_file)}, _render)
 
 
 # ============================================================
@@ -407,7 +426,7 @@ def async_sync(
 
     _validate_test_mode(test_mode, sheets)
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(
             env_file=env_file, domain=domain, username=username, password=password,
         )
@@ -436,7 +455,12 @@ def async_sync(
             console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
 
         config.paths.ensure_dirs()
-        log_file = setup_logger(logs_folder=config.paths.logs_folder, config=config.logging, command_name="async_sync")
+        log_file = setup_logger(
+            logs_folder=config.paths.logs_folder,
+            config=config.logging,
+            command_name="async_sync",
+            console_stream=output.log_stream(ctx),
+        )
 
         asyncio.run(_run_sync_engine(
             config, sheets, test_mode=test_mode,

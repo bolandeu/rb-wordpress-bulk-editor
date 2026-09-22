@@ -9,43 +9,58 @@ from typing import Optional, List
 import typer
 from loguru import logger
 
-from . import console
 from .helpers import resolve_logs_folder
+from .. import output
 from ..config import LoggingConfig
-from ..exceptions import WPBulkEditorError
+from ..exceptions import CliError, WPBulkEditorError
 from ..utils.logger import setup_logger
 
 
-def setup_command_logging(ctx: typer.Context, command_name: str, verbose: bool = False) -> Path:
+def setup_command_logging(
+    ctx: typer.Context,
+    command_name: str,
+    verbose: bool = False,
+) -> Path:
     """Стандартная настройка логирования для команды."""
     logs_folder = resolve_logs_folder(ctx)
     logs_folder.mkdir(parents=True, exist_ok=True)
-    logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
+    options = output.get_options(ctx)
+    logging_config = LoggingConfig(level="DEBUG" if (verbose or options.verbose) else "INFO")
     return setup_logger(
         logs_folder=logs_folder,
         config=logging_config,
         command_name=command_name,
+        console_stream=output.log_stream(ctx),
     )
 
 
 @contextmanager
-def handle_command_errors():
+def handle_command_errors(ctx: Optional[typer.Context] = None):
     """
-    Context manager для единообразной обработки ошибок в CLI командах.
+    Обработка ошибок команды: нужный exit-код и конверт ошибки (human или --json).
+
+    То же самое, что декоратор `output.guard`, но в виде context manager —
+    для команд, которые ещё не переведены на декоратор.
 
     Использование:
-        with handle_command_errors():
+        with handle_command_errors(ctx):
             ... бизнес-логика команды ...
     """
     try:
         yield
+    except (typer.Exit, typer.Abort):
+        raise
     except WPBulkEditorError as e:
-        console.print(f"\n[bold red]ERROR: {e}[/bold red]\n")
-        raise typer.Exit(code=1)
+        output.emit_error(ctx, e)
     except Exception as e:
-        console.print(f"\n[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
         logger.exception("Неожиданная ошибка")
-        raise typer.Exit(code=1)
+        output.emit_error(
+            ctx,
+            CliError(
+                f"{type(e).__name__}: {e}",
+                action="Повторите с --verbose, чтобы увидеть traceback.",
+            ),
+        )
 
 
 def load_and_print_credentials(
@@ -53,19 +68,29 @@ def load_and_print_credentials(
     domain: Optional[str] = None,
     username: Optional[str] = None,
     password: Optional[str] = None,
+    ctx: Optional[typer.Context] = None,
 ):
-    """Загрузить credentials и вывести в консоль."""
+    """
+    Загрузить credentials (CLI → окружение → keychain → legacy .env) и показать их.
+
+    Сообщения идут в stderr: это диагностика, а не результат команды.
+    """
     from ..utils.auth import load_credentials_from_env
 
-    console.print("[yellow]Загрузка credentials...[/yellow]")
+    options = output.get_options(ctx)
+    err = output.human.err_console
+
+    if not options.json and not options.quiet:
+        err.print("[yellow]Загрузка credentials...[/yellow]")
     domain, username, password = load_credentials_from_env(
         env_file=env_file,
         domain_override=domain,
         username_override=username,
         password_override=password,
     )
-    console.print(f"[green]OK[/green] WordPress: {domain}")
-    console.print(f"[green]OK[/green] User: {username}\n")
+    if not options.json and not options.quiet:
+        err.print(f"[green]OK[/green] WordPress: {domain}")
+        err.print(f"[green]OK[/green] User: {username}\n")
     return domain, username, password
 
 

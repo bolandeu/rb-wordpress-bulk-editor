@@ -10,6 +10,7 @@ from typing import Optional, List
 import asyncio
 
 from . import app, console
+from ..output import log_stream
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import get_project, resolve_env_file, resolve_output, require_excel_file
 from ..config import AppConfig, SyncConfig, LoggingConfig
@@ -190,7 +191,7 @@ def download_google_sheet(
 
     setup_command_logging(ctx, "download_google_sheet")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         final_sheet_id, credentials_path = _load_google_params(
             sheet_id, str(credentials) if credentials else None, env_file=env_file
         )
@@ -248,7 +249,7 @@ def upload_to_google_sheets(
 
     setup_command_logging(ctx, "upload_to_google_sheets", verbose)
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         from ..utils.google_sheets import GoogleSheetsClient
 
         final_sheet_id, credentials_path = _load_google_params(
@@ -320,7 +321,7 @@ def sync_from_google(
     console.print("\n[bold cyan]Google Sheets -> WordPress Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         from .sync_commands import run_sync
 
         # ШАГ 1
@@ -347,6 +348,7 @@ def sync_from_google(
         log_file = setup_logger(
             logs_folder=config.paths.logs_folder, config=config.logging,
             command_name="sync_from_google",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_sync(config, sheets))
@@ -401,7 +403,7 @@ def sync_google_bidirectional(
     console.print("\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets Pipeline[/bold cyan]")
     console.print("=" * 60 + "\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         from .sync_commands import run_sync
 
         # ШАГ 1
@@ -428,6 +430,7 @@ def sync_google_bidirectional(
         log_file = setup_logger(
             logs_folder=config.paths.logs_folder, config=config.logging,
             command_name="sync_google_bidirectional",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_sync(config, sheets))
@@ -479,7 +482,7 @@ def async_sync_from_google(
 
     console.print(f"\n[bold cyan]Google Sheets -> WordPress (Async)[/bold cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         from .sync_commands import run_sync_async
 
         # ШАГ 1
@@ -509,6 +512,7 @@ def async_sync_from_google(
         log_file = setup_logger(
             logs_folder=config.paths.logs_folder, config=config.logging,
             command_name="async_from_google",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_sync_async(
@@ -562,7 +566,7 @@ def async_sync_google_bidirectional(
 
     console.print(f"\n[bold cyan]Google Sheets <-> WordPress <-> Google Sheets (Async)[/bold cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         from .sync_commands import run_sync_async
 
         # ШАГ 1
@@ -592,6 +596,7 @@ def async_sync_google_bidirectional(
         log_file = setup_logger(
             logs_folder=config.paths.logs_folder, config=config.logging,
             command_name="async_google_bidirectional",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_sync_async(
