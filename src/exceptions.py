@@ -33,6 +33,11 @@ class ProfileSheetMissingError(ExcelError):
     pass
 
 
+class RecordSourceError(WPBulkEditorError):
+    """Ошибка источника записей (структура файла, нераспознаваемая запись)"""
+    pass
+
+
 class WordPressError(WPBulkEditorError):
     """Базовая ошибка WordPress API"""
     pass

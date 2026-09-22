@@ -1,17 +1,16 @@
 """
-Асинхронная синхронизация контента с параллельной обработкой строк.
+Асинхронная синхронизация контента с параллельной обработкой записей.
 """
 
 from functools import partial
 import asyncio
-from typing import Dict, List, Optional
-import pandas as pd
+from typing import List, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.taxonomies import TaxonomyCache
-from ..excel.writer import ExcelWriter
 from ..mappers.content_mapper import ContentMapper
 from ..config import AppConfig
+from ..records.base import Record, RecordWriter, collect_fields
 from ..wordpress.client import WordPressClient
 from ..utils.content_processor import ContentProcessor
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
@@ -21,10 +20,10 @@ from .content_sync_base import ContentSyncBase
 
 class ContentSyncAsync(ContentSyncBase):
     """
-    Асинхронная версия ContentSync с параллельной обработкой строк.
+    Асинхронная версия ContentSync с параллельной обработкой записей.
 
     Отличия от ContentSync:
-    - Строки обрабатываются параллельно с ограничением Semaphore
+    - Записи обрабатываются параллельно с ограничением Semaphore
     - Используется AsyncBatchProcessor для управления concurrency
     - Результаты собираются через asyncio.gather()
     """
@@ -38,52 +37,57 @@ class ContentSyncAsync(ContentSyncBase):
         super().__init__(wp_client, config, taxonomy_cache)
         self.batch_processor = AsyncBatchProcessor(config.sync.concurrency)
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None
     ) -> SyncReport:
         """
-        Асинхронная синхронизация листа с параллельной обработкой строк.
+        Асинхронная синхронизация группы записей с параллельной обработкой.
 
         Args:
-            sheet_name: Название листа (= тип контента)
-            df: DataFrame с данными листа
-            excel_writer: Writer для обратной записи (если нужна)
+            discriminator: Тип контента (post_type)
+            records: Записи одного типа
+            writer: Writer для обратной записи (если нужна)
 
         Returns:
-            SyncReport со статистикой и списком ошибочных строк
+            SyncReport со статистикой и списком ошибочных записей
         """
         stats = self._init_stats()
         error_results: List[SyncResult] = []
 
+        records = list(records)
+
         # Создаем endpoints
-        posts_endpoint = self._make_posts_endpoint(sheet_name)
+        posts_endpoint = self._make_posts_endpoint(discriminator)
         media_endpoint = self._make_media_endpoint()
 
         # Создаем mapper и content processor
         from ..config import Settings
         mapper = ContentMapper(
-            df.columns.tolist(),
+            collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
             known_taxonomies=Settings().get_taxonomies(),
         )
         content_processor = ContentProcessor(self.config.paths.content_folder)
 
         # Обрабатываем в порядке: delete → update → add
-        for action in ["delete", "update", "add"]:
-            # Фильтруем строки по action
-            action_rows = df[df["action"].str.lower().str.strip() == action]
+        by_action = self._group_by_action(records)
+        for action in self.ACTION_ORDER:
+            action_records = by_action[action]
 
-            if len(action_rows) == 0:
+            if not action_records:
                 continue
 
-            logger.info(f"Processing {action}: {len(action_rows)} rows (PARALLEL)")
+            logger.info(f"Processing {action}: {len(action_records)} rows (PARALLEL)")
 
             # Создаем задачи для параллельной обработки
             tasks = []
-            for idx, row in action_rows.iterrows():
+            for record in action_records:
+                idx = record.write_key
+                row = record.data
+
                 # Валидация (делаем синхронно перед созданием задачи)
                 is_valid, error_msg = mapper.validate_row(row, action)
                 if not is_valid:
@@ -148,10 +152,9 @@ class ContentSyncAsync(ContentSyncBase):
                         elif action == "delete":
                             stats["deleted"] += 1
 
-                        # Записываем в Excel через ASYNC метод
-                        if excel_writer and result.api_response and self.config.sync.update_excel:
-                            await excel_writer.update_from_api_response_async(
-                                sheet_name,
+                        # Записываем в источник через ASYNC метод
+                        if writer and result.api_response and self.config.sync.update_excel:
+                            await writer.update_from_result_async(
                                 result.row_index,
                                 result.api_response,
                                 action,
@@ -168,9 +171,7 @@ class ContentSyncAsync(ContentSyncBase):
                         ))
 
         # Подсчитываем пропущенные
-        valid_actions = {"add", "update", "delete"}
-        skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
-        stats["skipped"] = len(skipped)
-        stats["total"] = len(df)
+        stats["skipped"] = self._count_skipped(records)
+        stats["total"] = len(records)
 
         return SyncReport.from_stats(stats, error_results)

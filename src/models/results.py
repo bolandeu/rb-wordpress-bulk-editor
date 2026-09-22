@@ -5,11 +5,13 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from ..records.base import WriteKey
+
 
 @dataclass
 class SyncResult:
-    """Результат обработки одной строки Excel."""
-    row_index: int
+    """Результат обработки одной записи источника."""
+    row_index: WriteKey
     action: str
     post_id: Optional[int]
     success: bool

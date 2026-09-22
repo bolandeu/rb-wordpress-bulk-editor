@@ -6,12 +6,12 @@ _add_term, _update_term, _delete_term, _build_payload
 """
 
 from abc import abstractmethod
-from typing import Dict, Any
-import pandas as pd
+from typing import Any, Dict, Mapping, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.taxonomies import TaxonomiesEndpoint
 from ..constants import ACF_PREFIX
+from ..records.base import Record, RecordWriter, is_missing
 from .base_sync import BaseSync
 
 
@@ -20,12 +20,17 @@ class TaxonomySyncBase(BaseSync):
     Базовый класс для синхронизации таксономий.
 
     Содержит общую логику обработки терминов.
-    Наследники (TaxonomySync, TaxonomySyncAsync) реализуют только sync_sheet().
+    Наследники (TaxonomySync, TaxonomySyncAsync) реализуют только sync_records().
     """
 
     @abstractmethod
-    async def sync_sheet(self, sheet_name: str, df, excel_writer=None):
-        """Синхронизировать один лист таксономии."""
+    async def sync_records(
+        self,
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None,
+    ):
+        """Синхронизировать группу терминов одной таксономии."""
 
     def _make_taxonomy_endpoint(self, taxonomy: str) -> TaxonomiesEndpoint:
         """Фабричный метод для TaxonomiesEndpoint (можно переопределить в тестах)."""
@@ -34,7 +39,7 @@ class TaxonomySyncBase(BaseSync):
     async def _add_term(
         self,
         taxonomy_endpoint: TaxonomiesEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Создать новый термин."""
         # Создаем payload
@@ -68,7 +73,7 @@ class TaxonomySyncBase(BaseSync):
     async def _update_term(
         self,
         taxonomy_endpoint: TaxonomiesEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Обновить существующий термин."""
         term_id = int(row["id"])
@@ -91,7 +96,7 @@ class TaxonomySyncBase(BaseSync):
     async def _delete_term(
         self,
         taxonomy_endpoint: TaxonomiesEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Удалить термин (в корзину)."""
         term_id = int(row["id"])
@@ -107,12 +112,12 @@ class TaxonomySyncBase(BaseSync):
         result = await taxonomy_endpoint.delete(term_id, force=False)
         return result
 
-    def _build_payload(self, row: pd.Series) -> Dict[str, Any]:
+    def _build_payload(self, row: Mapping[str, Any]) -> Dict[str, Any]:
         """
-        Построить payload для API из строки Excel.
+        Построить payload для API из записи.
 
         Args:
-            row: Строка из DataFrame
+            row: Запись (Mapping поле → значение)
 
         Returns:
             Payload для WordPress API
@@ -121,24 +126,24 @@ class TaxonomySyncBase(BaseSync):
         acf_data = {}
 
         # Обязательные поля
-        if "name" in row.index and pd.notna(row["name"]):
+        if "name" in row and not is_missing(row["name"]):
             payload["name"] = str(row["name"]).strip()
 
         # Текстовые поля - отправляем всегда (даже пустые для очистки)
-        if "slug" in row.index:
-            if pd.notna(row["slug"]):
+        if "slug" in row:
+            if not is_missing(row["slug"]):
                 payload["slug"] = str(row["slug"]).strip()
             else:
                 payload["slug"] = ""
 
-        if "description" in row.index:
-            if pd.notna(row["description"]):
+        if "description" in row:
+            if not is_missing(row["description"]):
                 payload["description"] = str(row["description"]).strip()
             else:
                 payload["description"] = ""
 
         # Parent (для иерархических таксономий)
-        if "parent" in row.index and pd.notna(row["parent"]) and str(row["parent"]).strip() != "":
+        if "parent" in row and not is_missing(row["parent"]) and str(row["parent"]).strip() != "":
             try:
                 parent_id = int(row["parent"])
                 if parent_id > 0:
@@ -150,7 +155,7 @@ class TaxonomySyncBase(BaseSync):
         # Пропускаем системные поля
         system_fields = {"id", "action", "name", "slug", "description", "parent", "link", "count"}
 
-        for field_name in row.index:
+        for field_name in row.keys():
             # Пропускаем уже обработанные и системные поля
             if field_name in system_fields or field_name in payload:
                 continue
@@ -160,12 +165,12 @@ class TaxonomySyncBase(BaseSync):
             # ACF поля - группируем в отдельный объект
             if field_name.startswith(ACF_PREFIX):
                 acf_key = field_name[len(ACF_PREFIX):]  # Убираем префикс acf_
-                if pd.notna(value) and str(value).strip() != "":
+                if not is_missing(value) and str(value).strip() != "":
                     acf_data[acf_key] = str(value).strip()
                 continue
 
             # Остальные кастомные поля отправляем на верхнем уровне
-            if pd.notna(value):
+            if not is_missing(value):
                 payload[field_name] = str(value).strip()
             else:
                 # Отправляем пустое значение для очистки

@@ -2,64 +2,67 @@
 Синхронизация контента (posts, pages, custom types) — последовательная обработка.
 """
 
-from typing import Dict, List, Optional
-import pandas as pd
+from typing import List, Optional, Sequence
 from loguru import logger
 
-from ..excel.writer import ExcelWriter
 from ..mappers.content_mapper import ContentMapper
+from ..records.base import Record, RecordWriter, collect_fields
 from ..utils.content_processor import ContentProcessor
 from ..models import SyncReport, SyncResult
 from .content_sync_base import ContentSyncBase
 
 
 class ContentSync(ContentSyncBase):
-    """Синхронизация контента — последовательная обработка строк."""
+    """Синхронизация контента — последовательная обработка записей."""
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None
     ) -> SyncReport:
         """
-        Синхронизировать один лист Excel (последовательно).
+        Синхронизировать группу записей одного типа контента (последовательно).
 
         Args:
-            sheet_name: Название листа (= тип контента)
-            df: DataFrame с данными листа
-            excel_writer: Writer для обратной записи (если нужна)
+            discriminator: Тип контента (post_type)
+            records: Записи одного типа
+            writer: Writer для обратной записи (если нужна)
 
         Returns:
-            SyncReport со статистикой и списком ошибочных строк
+            SyncReport со статистикой и списком ошибочных записей
         """
         stats = self._init_stats()
         error_results: List[SyncResult] = []
 
+        records = list(records)
+
         # Создаем endpoints
-        posts_endpoint = self._make_posts_endpoint(sheet_name)
+        posts_endpoint = self._make_posts_endpoint(discriminator)
         media_endpoint = self._make_media_endpoint()
 
         # Создаем mapper и content processor
         from ..config import Settings
         mapper = ContentMapper(
-            df.columns.tolist(),
+            collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
             known_taxonomies=Settings().get_taxonomies(),
         )
         content_processor = ContentProcessor(self.config.paths.content_folder)
 
         # Обрабатываем в порядке: delete → update → add
-        for action in ["delete", "update", "add"]:
-            # Фильтруем строки по action
-            action_rows = df[df["action"].str.lower().str.strip() == action]
+        by_action = self._group_by_action(records)
+        for action in self.ACTION_ORDER:
+            action_records = by_action[action]
 
-            if len(action_rows) == 0:
+            if not action_records:
                 continue
 
-            logger.info(f"Processing {action}: {len(action_rows)} rows")
+            logger.info(f"Processing {action}: {len(action_records)} rows")
 
-            for idx, row in action_rows.iterrows():
+            for record in action_records:
+                idx = record.write_key
+                row = record.data
                 try:
                     # Валидация
                     is_valid, error_msg = mapper.validate_row(row, action)
@@ -99,10 +102,9 @@ class ContentSync(ContentSyncBase):
                     elif action == "delete":
                         stats["deleted"] += 1
 
-                    # Записываем обратно в Excel
-                    if excel_writer and result and self.config.sync.update_excel:
-                        excel_writer.update_from_api_response(
-                            sheet_name,
+                    # Записываем обратно в источник
+                    if writer and result and self.config.sync.update_excel:
+                        writer.update_from_result(
                             idx,
                             result,
                             action,
@@ -121,9 +123,7 @@ class ContentSync(ContentSyncBase):
                     ))
 
         # Подсчитываем пропущенные
-        valid_actions = {"add", "update", "delete"}
-        skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
-        stats["skipped"] = len(skipped)
-        stats["total"] = len(df)
+        stats["skipped"] = self._count_skipped(records)
+        stats["total"] = len(records)
 
         return SyncReport.from_stats(stats, error_results)

@@ -9,9 +9,20 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
+from src.records.base import Record
 from src.sync.content_sync import ContentSync
 from src.models import SyncReport, SyncResult
 from src.config import AppConfig, WordPressConfig, SyncConfig, PathsConfig
+
+
+# ── Helpers ─────────────────────────────────────────────────────────
+
+def make_records(df: pd.DataFrame, discriminator: str = "posts") -> list[Record]:
+    """DataFrame → список Record (как их отдаёт ExcelRecordSource)."""
+    return [
+        Record(discriminator=discriminator, is_taxonomy=False, data=row.to_dict(), write_key=idx)
+        for idx, row in df.iterrows()
+    ]
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
@@ -81,10 +92,10 @@ def mock_taxonomy_cache():
 # ── ContentSync return type ───────────────────────────────────────────
 
 class TestContentSyncReturnType:
-    async def test_sync_sheet_returns_sync_report(
+    async def test_sync_records_returns_sync_report(
         self, app_config, mock_wp_client, mock_taxonomy_cache
     ):
-        """sync_sheet должен возвращать SyncReport, а не dict."""
+        """sync_records должен возвращать SyncReport, а не dict."""
         df = pd.DataFrame({
             "id": ["", "10"],
             "action": ["skip", "skip"],
@@ -92,7 +103,7 @@ class TestContentSyncReturnType:
         })
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
-        result = await sync.sync_sheet("posts", df, excel_writer=None)
+        result = await sync.sync_records("posts", make_records(df), writer=None)
 
         assert isinstance(result, SyncReport)
         assert hasattr(result, "total")
@@ -113,7 +124,7 @@ class TestContentSyncReturnType:
         })
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
-        report = await sync.sync_sheet("posts", df, excel_writer=None)
+        report = await sync.sync_records("posts", make_records(df), writer=None)
         stats = report.to_stats()
 
         assert "total" in stats
@@ -137,7 +148,7 @@ class TestContentSyncStats:
         })
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
-        report = await sync.sync_sheet("posts", df, excel_writer=None)
+        report = await sync.sync_records("posts", make_records(df), writer=None)
 
         assert report.total == 3
         assert report.skipped == 3
@@ -153,7 +164,7 @@ class TestContentSyncStats:
         })
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
-        report = await sync.sync_sheet("posts", df, excel_writer=None)
+        report = await sync.sync_records("posts", make_records(df), writer=None)
 
         assert report.total == len(df)
 
@@ -176,7 +187,7 @@ class TestSyncResultErrors:
         })
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
-        report = await sync.sync_sheet("posts", df, excel_writer=None)
+        report = await sync.sync_records("posts", make_records(df), writer=None)
 
         assert report.failed >= 0  # Ошибки считаются
         # Если ошибка попала в errors list, проверяем структуру
@@ -200,7 +211,7 @@ class TestDryRunMode:
         })
 
         sync = ContentSync(mock_wp_client, dry_run_config, mock_taxonomy_cache)
-        await sync.sync_sheet("posts", df, excel_writer=None)
+        await sync.sync_records("posts", make_records(df), writer=None)
 
         # В dry-run не должны вызываться post/put/delete
         mock_wp_client.post.assert_not_called()

@@ -17,9 +17,11 @@ from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
 from ..wordpress.client import WordPressClient
 from ..wordpress.taxonomies import TaxonomyCache
+from ..records.excel import ExcelRecordSource, ExcelRecordWriter
 from ..sync.content_sync import ContentSync
 from ..sync.content_sync_async import ContentSyncAsync
 from ..sync.media_sync import MediaSync
+from ..sync.orchestrator import sync_record_groups
 from ..sync.taxonomy_sync import TaxonomySync
 from ..sync.taxonomy_sync_async import TaxonomySyncAsync
 from ..utils.logger import setup_logger, log_summary
@@ -244,38 +246,38 @@ async def _process_sheet(
 ) -> dict:
     """Обработка одного листа (единая для sync и async)."""
     try:
-        df = reader.read_sheet(sheet_name)
-        logger.info(f"Всего строк: {len(df)}")
+        source = ExcelRecordSource(reader, sheet_name)
+        fields = source.fields()
+        records = list(source.read())
+        logger.info(f"Всего строк: {len(records)}")
 
         if test_mode:
-            original_len = len(df)
-            df = df.head(3)
-            logger.info(f"ТЕСТОВЫЙ РЕЖИМ: Обрабатываем только первые {len(df)} строк из {original_len}")
+            original_len = len(records)
+            records = records[:3]
+            logger.info(f"ТЕСТОВЫЙ РЕЖИМ: Обрабатываем только первые {len(records)} строк из {original_len}")
 
-        if "action" not in df.columns:
+        if "action" not in fields:
             logger.warning(f"Лист {sheet_name} не содержит колонку 'action', пропускаем")
-            return _empty_stats(total=len(df), skipped=len(df))
+            return _empty_stats(total=len(records), skipped=len(records))
 
-        sheet_type = reader.classify_sheet(sheet_name)
+        writer = ExcelRecordWriter(excel_writer, sheet_name) if excel_writer else None
+        sheet_type = source.sheet_type
 
-        if sheet_type == "content":
-            report = await content_sync.sync_sheet(sheet_name, df, excel_writer)
+        if sheet_type in ("content", "taxonomy"):
+            if sheet_type == "taxonomy" and config.sync.skip_tax:
+                logger.info(f"--skip-tax: пропускаем лист '{sheet_name}'")
+                return _empty_stats(total=len(records), skipped=len(records))
+            report = await sync_record_groups(records, content_sync, taxonomy_sync, writer)
             return report.to_stats()
         elif sheet_type == "media":
             if config.sync.skip_media:
                 logger.info(f"--skip-media: пропускаем лист '{sheet_name}'")
-                return _empty_stats(total=len(df), skipped=len(df))
-            report = await media_sync.sync_media(df, excel_writer)
-            return report.to_stats()
-        elif sheet_type == "taxonomy":
-            if config.sync.skip_tax:
-                logger.info(f"--skip-tax: пропускаем лист '{sheet_name}'")
-                return _empty_stats(total=len(df), skipped=len(df))
-            report = await taxonomy_sync.sync_sheet(sheet_name, df, excel_writer)
+                return _empty_stats(total=len(records), skipped=len(records))
+            report = await media_sync.sync_media(records, writer)
             return report.to_stats()
         else:
             logger.warning(f"Неизвестный тип листа: {sheet_name}")
-            return _empty_stats(total=len(df), skipped=len(df))
+            return _empty_stats(total=len(records), skipped=len(records))
 
     except Exception as e:
         logger.exception(f"Ошибка обработки листа {sheet_name}")
