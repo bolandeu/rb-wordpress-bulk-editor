@@ -2,9 +2,20 @@
 Поддержка проектов: --project <name> загружает конфиг из projects/<name>/
 """
 
+from importlib import metadata
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from dataclasses import dataclass
+
+from dotenv import dotenv_values
+
+from ..exceptions import CliTooOld
+
+# Имя пакета и команды — для importlib.metadata и подсказки об обновлении.
+PACKAGE_NAME = "wp-bulk-editor"
+
+# Ключ в .env проекта: минимальная версия CLI, понимающая этот проект.
+MIN_VERSION_KEY = "WP_BULK_MIN_VERSION"
 
 
 def find_repo_root() -> Path:
@@ -52,6 +63,21 @@ class ProjectContext:
             return self.root / "content"
         return Path("data/content")
 
+    @property
+    def min_version(self) -> Optional[str]:
+        """
+        Минимальная версия CLI, объявленная проектом (`WP_BULK_MIN_VERSION` в .env).
+
+        .env проекта — единственная конфигурационная поверхность проекта здесь,
+        отдельного config-файла нет. Читаем файл напрямую (`dotenv_values`),
+        не трогая окружение процесса.
+        """
+        env_file = self.env_file
+        if env_file is None:
+            return None
+        value = (dotenv_values(env_file).get(MIN_VERSION_KEY) or "").strip()
+        return value or None
+
     def find_excel(self) -> Optional[Path]:
         """Найти xlsx файл в папке проекта."""
         if not self.root:
@@ -90,3 +116,51 @@ def resolve_project(project_name: Optional[str]) -> ProjectContext:
         )
 
     return ProjectContext(name=project_name, root=project_dir.resolve())
+
+
+def installed_version() -> Optional[str]:
+    """
+    Версия установленного пакета или None при запуске из исходников.
+
+    Голый запуск из репозитория (пакет не установлен) версии не имеет —
+    проверку совместимости в этом случае пропускаем, а не проваливаем.
+    """
+    try:
+        return metadata.version(PACKAGE_NAME)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _version_key(value: str) -> Tuple[int, ...]:
+    """Версия → кортеж чисел для сравнения. Нечисловые хвосты (1.2.0rc1) отбрасываются."""
+    parts = []
+    for chunk in value.split("."):
+        digits = ""
+        for ch in chunk:
+            if not ch.isdigit():
+                break
+            digits += ch
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def check_cli_compat(project: ProjectContext, version: Optional[str] = None) -> None:
+    """
+    Проверить, что установленный CLI не старее объявленного проектом минимума.
+
+    Raises:
+        CliTooOld: установленная версия младше `WP_BULK_MIN_VERSION` (exit 6).
+    """
+    required = project.min_version
+    if not required:
+        return
+
+    current = version if version is not None else installed_version()
+    if current is None:
+        return
+
+    if _version_key(current) < _version_key(required):
+        raise CliTooOld(
+            f"Проект '{project.name}' требует wp-bulk-editor >= {required}, "
+            f"установлена версия {current}."
+        )

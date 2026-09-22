@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .. import output
 from ..output import log_stream
 from .common import handle_command_errors, load_and_print_credentials
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file, require_excel_file
@@ -84,7 +85,9 @@ def fetch(
         None,
         "--exclude",
         help="Список типов для исключения через запятую (posts,category)"
-    )
+    ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
 ):
     """
     Получение данных из WordPress -> Excel
@@ -94,6 +97,8 @@ def fetch(
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+    if non_interactive:
+        output.get_options(ctx).non_interactive = True
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch[/bold blue]\n")
 
@@ -104,9 +109,10 @@ def fetch(
         console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
         if file.exists():
-            if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
-                console.print("[red]Отменено пользователем[/red]")
-                raise typer.Exit(1)
+            with handle_command_errors(ctx):
+                output.require_confirmation(
+                    ctx, f"Файл {file} уже существует. Перезаписать?", confirm
+                )
     else:
         auto_mode = False
         console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")

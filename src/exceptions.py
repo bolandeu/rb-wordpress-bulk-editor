@@ -153,6 +153,21 @@ class ImageProcessingError(WPBulkEditorError):
     pass
 
 
+class Aborted(WPBulkEditorError):
+    """Пользователь отказался подтверждать опасную операцию"""
+
+    code = "ABORTED"
+    exit_code = 1
+
+
+class CliTooOld(WPBulkEditorError):
+    """Установленная версия CLI старее, чем требует проект (WP_BULK_MIN_VERSION)"""
+
+    code = "CLI_TOO_OLD"
+    exit_code = 6
+    default_action = "Обновите CLI: uv tool upgrade wp-bulk-editor"
+
+
 class CredentialStoreUnavailable(WPBulkEditorError):
     """OS keychain недоступен для записи/удаления credentials"""
 

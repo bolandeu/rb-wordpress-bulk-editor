@@ -126,6 +126,8 @@ def options(
         "-d",
         help="Показать что будет отправлено, без отправки"
     ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
 ):
@@ -164,13 +166,9 @@ def options(
 
             # Проверяем существование
             if file.exists():
-                if opts.json:
-                    raise ValidationError(
-                        f"Файл {file} уже существует; укажите другой --file"
-                    )
-                if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
-                    console.print("[red]Отменено пользователем[/red]")
-                    raise typer.Exit(1)
+                output.require_confirmation(
+                    ctx, f"Файл {file} уже существует. Перезаписать?", confirm
+                )
         elif human_mode:
             console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
 
@@ -343,6 +341,8 @@ def bulk_delete(
         "-d",
         help="Показать что будет удалено, без удаления"
     ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -353,23 +353,43 @@ def bulk_delete(
     """
     Массовое удаление всех записей указанного типа
 
+    ОПАСНО: удаление необратимо. Сначала --dry-run (ничего не удаляет),
+    затем — подтверждение: человеку задаётся вопрос, а под --non-interactive
+    (и в --json, и когда stdin не терминал) нужен явный --confirm.
+
     Примеры:
-        # Удалить все черновики постов в корзину (используя .env)
-        python -m src.cli bulk-delete --post-type posts --status draft
+        # Посмотреть что будет удалено, ничего не трогая
+        wp-bulk bulk-delete --post-type posts --dry-run
 
-        # Удалить все записи типа service полностью с медиа
-        python -m src.cli bulk-delete --post-type service --force --delete-media
+        # Удалить все черновики постов в корзину (спросит подтверждение)
+        wp-bulk bulk-delete --post-type posts --status draft
 
-        # Показать что будет удалено (dry-run)
-        python -m src.cli bulk-delete --post-type posts --dry-run
+        # Неинтерактивно: подтверждение обязательно флагом
+        wp-bulk bulk-delete --post-type service --force --delete-media \
+            --non-interactive --confirm
+
+    Exit-коды: 0 — успех, 1 — отменено пользователем/непредвиденная ошибка,
+    2 — аргументы или отсутствующий --confirm, 3 — нет credentials,
+    5 — недоступен WordPress.
     """
     env_file = resolve_env_file(ctx, env_file)
+    if non_interactive:
+        output.get_options(ctx).non_interactive = True
 
     console.print("\n[bold red]Bulk Delete[/bold red]")
     console.print("=" * 60 + "\n")
 
     with handle_command_errors(ctx):
         log_file = setup_command_logging(ctx, "bulk_delete", verbose)
+
+        # Неинтерактивный запуск без --confirm отвергаем сразу, до обращения
+        # к сайту: ошибка должна быть про отсутствующий --confirm, а не про сеть.
+        if not dry_run and not confirm and not output.is_interactive(ctx):
+            output.require_confirmation(
+                ctx,
+                f"удаление всех записей типа '{post_type}' (статус: {status})",
+                confirm,
+            )
 
         # Получаем credentials (приоритет: CLI параметры -> .env файл)
         domain, username, password = load_and_print_credentials(
@@ -390,14 +410,39 @@ def bulk_delete(
         # Создаем WordPress клиент
         wp_config = _make_wp_config(domain, username, password)
 
+        # Сначала читаем список — он же и есть превью для --dry-run,
+        # и количество записей для вопроса о подтверждении.
+        all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
+        console.print(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
+
+        if dry_run:
+            # Превью никогда не спрашивает и ничего не меняет.
+            console.print(f"[yellow]DRY-RUN: Будет удалено {len(all_posts)} записей[/yellow]")
+            for post in all_posts[:10]:
+                title_text = wp_rendered(post.get("title", {}), "No title")
+                console.print(f"  ID={post['id']}: {title_text}")
+            if len(all_posts) > 10:
+                console.print(f"  ... и еще {len(all_posts) - 10} записей")
+            console.print()
+            return
+
+        if all_posts:
+            mode = "полностью (минуя корзину)" if force else "в корзину"
+            media_note = " вместе с featured media" if delete_media else ""
+            output.require_confirmation(
+                ctx,
+                f"Удалить {len(all_posts)} записей типа '{post_type}' "
+                f"(статус: {status}) {mode}{media_note}?",
+                confirm,
+            )
+
         # Запускаем удаление
         stats = asyncio.run(_run_bulk_delete(
             wp_config,
+            all_posts,
             post_type,
-            status,
             force,
-            delete_media,
-            dry_run
+            delete_media
         ))
 
         # Показываем результаты
@@ -411,19 +456,32 @@ def bulk_delete(
         console.print(f"\n[dim]Логи: {log_file}[/dim]")
 
 
-async def _run_bulk_delete(
+async def _collect_posts(
     wp_config: WordPressConfig,
     post_type: str,
     status: str,
+) -> List[Dict]:
+    """Прочитать список записей, которые попадут под удаление (без изменений на сайте)."""
+    async with WordPressClient(wp_config) as client:
+        posts_endpoint = PostsEndpoint(client, post_type)
+        logger.info(f"Fetching all {post_type} with status={status}...")
+        all_posts = await posts_endpoint.get_all(status=status)
+        logger.info(f"Found {len(all_posts)} {post_type}")
+        return all_posts
+
+
+async def _run_bulk_delete(
+    wp_config: WordPressConfig,
+    all_posts: List[Dict],
+    post_type: str,
     force: bool,
-    delete_media: bool,
-    dry_run: bool
+    delete_media: bool
 ) -> Dict[str, int]:
-    """Выполнить массовое удаление записей."""
+    """Выполнить массовое удаление уже собранных записей."""
     from ..wordpress.media import MediaEndpoint
 
     stats = {
-        "found": 0,
+        "found": len(all_posts),
         "deleted": 0,
         "media_deleted": 0,
         "errors": 0
@@ -432,21 +490,6 @@ async def _run_bulk_delete(
     async with WordPressClient(wp_config) as client:
         posts_endpoint = PostsEndpoint(client, post_type)
         media_endpoint = MediaEndpoint(client) if delete_media else None
-
-        logger.info(f"Fetching all {post_type} with status={status}...")
-        all_posts = await posts_endpoint.get_all(status=status)
-
-        stats["found"] = len(all_posts)
-        logger.info(f"Found {len(all_posts)} {post_type}")
-
-        if dry_run:
-            console.print(f"\n[yellow]DRY-RUN: Будет удалено {len(all_posts)} записей[/yellow]")
-            for post in all_posts[:10]:
-                title_text = wp_rendered(post.get("title", {}), "No title")
-                console.print(f"  ID={post['id']}: {title_text}")
-            if len(all_posts) > 10:
-                console.print(f"  ... и еще {len(all_posts) - 10} записей")
-            return stats
 
         for post in all_posts:
             try:

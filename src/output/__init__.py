@@ -17,12 +17,14 @@ from typing import Any, Callable, Dict, Optional
 import typer
 from loguru import logger
 
-from ..exceptions import CliError, WPBulkEditorError
+from ..exceptions import Aborted, CliError, ValidationError, WPBulkEditorError
 from . import human
 from . import json as json_output
 
 __all__ = [
+    "ConfirmOption",
     "JsonOption",
+    "NonInteractiveOption",
     "OutputOptions",
     "QuietOption",
     "VerboseOption",
@@ -33,7 +35,9 @@ __all__ = [
     "guard",
     "help_if_no_command",
     "human",
+    "is_interactive",
     "is_json",
+    "require_confirmation",
     "set_global_options",
     "vecho",
 ]
@@ -42,6 +46,12 @@ __all__ = [
 JsonOption = typer.Option(False, "--json", help="Машиночитаемый JSON-вывод.")
 QuietOption = typer.Option(False, "--quiet", help="Только существенный вывод.")
 VerboseOption = typer.Option(False, "--verbose", "-v", help="Подробная диагностика.")
+NonInteractiveOption = typer.Option(
+    False, "--non-interactive", help="Никогда не спрашивать; вместо вопроса — ошибка."
+)
+ConfirmOption = typer.Option(
+    False, "--confirm", help="Подтвердить опасную операцию без вопроса."
+)
 
 _META_KEY = "wp_bulk.output"
 
@@ -50,6 +60,7 @@ _LOCAL_FLAGS = {
     "json_output": "json",
     "quiet": "quiet",
     "verbose": "verbose",
+    "non_interactive": "non_interactive",
 }
 
 
@@ -59,6 +70,7 @@ class OutputOptions:
     json: bool = False
     quiet: bool = False
     verbose: bool = False
+    non_interactive: bool = False
 
 
 def get_options(ctx: Optional[typer.Context]) -> OutputOptions:
@@ -68,12 +80,19 @@ def get_options(ctx: Optional[typer.Context]) -> OutputOptions:
     return ctx.meta.setdefault(_META_KEY, OutputOptions())
 
 
-def set_global_options(ctx: typer.Context, json: bool, quiet: bool, verbose: bool) -> OutputOptions:
+def set_global_options(
+    ctx: typer.Context,
+    json: bool,
+    quiet: bool,
+    verbose: bool,
+    non_interactive: bool = False,
+) -> OutputOptions:
     """Записать глобальные флаги (вызывается из callback приложения)."""
     options = get_options(ctx)
     options.json = options.json or json
     options.quiet = options.quiet or quiet
     options.verbose = options.verbose or verbose
+    options.non_interactive = options.non_interactive or non_interactive
     return options
 
 
@@ -129,6 +148,46 @@ def emit_error(ctx: Optional[typer.Context], error: WPBulkEditorError) -> None:
     else:
         human.error(error.message, error.action or "")
     raise typer.Exit(code=error.exit_code)
+
+
+def is_interactive(ctx: Optional[typer.Context]) -> bool:
+    """
+    Можно ли задать пользователю вопрос.
+
+    Нельзя при `--non-interactive`, в JSON-режиме (вопрос сломал бы конверт)
+    и когда stdin не терминал (пайп, CI, вызов агентом): там вопрос — это зависание.
+    """
+    options = get_options(ctx)
+    if options.non_interactive or options.json:
+        return False
+    return sys.stdin is not None and sys.stdin.isatty()
+
+
+def require_confirmation(
+    ctx: Optional[typer.Context],
+    description: str,
+    confirm: bool = False,
+) -> None:
+    """
+    Гейт перед необратимой операцией. Вызывать после проверки --dry-run.
+
+    `--confirm` пропускает вопрос. Человеку у терминала задаётся вопрос;
+    отказ — `Aborted` (exit 1). Без терминала (или при --non-interactive/--json)
+    без `--confirm` — `INVALID_ARGUMENTS` (exit 2), а не зависший prompt:
+    агент не должен запускать необратимое случайно.
+    """
+    if confirm:
+        return
+
+    if not is_interactive(ctx):
+        raise ValidationError(
+            f"Операция необратима и требует подтверждения: {description}",
+            action="Повторите с --confirm (или уберите --non-interactive), "
+                   "либо посмотрите план с --dry-run.",
+        )
+
+    if not typer.confirm(description):
+        raise Aborted("Отменено пользователем")
 
 
 def help_if_no_command(ctx: typer.Context) -> None:

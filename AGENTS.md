@@ -35,6 +35,13 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 Не создавать свой `httpx.AsyncClient` в endpoint-ах: загрузка медиа тоже идёт
 через провайдер (`upload_binary`), иначе теряются авторизация, retry и CB.
 
+**Необратимое действие — только через гейт.**
+`bulk-delete` сначала даёт `--dry-run` (превью, без вопросов и без изменений),
+затем `output.require_confirmation(ctx, описание, confirm)` — и только потом удаляет.
+Свой `typer.confirm` в командах не писать: под `--non-interactive`, в `--json`
+и когда stdin не терминал, вопрос должен превращаться в `INVALID_ARGUMENTS` (exit 2),
+а не в зависший prompt. Гейт вызывается **после** проверки `--dry-run`, не до.
+
 **Секреты — keychain или окружение, не файлы проекта.**
 `src/credentials/manager.py` (keyring, provider = домен сайта).
 Порядок: CLI-флаг → переменная окружения → keychain → `.env` (legacy).
@@ -148,6 +155,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | `WP_CIRCUIT_BREAKER_THRESHOLD` / `WP_CIRCUIT_BREAKER_RECOVERY` | CB настройки |
 | `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_MODELS` / `LLM_PROMPT` | LLM генерация |
 | `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_CREDENTIALS_PATH` | Google Sheets |
+| `WP_BULK_MIN_VERSION=1.2.0` | минимальная версия CLI для этого проекта |
 
 ---
 
@@ -159,6 +167,28 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 **Авто-обнаружение Excel** — только для `fetch`. Остальные команды (`sync`, `async`, `llm`, `validate`, `fetch-media`) требуют явный `--file`.
 
 **Авто-обнаружение output** — `export` → `projects/<name>/exported_content/`, `export-media` → `projects/<name>/export_media/`.
+
+**Минимальная версия CLI.** Проект объявляет её в своём `.env`:
+`WP_BULK_MIN_VERSION=1.2.0`. Читает `ProjectContext.min_version`, проверяет
+`check_cli_compat()` в callback приложения: версия старее — `CliTooOld` (exit 6)
+до выполнения команды. Исключение — `doctor`: он обязан уметь диагностировать
+именно несовместимую версию, поэтому показывает её проверкой `cli_compat`.
+Запуск из исходников (пакет не установлен) версии не имеет — проверка пропускается.
+
+---
+
+## Диагностика и бандленная документация
+
+`wp-bulk doctor [--json] [--check-connection]` — единственная команда проверки
+готовности окружения. Проверки: `project`, `cli_compat`, `config`, `credentials`
+(с источником: cli/env/keychain/.env), `credential_store`, и `connection` —
+только по явному флагу, чтобы doctor оставался быстрым и офлайновым.
+Статусы: `ok` / `warn` / `fail`; сам запуск диагностики всегда exit 0.
+
+`src/data/SKILL.md` — соглашения CLI для агента, едет внутри пакета
+(`[tool.setuptools.package-data]`). Печатается флагом `wp-bulk --ai`.
+**Списка команд там нет и быть не должно:** его печатает голый `wp-bulk` из
+docstring'ов. Добавили команду — написали хороший docstring, SKILL.md не трогаем.
 
 ---
 
@@ -172,7 +202,10 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 3. Credentials грузить через `load_and_print_credentials(..., ctx=ctx)`.
 4. Если нужен файл: `resolve_excel_file(ctx, file)` — разруливает explicit > project xlsx > None.
 5. Если нужен `.env`: `resolve_env_file(ctx, env_file)`.
-6. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
+6. Если команда что-то спрашивает или необратимо меняет сайт — добавить
+   `confirm: bool = output.ConfirmOption` и `non_interactive: bool = output.NonInteractiveOption`,
+   вопрос задавать только через `output.require_confirmation`.
+7. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
 
 ---
 
@@ -196,6 +229,8 @@ WPBulkEditorError                       UNEXPECTED (1)
 │   ├── NetworkError          ← ретраить
 │   └── MediaUploadError
 ├── ValidationError                     INVALID_ARGUMENTS (2)
+├── Aborted            ← отказ в confirm-гейте   ABORTED (1)
+├── CliTooOld          ← WP_BULK_MIN_VERSION     CLI_TOO_OLD (6)
 ├── CredentialStoreUnavailable          CREDENTIAL_STORE_UNAVAILABLE (1)
 ├── ImageProcessingError                UNEXPECTED (1)
 └── CircuitBreakerOpenError (utils/retry.py)   PROVIDER_ERROR (5)
@@ -212,3 +247,42 @@ WPBulkEditorError                       UNEXPECTED (1)
 - Разделитель таксономий в Excel: `"; "` (точка с запятой + пробел).
 - Path traversal: валидировать через `resolve().relative_to()` для всех пользовательских путей.
 - Async: все WP API calls через `async with WordPressClient(...)`. `asyncio.run()` только на CLI-уровне.
+- Кроссплатформенность: `pathlib`/`shutil`, никаких `os.system`, `shell=True` и
+  POSIX-путей строкой. Пакет должен ставиться и работать на macOS/Linux/Windows.
+
+---
+
+## Тесты и качество
+
+```bash
+uv sync
+uv run python -m pytest -q                     # (uv run pytest не резолвится в PATH)
+uv run python -m pytest -q --cov=src --cov-report=term-missing   # fail_under в pyproject
+uv run ruff check .
+```
+
+Конвенции тестов: плоские `tests/test_<module>.py`, группировка в `class Test<Thing>:`,
+`asyncio_mode = "auto"`. HTTP мокается через `httpx.MockTransport` + хелпер
+`mock_transport(responses)` (`tests/test_wordpress_client.py`), настоящий OS keychain
+в тестах подменяется (`tests/test_credentials.py::FakeKeyring`).
+
+E2E не автоматизированы: нужен живой WordPress (docker-compose с `wordpress` + `mysql`,
+Application Password в отдельном `.env.test`). Основной сценарий для ручной проверки —
+`fetch` → правка Excel (`action=update/add/delete`) → `async` → сверка через WP API и
+проверка, что новой строке записан `id`, а `action` стал `skip`.
+
+---
+
+## Windows
+
+- Ставить через `uv tool install "git+<repo-url>"` — тогда `wp-bulk` попадает в PATH.
+  При работе из клона (`uv pip install -e .`) `wp-bulk.exe` лежит в `.venv\Scripts\`,
+  которая в PATH не добавляется: запускать `uv run wp-bulk ...` из папки проекта.
+- `uv sync` ставит точно по `uv.lock` (воспроизводимо), `uv pip install -e .` — свежие
+  совместимые версии по `pyproject.toml`.
+- Кириллица «кракозябрами» в консоли: `chcp 65001` на сессию или `PYTHONUTF8=1` в
+  переменных окружения системы.
+- `uv` не найден сразу после установки — открыть терминал заново (PATH обновляется
+  только в новой сессии).
+- `SSL: CERTIFICATE_VERIFY_FAILED` на локальном Docker с самоподписанным сертификатом:
+  `WP_VERIFY_SSL=false` в `.env` проекта.

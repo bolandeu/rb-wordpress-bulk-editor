@@ -10,6 +10,7 @@ import typer
 
 from src import output
 from src.exceptions import (
+    Aborted,
     AuthenticationError,
     CredentialStoreUnavailable,
     ServerError,
@@ -124,6 +125,38 @@ def test_guard_passes_through_typer_exit():
         command(ctx=make_ctx())
 
     assert exc.value.exit_code == 0
+
+
+# ── Гейт подтверждения ───────────────────────────────────────────────
+
+class TestRequireConfirmation:
+    def test_confirm_flag_skips_the_question(self, monkeypatch):
+        monkeypatch.setattr(typer, "confirm", lambda *a, **kw: pytest.fail("спросил, хотя был --confirm"))
+        output.require_confirmation(make_ctx(), "удалить всё?", confirm=True)
+
+    def test_non_interactive_without_confirm_is_invalid_arguments(self):
+        ctx = make_ctx()
+        output.get_options(ctx).non_interactive = True
+
+        with pytest.raises(ValidationError) as exc:
+            output.require_confirmation(ctx, "удалить всё?")
+
+        assert exc.value.exit_code == 2
+        assert "--confirm" in exc.value.action
+
+    def test_json_mode_never_prompts(self):
+        with pytest.raises(ValidationError):
+            output.require_confirmation(make_ctx(json_mode=True), "удалить всё?")
+
+    def test_user_refusal_is_aborted(self, monkeypatch):
+        monkeypatch.setattr(output, "is_interactive", lambda ctx: True)
+        monkeypatch.setattr(typer, "confirm", lambda *a, **kw: False)
+
+        with pytest.raises(Aborted) as exc:
+            output.require_confirmation(make_ctx(), "удалить всё?")
+
+        assert exc.value.exit_code == 1
+        assert exc.value.code == "ABORTED"
 
 
 def test_guard_picks_up_local_json_flag(capsys):
