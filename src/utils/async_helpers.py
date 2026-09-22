@@ -8,9 +8,10 @@ Async helpers для параллельной обработки строк.
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Optional, Callable, Dict
-import pandas as pd
+from typing import Any, Optional, Callable, Dict, Mapping
 from loguru import logger
+
+from ..records.base import WriteKey
 
 
 @dataclass
@@ -21,13 +22,13 @@ class ProcessResult:
     Attributes:
         success: True если обработка успешна, False если ошибка
         action: Тип операции ("added", "updated", "deleted")
-        row_index: Индекс строки в DataFrame
+        row_index: Ключ обратной записи (write_key)
         api_response: Ответ от WordPress API (если success=True)
         error: Исключение (если success=False)
     """
     success: bool
     action: str
-    row_index: int
+    row_index: WriteKey
     api_response: Optional[Dict[str, Any]] = None
     error: Optional[Exception] = None
 
@@ -66,8 +67,8 @@ class AsyncBatchProcessor:
     async def process_row(
         self,
         action: str,
-        row_index: int,
-        row: pd.Series,
+        row_index: WriteKey,
+        row: Mapping[str, Any],
         process_func: Callable,
         *args,
         **kwargs
@@ -84,8 +85,8 @@ class AsyncBatchProcessor:
 
         Args:
             action: Тип операции ("add", "update", "delete")
-            row_index: Индекс строки в DataFrame
-            row: Данные строки (pandas Series) - для логирования, не передаётся в func
+            row_index: Ключ обратной записи (write_key)
+            row: Данные записи (Mapping) - для логирования, не передаётся в func
             process_func: Async функция обработки (partial с уже привязанными аргументами)
                           Signature: async def func() -> Dict
             *args: Дополнительные позиционные аргументы для process_func

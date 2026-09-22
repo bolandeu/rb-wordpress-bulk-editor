@@ -32,11 +32,38 @@ class TestIsTaxonomyColumn:
         assert is_taxonomy_column(col) is True
 
     @pytest.mark.parametrize("col", [
+        "rb_services_cat", "genre-cat",       # cat
+        "post_tag", "genre-tag",              # tag
+        "custom_tax", "genre-tax",            # tax
+    ])
+    def test_suffix_matrix(self, col):
+        assert is_taxonomy_column(col) is True
+
+    @pytest.mark.parametrize("col", ["RB_Services_Cat", "Genre-TAG", "Custom_Tax"])
+    def test_suffix_case_insensitive(self, col):
+        assert is_taxonomy_column(col) is True
+
+    @pytest.mark.parametrize("col", [
         "title", "content", "slug", "status", "acf_price",
-        "id", "action", "catalog",  # 'catalog' ends with 'cat' but not '-cat'
+        "id", "action",
+        "catalog",     # заканчивается на 'cat', но без разделителя
+        "cat", "tag_", "taxonomy", "category_id",
     ])
     def test_negative_cases(self, col):
         assert is_taxonomy_column(col) is False
+
+    @pytest.mark.parametrize("col", [
+        "acf.product_cat", "seo.meta_tag", "meta.custom_tax",  # dot-нотация
+        "acf_service_cat", "acf_meta-tag",                     # legacy ACF префикс
+    ])
+    def test_suffix_does_not_shadow_nested_and_acf(self, col):
+        """Суффикс-эвристика не должна съедать dot-нотацию и acf_-колонки."""
+        assert is_taxonomy_column(col) is False
+
+    def test_explicit_override_wins_over_nested_and_acf(self):
+        """Явный список таксономий — осознанный override, работает для любых имён."""
+        assert is_taxonomy_column("acf.product_cat", known_taxonomies=["acf.product_cat"])
+        assert is_taxonomy_column("acf_service_cat", known_taxonomies=["acf_service_cat"])
 
     def test_override_recognizes_custom_slug(self):
         assert is_taxonomy_column("brand", known_taxonomies=["brand", "regions"])

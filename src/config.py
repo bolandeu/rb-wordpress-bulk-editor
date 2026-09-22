@@ -121,7 +121,7 @@ class SyncConfig(BaseModel):
 
 class PathsConfig(BaseModel):
     """Конфигурация путей"""
-    excel_file: Path = Field(..., description="Путь к Excel файлу")
+    excel_file: Path = Field(..., description="Путь к файлу данных (.xlsx или .json)")
     media_folder: Path = Field(
         default=Path("data/media"),
         description="Папка с медиафайлами"
@@ -142,11 +142,11 @@ class PathsConfig(BaseModel):
     @field_validator("excel_file")
     @classmethod
     def validate_excel_file(cls, v: Path) -> Path:
-        """Проверка существования Excel файла"""
+        """Проверка существования файла данных (Excel или JSON)"""
         if not v.exists():
-            raise ValueError(f"Excel файл не найден: {v}")
-        if v.suffix not in [".xlsx", ".xls"]:
-            raise ValueError(f"Неверный формат файла: {v.suffix}. Ожидается .xlsx")
+            raise ValueError(f"Файл данных не найден: {v}")
+        if v.suffix not in [".xlsx", ".xls", ".json"]:
+            raise ValueError(f"Неверный формат файла: {v.suffix}. Ожидается .xlsx или .json")
         return v
 
     def ensure_dirs(self):

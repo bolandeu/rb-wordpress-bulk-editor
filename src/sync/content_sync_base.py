@@ -7,16 +7,21 @@ _add_item, _update_item, _delete_item, _process_taxonomies, _upload_media
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Dict, Any, Optional
-import pandas as pd
+from typing import Any, Dict, Mapping, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
-from ..wordpress.taxonomies import TaxonomiesEndpoint, TaxonomyCache, normalize_taxonomy_name
+from ..wordpress.taxonomies import (
+    TaxonomiesEndpoint,
+    TaxonomyCache,
+    normalize_taxonomy_name,
+    primary_term_meta_key,
+)
 from ..wordpress.media import MediaEndpoint
 from ..mappers.content_mapper import ContentMapper
 from ..config import AppConfig
+from ..records.base import Record, RecordWriter, has_value, is_blank
 from ..utils.content_processor import ContentProcessor
 from .base_sync import BaseSync
 
@@ -26,7 +31,7 @@ class ContentSyncBase(BaseSync):
     Базовый класс для синхронизации контента.
 
     Содержит общую логику обработки записей.
-    Наследники (ContentSync, ContentSyncAsync) реализуют только sync_sheet().
+    Наследники (ContentSync, ContentSyncAsync) реализуют только sync_records().
     """
 
     def __init__(
@@ -39,8 +44,13 @@ class ContentSyncBase(BaseSync):
         self.taxonomy_cache = taxonomy_cache
 
     @abstractmethod
-    async def sync_sheet(self, sheet_name: str, df, excel_writer=None):
-        """Синхронизировать один лист Excel."""
+    async def sync_records(
+        self,
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None,
+    ):
+        """Синхронизировать группу записей одного типа контента."""
 
     def _make_posts_endpoint(self, post_type: str) -> PostsEndpoint:
         """Фабричный метод для PostsEndpoint (можно переопределить в тестах)."""
@@ -56,18 +66,18 @@ class ContentSyncBase(BaseSync):
         media_endpoint: MediaEndpoint,
         mapper: ContentMapper,
         content_processor: ContentProcessor,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Создать новую запись."""
         # Dry-run: только логируем, не отправляем
         if self.config.sync.dry_run:
-            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            taxonomy_ids, _ = await self._process_taxonomies(row, mapper)
             payload = mapper.map_row(row, taxonomy_ids)
             logger.info(f"[DRY-RUN] Would CREATE post: {payload.get('title', 'No title')}")
             return {"id": 0, "link": "", "dry_run": True}
 
         # 1. Обрабатываем таксономии
-        taxonomy_ids = await self._process_taxonomies(row, mapper)
+        taxonomy_ids, primary_terms = await self._process_taxonomies(row, mapper)
 
         # 2. Создаем payload
         payload = mapper.map_row(row, taxonomy_ids)
@@ -79,7 +89,7 @@ class ContentSyncBase(BaseSync):
 
         # 4. Обрабатываем content_path если заполнен
         # Пропускаем если columns_filter активен и content не в фильтре
-        if (not _cf or "content" in _cf) and "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
+        if (not _cf or "content" in _cf) and has_value(row, "content_path"):
             content_filename = str(row["content_path"]).strip()
 
             if content_processor.validate_file_exists(content_filename):
@@ -122,18 +132,21 @@ class ContentSyncBase(BaseSync):
             result = await posts_endpoint.create(payload)
             post_id = result["id"]
 
-        # 6. Загружаем медиа (если есть img_path)
+        # 6. Основные (primary) термины таксономий — best-effort
+        await self._apply_primary_terms(posts_endpoint, post_id, primary_terms)
+
+        # 7. Загружаем медиа (если есть img_path)
         # Пропускаем если --skip-media или columns_filter активен и img_path/featured_media не в фильтре
         _should_media = not self.config.sync.skip_media and (not _cf or "img_path" in _cf or "featured_media" in _cf)
         if _should_media and mapper.should_upload_media(row):
             media_path = mapper.extract_media_path(row)
             # Берем title и alt_text из строки
-            title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else ""
-            alt_text = row.get("alt_text", "") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else ""
+            title = row.get("title", "") if has_value(row, "title") else ""
+            alt_text = row.get("alt_text", "") if has_value(row, "alt_text") else ""
             # Если alt_text не заполнен, используем title
             if not alt_text:
                 alt_text = title
-            caption = row.get("caption", "") if "caption" in row.index and pd.notna(row.get("caption")) else ""
+            caption = row.get("caption", "") if has_value(row, "caption") else ""
 
             try:
                 logger.debug(f"Uploading media for post {post_id}: {media_path}")
@@ -169,20 +182,20 @@ class ContentSyncBase(BaseSync):
         media_endpoint: MediaEndpoint,
         mapper: ContentMapper,
         content_processor: ContentProcessor,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Обновить существующую запись."""
         post_id = int(row["id"])
 
         # Dry-run: только логируем, не отправляем
         if self.config.sync.dry_run:
-            taxonomy_ids = await self._process_taxonomies(row, mapper)
+            taxonomy_ids, _ = await self._process_taxonomies(row, mapper)
             payload = mapper.map_row(row, taxonomy_ids)
             logger.info(f"[DRY-RUN] Would UPDATE post ID={post_id}: {payload.get('title', 'No title')}")
             return {"id": post_id, "link": "", "dry_run": True}
 
         # 1. Обрабатываем таксономии
-        taxonomy_ids = await self._process_taxonomies(row, mapper)
+        taxonomy_ids, primary_terms = await self._process_taxonomies(row, mapper)
 
         # 2. Создаем payload
         payload = mapper.map_row(row, taxonomy_ids)
@@ -194,7 +207,7 @@ class ContentSyncBase(BaseSync):
 
         # 4. Обрабатываем content_path если заполнен
         # Пропускаем если columns_filter активен и content не в фильтре
-        if (not _cf or "content" in _cf) and "content_path" in row.index and pd.notna(row["content_path"]) and row["content_path"] != "":
+        if (not _cf or "content" in _cf) and has_value(row, "content_path"):
             content_filename = str(row["content_path"]).strip()
 
             if content_processor.validate_file_exists(content_filename):
@@ -216,18 +229,18 @@ class ContentSyncBase(BaseSync):
             # Пропускаем если columns_filter активен и img_path/featured_media не в фильтре
             _should_media = not _cf or "img_path" in _cf or "featured_media" in _cf
             img_path_filled = _should_media and mapper.should_upload_media(row)
-            featured_media_in_excel = _should_media and "featured_media" in row.index and pd.notna(row["featured_media"]) and str(row["featured_media"]).strip() != ""
+            featured_media_in_excel = _should_media and has_value(row, "featured_media") and str(row["featured_media"]).strip() != ""
 
             if img_path_filled:
                 # Загружаем новую картинку
                 media_path = mapper.extract_media_path(row)
                 # Берем title и alt_text из строки
-                title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else ""
-                alt_text = row.get("alt_text", "") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else ""
+                title = row.get("title", "") if has_value(row, "title") else ""
+                alt_text = row.get("alt_text", "") if has_value(row, "alt_text") else ""
                 # Если alt_text не заполнен, используем title
                 if not alt_text:
                     alt_text = title
-                caption = row.get("caption", "") if "caption" in row.index and pd.notna(row.get("caption")) else ""
+                caption = row.get("caption", "") if has_value(row, "caption") else ""
 
                 try:
                     logger.debug(f"Uploading media for post {post_id}: {media_path}")
@@ -283,6 +296,9 @@ class ContentSyncBase(BaseSync):
         logger.info(f"Sending update for post ID={post_id}: payload keys={list(payload.keys())}, content={'yes (' + str(content_len) + ' chars)' if has_content else 'no'}")
         result = await posts_endpoint.update(post_id, payload)
 
+        # 6a. Основные (primary) термины таксономий — best-effort
+        await self._apply_primary_terms(posts_endpoint, post_id, primary_terms)
+
         # 7. Проверяем что content реально обновился (сравниваем хеши текста без тегов)
         if has_content:
             import hashlib, re
@@ -331,7 +347,7 @@ class ContentSyncBase(BaseSync):
     async def _delete_item(
         self,
         posts_endpoint: PostsEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Удалить запись (в корзину)."""
         post_id = int(row["id"])
@@ -363,22 +379,27 @@ class ContentSyncBase(BaseSync):
 
     async def _process_taxonomies(
         self,
-        row: pd.Series,
+        row: Mapping[str, Any],
         mapper: ContentMapper
-    ) -> Dict[str, list[int]]:
+    ) -> tuple[Dict[str, list[int]], Dict[str, int]]:
         """
-        Обработать таксономии из строки Excel.
+        Обработать таксономии из записи.
+
+        Уважает self.config.sync.dry_run: термины по-прежнему ищутся (это
+        безопасно и нужно для точного превью), но не создаются — отсутствующий
+        термин возвращается с ID=0 (см. TaxonomiesEndpoint.process_taxonomy_string).
 
         Args:
-            row: pandas Series
+            row: Запись (Mapping поле → значение)
             mapper: ContentMapper
 
         Returns:
-            Dict {taxonomy_name: [term_ids]}
+            (Dict {taxonomy_name: [term_ids]},
+             Dict {taxonomy_name: primary_term_id} — первый термин строки)
         """
         # Если skip_tax=True, пропускаем обработку таксономий
         if self.config.sync.skip_tax:
-            return {}
+            return {}, {}
 
         taxonomy_fields = mapper.detector.get_taxonomy_fields()
 
@@ -386,16 +407,17 @@ class ContentSyncBase(BaseSync):
         if mapper.allowed_columns:
             taxonomy_fields = [f for f in taxonomy_fields if f in mapper.allowed_columns]
             if not taxonomy_fields:
-                return {}
+                return {}, {}
 
         taxonomy_ids = {}
+        primary_terms: Dict[str, int] = {}
 
         for tax_field in taxonomy_fields:
-            if tax_field not in row.index:
+            if tax_field not in row:
                 continue
 
             value = row[tax_field]
-            if pd.isna(value) or value == "":
+            if is_blank(value):
                 continue
 
             # Создаем endpoint для таксономии
@@ -403,15 +425,56 @@ class ContentSyncBase(BaseSync):
             tax_endpoint = TaxonomiesEndpoint(self.wp_client, normalized_tax_field)
 
             # Обрабатываем строку с таксономиями (передаем кэш для обновления)
-            term_ids = await tax_endpoint.process_taxonomy_string(
+            # dry_run пробрасывается до create-веток get_or_create*: поиск
+            # существующих терминов выполняется как обычно, но ничего не создаётся
+            term_ids, primary_id = await tax_endpoint.process_taxonomy_string(
                 str(value),
-                taxonomy_cache=self.taxonomy_cache
+                taxonomy_cache=self.taxonomy_cache,
+                dry_run=self.config.sync.dry_run
             )
 
             if term_ids:
                 taxonomy_ids[tax_field] = term_ids
 
-        return taxonomy_ids
+            if primary_id is not None:
+                primary_terms[tax_field] = primary_id
+
+        return taxonomy_ids, primary_terms
+
+    async def _apply_primary_terms(
+        self,
+        posts_endpoint: PostsEndpoint,
+        post_id: int,
+        primary_terms: Dict[str, int]
+    ) -> None:
+        """
+        Записать основные (primary) термины в мета-поля Yoast SEO.
+
+        Best-effort: если мета-поле не зарегистрировано в REST или запрос упал —
+        логируем предупреждение и продолжаем, привязка терминов к записи уже
+        выполнена и от этого вызова не зависит.
+
+        Вызывается только из не-dry-run веток _add_item/_update_item (dry-run
+        уходит на return раньше) — под --dry-run реального PUT не будет.
+
+        Args:
+            posts_endpoint: PostsEndpoint
+            post_id: ID записи
+            primary_terms: {taxonomy_name: primary_term_id}
+        """
+        if not primary_terms:
+            return
+
+        meta = {
+            primary_term_meta_key(taxonomy): term_id
+            for taxonomy, term_id in primary_terms.items()
+        }
+
+        try:
+            await posts_endpoint.update(post_id, {"meta": meta})
+            logger.debug(f"Set primary terms for post ID={post_id}: {meta}")
+        except Exception as e:
+            logger.warning(f"Failed to set primary terms for post ID={post_id}: {e}")
 
     async def _upload_media(
         self,

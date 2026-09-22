@@ -1,5 +1,5 @@
 """
-Команды загрузки данных из WordPress: fetch, fetch-media
+Команды загрузки данных из WordPress: fetch, fetch-media, update
 """
 
 from pathlib import Path
@@ -10,10 +10,12 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
+from .. import output
+from ..output import log_stream
 from .common import handle_command_errors, load_and_print_credentials
 from .helpers import get_project, resolve_env_file, resolve_logs_folder, resolve_excel_file, require_excel_file
 from ..config import LoggingConfig, WordPressConfig, Settings
-from ..constants import is_taxonomy_column
+from ..constants import is_taxonomy_column, is_dot_notation_column, read_nested_value
 from ..utils.wp_helpers import wp_rendered
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -83,7 +85,9 @@ def fetch(
         None,
         "--exclude",
         help="Список типов для исключения через запятую (posts,category)"
-    )
+    ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
 ):
     """
     Получение данных из WordPress -> Excel
@@ -93,6 +97,8 @@ def fetch(
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
+    if non_interactive:
+        output.get_options(ctx).non_interactive = True
 
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch[/bold blue]\n")
 
@@ -103,16 +109,17 @@ def fetch(
         console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
         if file.exists():
-            if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
-                console.print("[red]Отменено пользователем[/red]")
-                raise typer.Exit(1)
+            with handle_command_errors(ctx):
+                output.require_confirmation(
+                    ctx, f"Файл {file} уже существует. Перезаписать?", confirm
+                )
     else:
         auto_mode = False
         console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
 
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         # 1. Настройка логирования
         logs_folder = resolve_logs_folder(ctx)
         logs_folder.mkdir(parents=True, exist_ok=True)
@@ -121,7 +128,8 @@ def fetch(
         log_file = setup_logger(
             logs_folder=logs_folder,
             config=logging_config,
-            command_name="fetch"
+            command_name="fetch",
+            console_stream=log_stream(ctx),
         )
         logger.info(f"Лог-файл создан: {log_file}")
 
@@ -464,7 +472,7 @@ def fetch_media(
     console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(
             env_file=env_file,
         )
@@ -478,7 +486,8 @@ def fetch_media(
         log_file = setup_logger(
             logs_folder=logs_folder,
             config=logging_config,
-            command_name="fetch_media"
+            command_name="fetch_media",
+            console_stream=log_stream(ctx),
         )
 
         asyncio.run(run_fetch_media(wp_config, file))
@@ -537,3 +546,240 @@ async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
 
         logger.info(f"Successfully written {len(df)} media records to sheet 'media'")
         console.print(f"[green]Загружено:[/green] {len(df)} медиафайлов")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# update — подтянуть конкретные поля из WP в Excel по ID (read-only для WP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_column_value(api_response: dict, column: str) -> Optional[str]:
+    """
+    Извлечь значение одной колонки из ответа WordPress API.
+    Поддерживает: обычные поля, rendered/raw, excerpt (strip HTML),
+    ACF (acf_*), dot-нотацию (seo.title).
+    Возвращает None если поле не найдено в ответе.
+    """
+    import re
+    from ..excel.writer import normalize_api_value
+
+    # dot-нотация: seo.title, seo.robots.index
+    if is_dot_notation_column(column):
+        return read_nested_value(column, api_response)
+
+    # ACF: acf_price → api_response['acf']['price']
+    if column.startswith("acf_"):
+        acf = api_response.get("acf", {})
+        if isinstance(acf, dict):
+            val = acf.get(column[4:])
+            return normalize_api_value(val) if val is not None else None
+        return None
+
+    # excerpt — raw + strip HTML
+    if column == "excerpt":
+        raw = normalize_api_value(api_response.get("excerpt"))
+        if raw:
+            raw = re.sub(r"<[^>]+>", "", str(raw)).strip()
+        return raw
+
+    # rendered/raw поля
+    if column in ("title", "content", "name", "description"):
+        if column in api_response:
+            return normalize_api_value(api_response[column])
+        return None
+
+    # прямые поля (slug, status, date, modified, link, featured_media, …)
+    if column in api_response:
+        val = api_response[column]
+        return normalize_api_value(val) if isinstance(val, dict) else val
+
+    return None
+
+
+@app.command("update")
+def update_from_wp(
+    ctx: typer.Context,
+    ids: Optional[str] = typer.Option(
+        None,
+        "--id",
+        help="ID записей через запятую: 123,456,789. Без --id — все строки с id на листе.",
+    ),
+    columns: str = typer.Option(
+        ...,
+        "--columns",
+        "-c",
+        help="Колонки для обновления из WordPress: title,excerpt,seo_title",
+    ),
+    file: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Excel файл (авто-определяется из --project)",
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Листы для поиска ID (по умолчанию — все контентные)",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать изменения без записи в файл"),
+    test_mode: bool = typer.Option(False, "--test-mode", help="Обработать только первые 3 строки (для проверки)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
+    env_file: Optional[Path] = typer.Option(None, "--env-file"),
+):
+    """
+    Подтянуть указанные поля из WordPress в Excel по ID.
+    Без --id обновляет все строки с заполненным id на листе.
+    WordPress не изменяется — только чтение. Обязательно укажи --columns.
+    """
+    env_file = resolve_env_file(ctx, env_file)
+    file = require_excel_file(ctx, file)
+
+    id_list = [i.strip() for i in ids.split(",") if i.strip()] if ids else None
+    column_list = [c.strip() for c in columns.split(",") if c.strip()]
+
+    if not column_list:
+        console.print("[red]ERROR: --columns не может быть пустым — укажи хотя бы одну колонку[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold blue]WordPress Bulk Editor — Update from WP[/bold blue]\n")
+    console.print(f"Excel файл: [cyan]{file}[/cyan]")
+    if id_list:
+        console.print(f"ID:         [cyan]{', '.join(id_list)}[/cyan]")
+    else:
+        console.print(f"ID:         [cyan]все строки с id[/cyan]")
+    console.print(f"Колонки:    [cyan]{', '.join(column_list)}[/cyan]")
+    if dry_run:
+        console.print("[yellow]Режим DRY-RUN — файл не будет изменён[/yellow]")
+    if test_mode:
+        console.print("[yellow]Режим TEST — только первые 3 строки[/yellow]")
+    console.print()
+
+    with handle_command_errors(ctx):
+        domain, username, password = load_and_print_credentials(env_file)
+        wp_config = WordPressConfig.from_credentials(domain, username, password)
+        sheets_filter = [s.strip() for s in sheets.split(",")] if sheets else None
+
+        asyncio.run(_run_update(
+            wp_config=wp_config,
+            excel_file=file,
+            id_list=id_list,
+            column_list=column_list,
+            sheets_filter=sheets_filter,
+            dry_run=dry_run,
+            test_mode=test_mode,
+        ))
+
+
+async def _run_update(
+    wp_config: WordPressConfig,
+    excel_file: Path,
+    id_list: Optional[List[str]],
+    column_list: List[str],
+    sheets_filter: Optional[List[str]],
+    dry_run: bool,
+    test_mode: bool = False,
+):
+    """Основная логика update: WP → Excel (read-only для WP).
+    id_list=None означает «все строки с заполненным id».
+    """
+    from ..constants import SYSTEM_SHEETS
+
+    id_set = set(id_list) if id_list else None
+    writer = ExcelWriter(excel_file)
+    writer.load()
+
+    total_found = 0
+    total_updated = 0
+
+    async with WordPressClient(wp_config) as client:
+        await client.test_connection()
+
+        for sheet_name, df in writer._dataframes.items():
+            # Пропускаем служебные и нефильтрованные листы
+            if sheet_name in SYSTEM_SHEETS:
+                continue
+            if sheets_filter and sheet_name not in sheets_filter:
+                continue
+            if "id" not in df.columns:
+                logger.debug(f"Лист '{sheet_name}': нет колонки id, пропускаем")
+                continue
+
+            # Собрать строки для обновления
+            rows_to_update: List[tuple] = []
+            for idx, row in df.iterrows():
+                raw_id = str(row.get("id", "")).strip()
+                if not raw_id or raw_id == "nan":
+                    continue
+                try:
+                    normalized = str(int(float(raw_id)))
+                except (ValueError, TypeError):
+                    normalized = raw_id
+                # Если id_set задан — фильтруем, иначе берём все
+                if id_set is not None and normalized not in id_set:
+                    continue
+                rows_to_update.append((idx, int(float(raw_id))))
+
+            if not rows_to_update:
+                continue
+
+            if test_mode:
+                rows_to_update = rows_to_update[:3]
+                console.print(f"[dim]TEST-MODE: лист '{sheet_name}' — первые {len(rows_to_update)} строк[/dim]")
+            elif id_set is None:
+                console.print(f"[dim]Лист '{sheet_name}': {len(rows_to_update)} записей[/dim]")
+
+            if not rows_to_update:
+                continue
+
+            endpoint = PostsEndpoint(client, sheet_name)
+
+            for row_idx, post_id in rows_to_update:
+                total_found += 1
+                try:
+                    api_response = await endpoint.get(post_id)
+                except NotFoundError:
+                    console.print(f"[yellow]WARN[/yellow] ID={post_id} не найден на '{sheet_name}' (404)")
+                    continue
+                except Exception as e:
+                    console.print(f"[yellow]WARN[/yellow] ID={post_id} на '{sheet_name}': {e}")
+                    continue
+
+                # Извлечь только запрошенные колонки
+                existing_cols = df.columns.tolist()
+                update_data: dict = {}
+                missing_in_excel: list = []
+                missing_in_api: list = []
+
+                for col in column_list:
+                    if col not in existing_cols:
+                        missing_in_excel.append(col)
+                        continue
+                    val = _extract_column_value(api_response, col)
+                    if val is None:
+                        missing_in_api.append(col)
+                        continue
+                    update_data[col] = val
+
+                if missing_in_excel:
+                    logger.debug(f"ID={post_id}: колонок нет в Excel: {missing_in_excel}")
+                if missing_in_api:
+                    logger.debug(f"ID={post_id}: полей нет в ответе API: {missing_in_api}")
+
+                if not update_data:
+                    console.print(f"[yellow]SKIP[/yellow] ID={post_id}: ничего не найдено для обновления")
+                    continue
+
+                if dry_run:
+                    console.print(f"[dim]DRY-RUN[/dim] ID={post_id} ({sheet_name}[{row_idx}]): {update_data}")
+                else:
+                    writer.update_row(sheet_name, row_idx, update_data)
+                    console.print(
+                        f"[green]✓[/green] ID={post_id} ({sheet_name}): "
+                        f"{', '.join(update_data.keys())}"
+                    )
+                total_updated += 1
+
+    if not dry_run:
+        writer.save()
+
+    action = "Будет обновлено" if dry_run else "Обновлено"
+    console.print(f"\n[bold]{action}: {total_updated} из {total_found} найденных записей[/bold]")

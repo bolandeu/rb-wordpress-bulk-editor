@@ -5,6 +5,7 @@
 from pathlib import Path
 from datetime import datetime
 import sys
+from typing import Optional, TextIO
 from loguru import logger
 
 from ..config import LoggingConfig
@@ -14,7 +15,8 @@ from ..constants import LOG_DATE_FORMAT
 def setup_logger(
     logs_folder: Path,
     config: LoggingConfig,
-    command_name: str = "sync"
+    command_name: str = "sync",
+    console_stream: Optional[TextIO] = None
 ) -> Path:
     """
     Настроить loguru logger.
@@ -23,6 +25,8 @@ def setup_logger(
         logs_folder: Папка для логов
         config: Конфигурация логирования
         command_name: Название команды (sync, fetch, options)
+        console_stream: Поток для консольного вывода (по умолчанию stdout;
+            в JSON-режиме команды передают stderr, чтобы не пачкать данные)
 
     Returns:
         Path к созданному лог-файлу
@@ -39,7 +43,7 @@ def setup_logger(
 
     # Консольный вывод (цветной, упрощенный)
     logger.add(
-        sys.stdout,
+        console_stream or sys.stdout,
         format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
         level=config.level,
         colorize=True

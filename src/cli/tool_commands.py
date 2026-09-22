@@ -13,7 +13,9 @@ from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import get_project, resolve_env_file, resolve_excel_file, resolve_output, require_excel_file
 from .project import find_repo_root
+from .. import output
 from ..config import WordPressConfig
+from ..exceptions import ValidationError
 from ..excel.reader import ExcelReader
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
@@ -29,6 +31,7 @@ def _make_wp_config(domain: str, username: str, password: str) -> WordPressConfi
 
 
 @app.command()
+@output.guard
 def validate(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
@@ -45,33 +48,52 @@ def validate(
         file_okay=True,
         dir_okay=False,
         resolve_path=True
-    )
+    ),
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
 ):
     """
-    Валидация Excel файла без синхронизации
+    Валидация Excel файла без синхронизации.
+
+    Exit-коды: 0 — файл валиден, 2 — структура/аргументы, 3 — нет credentials,
+    5 — недоступен WordPress, 1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_excel_file(ctx, file)
 
-    console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
+    options = output.get_options(ctx)
+    if not options.json and not options.quiet:
+        console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
     setup_command_logging(ctx, "validate")
 
-    with handle_command_errors():
-        # Проверка credentials
-        domain, username, password = load_and_print_credentials(env_file=env_file)
+    # Проверка credentials
+    domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
 
-        # Проверка структуры
-        console.print("[yellow]Проверка структуры листов...[/yellow]")
-        with ExcelReader(file) as reader:
-            sheets = reader.get_sheets_by_type()
-            console.print(f"[green]OK[/green] Content sheets: {len(sheets['content'])}")
-            console.print(f"[green]OK[/green] Taxonomy sheets: {len(sheets['taxonomy'])}\n")
+    # Проверка структуры
+    output.vecho(ctx, "Проверка структуры листов...")
+    with ExcelReader(file) as reader:
+        sheets = reader.get_sheets_by_type()
 
+    def _render(payload: dict):
+        console.print(f"[green]OK[/green] Content sheets: {len(payload['content_sheets'])}")
+        console.print(f"[green]OK[/green] Taxonomy sheets: {len(payload['taxonomy_sheets'])}\n")
         console.print("[bold green]SUCCESS! File is valid![/bold green]\n")
+
+    output.emit_success(
+        ctx,
+        {
+            "file": str(file),
+            "domain": domain,
+            "content_sheets": list(sheets["content"]),
+            "taxonomy_sheets": list(sheets["taxonomy"]),
+        },
+        _render,
+    )
 
 
 @app.command()
+@output.guard
 def options(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
@@ -103,13 +125,25 @@ def options(
         "--dry-run",
         "-d",
         help="Показать что будет отправлено, без отправки"
-    )
+    ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
 ):
     """
     Управление настройками сайта WordPress.
 
     Без --fetch: обновление WordPress из Excel
     С --fetch: выгрузка настроек из WordPress в Excel
+
+    Запись настроек на сайт и перезапись существующего xlsx откатить нельзя:
+    сначала доступен --dry-run, затем спрашивается подтверждение, а под
+    --non-interactive требуется явный --confirm.
+
+    Exit-коды: 0 — успех, 2 — аргументы/файл или отсутствующий --confirm,
+    3 — нет credentials,
+    5 — недоступен WordPress, 1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
     # Если активен --project и --file не указан — берём xlsx из папки проекта.
@@ -117,7 +151,11 @@ def options(
     if file is None:
         file = resolve_excel_file(ctx, file)
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
+    opts = output.get_options(ctx)
+    human_mode = not opts.json and not opts.quiet
+
+    if human_mode:
+        console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
 
     command_name = "options_fetch" if fetch else "options"
     setup_command_logging(ctx, command_name)
@@ -128,96 +166,123 @@ def options(
         # Определяем файл
         if file is None:
             file = Path.cwd() / "options.xlsx"
-            console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
+            if human_mode:
+                console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
             # Проверяем существование
             if file.exists():
-                if not typer.confirm(f"Файл {file} уже существует. Перезаписать?"):
-                    console.print("[red]Отменено пользователем[/red]")
-                    raise typer.Exit(1)
-        else:
+                output.require_confirmation(
+                    ctx, f"Файл {file} уже существует. Перезаписать?", confirm
+                )
+        elif human_mode:
             console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
 
-        console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+        if human_mode:
+            console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-        with handle_command_errors():
-            # 1. Загружаем credentials
-            domain, username, password = load_and_print_credentials(env_file=env_file)
+        # 1. Загружаем credentials
+        domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
 
-            # 2. Получаем настройки из WordPress
-            console.print("[yellow]Получение настроек из WordPress...[/yellow]")
+        # 2. Получаем настройки из WordPress
+        output.vecho(ctx, "Получение настроек из WordPress...")
 
-            wp_config = _make_wp_config(domain, username, password)
+        wp_config = _make_wp_config(domain, username, password)
 
-            site_options = asyncio.run(_fetch_options(wp_config))
+        site_options = asyncio.run(_fetch_options(wp_config))
 
-            if not site_options:
-                console.print("[yellow]WARNING: Нет настроек для выгрузки[/yellow]\n")
-                return
+        if not site_options:
+            output.emit_success(
+                ctx,
+                {"mode": "fetch", "file": str(file), "options": {}, "written": False},
+                lambda _: console.print("[yellow]WARNING: Нет настроек для выгрузки[/yellow]\n"),
+            )
+            return
 
-            console.print(f"[green]OK[/green] Получено настроек: {len(site_options)}\n")
+        # 3. Записываем в Excel
+        output.vecho(ctx, "Запись настроек в Excel...")
+        from ..excel.options import OptionsWriter
+        writer = OptionsWriter(file)
+        writer.write(site_options, mode="replace")
 
-            # Показываем что получено
-            console.print("[bold]Полученные настройки:[/bold]")
-            for key, value in site_options.items():
-                console.print(f"  {key}: [cyan]{value}[/cyan]")
-            console.print()
+        def _render_fetch(payload: dict):
+            console.print(f"[green]OK[/green] Получено настроек: {len(payload['options'])}\n")
+            output.human.key_values("Полученные настройки:", payload["options"])
+            console.print(f"\n[bold green]SUCCESS! Настройки выгружены в {payload['file']}![/bold green]\n")
 
-            # 3. Записываем в Excel
-            console.print("[yellow]Запись настроек в Excel...[/yellow]")
-            from ..excel.options import OptionsWriter
-            writer = OptionsWriter(file)
-            writer.write(site_options, mode="replace")
-
-            console.print(f"\n[bold green]SUCCESS! Настройки выгружены в {file}![/bold green]\n")
+        output.emit_success(
+            ctx,
+            {"mode": "fetch", "file": str(file), "options": site_options, "written": True},
+            _render_fetch,
+        )
 
     # Режим UPDATE - загрузка из Excel в WordPress
     else:
         if file is None:
-            console.print("[red]ERROR: Параметр --file обязателен для загрузки настроек[/red]\n")
-            raise typer.Exit(code=1)
+            raise ValidationError("Параметр --file обязателен для загрузки настроек")
 
         if not file.exists():
-            console.print(f"[red]ERROR: Файл не найден: {file}[/red]\n")
-            raise typer.Exit(code=1)
+            raise ValidationError(f"Файл не найден: {file}")
 
-        console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+        if human_mode:
+            console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
-        with handle_command_errors():
-            # 1. Загружаем credentials из .env
-            domain, username, password = load_and_print_credentials(env_file=env_file)
+        # 1. Загружаем credentials
+        domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
 
-            # 2. Читаем опции
-            console.print("[yellow]Чтение настроек из листа 'options'...[/yellow]")
-            from ..excel.options import OptionsReader
-            options_reader = OptionsReader(file)
-            site_options = options_reader.read()
+        # 2. Читаем опции
+        output.vecho(ctx, "Чтение настроек из листа 'options'...")
+        from ..excel.options import OptionsReader
+        options_reader = OptionsReader(file)
+        site_options = options_reader.read()
 
-            if not site_options:
-                console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n")
-                return
+        if not site_options:
+            output.emit_success(
+                ctx,
+                {"mode": "update", "file": str(file), "options": {}, "updated": False, "dry_run": dry_run},
+                lambda _: console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n"),
+            )
+            return
 
-            console.print(f"[green]OK[/green] Найдено настроек: {len(site_options)}\n")
-
-            # Показываем что будет отправлено
-            console.print("[bold]Настройки для обновления:[/bold]")
-            for key, value in site_options.items():
-                console.print(f"  {key}: [cyan]{value}[/cyan]")
-            console.print()
-
-            if dry_run:
-                console.print("[yellow]DRY-RUN режим: изменения не будут применены[/yellow]\n")
+        if dry_run:
+            def _render_dry(payload: dict):
+                console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
+                output.human.key_values("Настройки для обновления:", payload["options"])
+                console.print("\n[yellow]DRY-RUN режим: изменения не будут применены[/yellow]")
                 console.print("[bold green]DRY-RUN завершен![/bold green]\n")
-                return
 
-            # 3. Подключаемся к WordPress и отправляем
-            console.print("[yellow]Отправка настроек в WordPress...[/yellow]")
+            output.emit_success(
+                ctx,
+                {"mode": "update", "file": str(file), "options": site_options, "updated": False, "dry_run": True},
+                _render_dry,
+            )
+            return
 
-            wp_config = _make_wp_config(domain, username, password)
+        # 3. Перезапись настроек живого сайта — операция без отката:
+        # прежние значения нигде не сохраняются (гейт после проверки --dry-run).
+        output.require_confirmation(
+            ctx,
+            f"Перезаписать {len(site_options)} настроек сайта {domain} "
+            f"значениями из {file.name}? Прежние значения не сохраняются.",
+            confirm,
+        )
 
-            asyncio.run(_update_options(wp_config, site_options))
+        # 4. Подключаемся к WordPress и отправляем
+        output.vecho(ctx, "Отправка настроек в WordPress...")
 
+        wp_config = _make_wp_config(domain, username, password)
+
+        asyncio.run(_update_options(wp_config, site_options))
+
+        def _render_update(payload: dict):
+            console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
+            output.human.key_values("Обновлённые настройки:", payload["options"])
             console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
+
+        output.emit_success(
+            ctx,
+            {"mode": "update", "file": str(file), "options": site_options, "updated": True, "dry_run": False},
+            _render_update,
+        )
 
 
 async def _update_options(wp_config: WordPressConfig, site_options: dict):
@@ -290,6 +355,10 @@ def bulk_delete(
         "-d",
         help="Показать что будет удалено, без удаления"
     ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -300,77 +369,178 @@ def bulk_delete(
     """
     Массовое удаление всех записей указанного типа
 
+    ОПАСНО: удаление необратимо. Сначала --dry-run (ничего не удаляет),
+    затем — подтверждение: человеку задаётся вопрос, а под --non-interactive
+    (и в --json, и когда stdin не терминал) нужен явный --confirm.
+
     Примеры:
-        # Удалить все черновики постов в корзину (используя .env)
-        python -m src.cli bulk-delete --post-type posts --status draft
+        # Посмотреть что будет удалено, ничего не трогая
+        wp-bulk bulk-delete --post-type posts --dry-run
 
-        # Удалить все записи типа service полностью с медиа
-        python -m src.cli bulk-delete --post-type service --force --delete-media
+        # Удалить все черновики постов в корзину (спросит подтверждение)
+        wp-bulk bulk-delete --post-type posts --status draft
 
-        # Показать что будет удалено (dry-run)
-        python -m src.cli bulk-delete --post-type posts --dry-run
+        # Неинтерактивно: подтверждение обязательно флагом
+        wp-bulk bulk-delete --post-type service --force --delete-media \
+            --non-interactive --confirm
+
+    Exit-коды: 0 — успех, 1 — отменено пользователем/непредвиденная ошибка,
+    2 — аргументы или отсутствующий --confirm, 3 — нет credentials,
+    5 — недоступен WordPress.
     """
     env_file = resolve_env_file(ctx, env_file)
+    # Локальные флаги (`bulk-delete --json`) работают так же, как глобальные
+    # (`--json bulk-delete`): команда идёт не через @output.guard, поэтому
+    # подмешиваем их сами.
+    opts = output.get_options(ctx)
+    opts.json = opts.json or json_output
+    opts.quiet = opts.quiet or quiet
+    opts.non_interactive = opts.non_interactive or non_interactive
 
-    console.print("\n[bold red]Bulk Delete[/bold red]")
-    console.print("=" * 60 + "\n")
+    def say(message: str = "") -> None:
+        """Человеческий вывод. В --json stdout занят конвертом, значит молчим."""
+        if not opts.json and not opts.quiet:
+            console.print(message)
 
-    with handle_command_errors():
+    say("\n[bold red]Bulk Delete[/bold red]")
+    say("=" * 60 + "\n")
+
+    with handle_command_errors(ctx):
         log_file = setup_command_logging(ctx, "bulk_delete", verbose)
+
+        # Неинтерактивный запуск без --confirm отвергаем сразу, до обращения
+        # к сайту: ошибка должна быть про отсутствующий --confirm, а не про сеть.
+        if not dry_run and not confirm and not output.is_interactive(ctx):
+            output.require_confirmation(
+                ctx,
+                f"удаление всех записей типа '{post_type}' (статус: {status})",
+                confirm,
+            )
 
         # Получаем credentials (приоритет: CLI параметры -> .env файл)
         domain, username, password = load_and_print_credentials(
             env_file=env_file,
             domain=domain,
             username=username,
-            password=password
+            password=password,
+            ctx=ctx,
         )
 
-        console.print(f"[yellow]->[/yellow] Тип контента: {post_type}")
-        console.print(f"[yellow]->[/yellow] Статус: {status}")
-        console.print(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
-        console.print(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
+        say(f"[yellow]->[/yellow] Тип контента: {post_type}")
+        say(f"[yellow]->[/yellow] Статус: {status}")
+        say(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
+        say(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
         if dry_run:
-            console.print(f"[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
-        console.print()
+            say("[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
+        say()
 
         # Создаем WordPress клиент
         wp_config = _make_wp_config(domain, username, password)
 
+        # Сначала читаем список — он же и есть превью для --dry-run,
+        # и количество записей для вопроса о подтверждении.
+        all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
+        say(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
+
+        targets = [
+            {"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")}
+            for post in all_posts
+        ]
+
+        if dry_run:
+            # Превью никогда не спрашивает и ничего не меняет.
+            def _render_dry(payload: Dict):
+                console.print(f"[yellow]DRY-RUN: Будет удалено {payload['found']} записей[/yellow]")
+                for item in payload["posts"][:10]:
+                    console.print(f"  ID={item['id']}: {item['title']}")
+                if payload["found"] > 10:
+                    console.print(f"  ... и еще {payload['found'] - 10} записей")
+                console.print()
+
+            output.emit_success(
+                ctx,
+                {
+                    "dry_run": True,
+                    "post_type": post_type,
+                    "status": status,
+                    "found": len(targets),
+                    "deleted": 0,
+                    "posts": targets,
+                },
+                _render_dry,
+            )
+            return
+
+        if all_posts:
+            mode = "полностью (минуя корзину)" if force else "в корзину"
+            media_note = " вместе с featured media" if delete_media else ""
+            output.require_confirmation(
+                ctx,
+                f"Удалить {len(all_posts)} записей типа '{post_type}' "
+                f"(статус: {status}) {mode}{media_note}?",
+                confirm,
+            )
+
         # Запускаем удаление
         stats = asyncio.run(_run_bulk_delete(
             wp_config,
+            all_posts,
             post_type,
-            status,
             force,
-            delete_media,
-            dry_run
+            delete_media
         ))
 
         # Показываем результаты
-        console.print("\n[bold green]Операция завершена![/bold green]")
-        console.print("=" * 60)
-        console.print(f"  Найдено записей: [cyan]{stats['found']}[/cyan]")
-        console.print(f"  Удалено записей: [cyan]{stats['deleted']}[/cyan]")
-        if delete_media:
-            console.print(f"  Удалено медиа: [cyan]{stats['media_deleted']}[/cyan]")
-        console.print(f"  Ошибок: [{'red' if stats['errors'] > 0 else 'green'}]{stats['errors']}[/{'red' if stats['errors'] > 0 else 'green'}]")
-        console.print(f"\n[dim]Логи: {log_file}[/dim]")
+        def _render_done(payload: Dict):
+            errors_color = "red" if payload["errors"] > 0 else "green"
+            console.print("\n[bold green]Операция завершена![/bold green]")
+            console.print("=" * 60)
+            console.print(f"  Найдено записей: [cyan]{payload['found']}[/cyan]")
+            console.print(f"  Удалено записей: [cyan]{payload['deleted']}[/cyan]")
+            if delete_media:
+                console.print(f"  Удалено медиа: [cyan]{payload['media_deleted']}[/cyan]")
+            console.print(f"  Ошибок: [{errors_color}]{payload['errors']}[/{errors_color}]")
+            console.print(f"\n[dim]Логи: {log_file}[/dim]")
+
+        output.emit_success(
+            ctx,
+            {
+                "dry_run": False,
+                "post_type": post_type,
+                "status": status,
+                "force": force,
+                **stats,
+            },
+            _render_done,
+        )
+
+
+async def _collect_posts(
+    wp_config: WordPressConfig,
+    post_type: str,
+    status: str,
+) -> List[Dict]:
+    """Прочитать список записей, которые попадут под удаление (без изменений на сайте)."""
+    async with WordPressClient(wp_config) as client:
+        posts_endpoint = PostsEndpoint(client, post_type)
+        logger.info(f"Fetching all {post_type} with status={status}...")
+        all_posts = await posts_endpoint.get_all(status=status)
+        logger.info(f"Found {len(all_posts)} {post_type}")
+        return all_posts
 
 
 async def _run_bulk_delete(
     wp_config: WordPressConfig,
+    all_posts: List[Dict],
     post_type: str,
-    status: str,
     force: bool,
-    delete_media: bool,
-    dry_run: bool
+    delete_media: bool
 ) -> Dict[str, int]:
-    """Выполнить массовое удаление записей."""
+    """Выполнить массовое удаление уже собранных записей."""
     from ..wordpress.media import MediaEndpoint
 
     stats = {
-        "found": 0,
+        "found": len(all_posts),
         "deleted": 0,
         "media_deleted": 0,
         "errors": 0
@@ -379,21 +549,6 @@ async def _run_bulk_delete(
     async with WordPressClient(wp_config) as client:
         posts_endpoint = PostsEndpoint(client, post_type)
         media_endpoint = MediaEndpoint(client) if delete_media else None
-
-        logger.info(f"Fetching all {post_type} with status={status}...")
-        all_posts = await posts_endpoint.get_all(status=status)
-
-        stats["found"] = len(all_posts)
-        logger.info(f"Found {len(all_posts)} {post_type}")
-
-        if dry_run:
-            console.print(f"\n[yellow]DRY-RUN: Будет удалено {len(all_posts)} записей[/yellow]")
-            for post in all_posts[:10]:
-                title_text = wp_rendered(post.get("title", {}), "No title")
-                console.print(f"  ID={post['id']}: {title_text}")
-            if len(all_posts) > 10:
-                console.print(f"  ... и еще {len(all_posts) - 10} записей")
-            return stats
 
         for post in all_posts:
             try:
@@ -496,7 +651,7 @@ def counter(
 
     setup_command_logging(ctx, "counter")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         # 1. Загружаем credentials
         domain, username, password = load_and_print_credentials(
             env_file=env_file,
@@ -664,7 +819,20 @@ def llm(
         None,
         "--model",
         "-m",
-        help="Модели через запятую (model1,model2,model3). Если не указано, используется LLM_MODELS из .env"
+        help=(
+            "Модели через запятую. Текст: цепочка llmkit ('провайдер/модель'), "
+            "по умолчанию LLM_MODELS из .env. Картинки (--column img_path): "
+            "модели endpoint'а, по умолчанию LLM_IMG_MODELS/LLM_MODELS"
+        )
+    ),
+    level: Optional[str] = typer.Option(
+        None,
+        "--level",
+        help=(
+            "Уровень llmkit (cheap/judge/strong — что настроено в его конфиге). "
+            "Только для текста, по умолчанию LLM_LEVEL из .env. Если не задан "
+            "ни --level, ни --model — llmkit берёт свой уровень по умолчанию"
+        )
     ),
     prompt: Optional[str] = typer.Option(
         None,
@@ -675,12 +843,12 @@ def llm(
     endpoint: Optional[str] = typer.Option(
         None,
         "--endpoint",
-        help="LLM API endpoint (по умолчанию из .env: LLM_ENDPOINT)"
+        help="LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_ENDPOINT"
     ),
     token: Optional[str] = typer.Option(
         None,
         "--token",
-        help="LLM API token (по умолчанию из .env: LLM_TOKEN)"
+        help="LLM API token — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_TOKEN"
     ),
     overwrite: bool = typer.Option(
         False,
@@ -725,20 +893,36 @@ def llm(
     )
 ):
     """
-    Массовая генерация контента через LLM API.
+    Массовая генерация контента через LLM.
 
     Обрабатывает строки где action=update и генерирует контент в указанную колонку.
     Поддерживает подстановку значений из других колонок через [column_name].
 
+    ТЕКСТ идёт через общую библиотеку llmkit: цепочки моделей с фолбэком, ретраи,
+    кэш и учёт стоимости. Ключи провайдеров llmkit берёт из своего конфига
+    (~/Library/Application Support/llmkit/config.toml) или связки ключей ОС —
+    НЕ из .env проекта. Нужен свой OpenAI-совместимый сервер для текста — заведите
+    его там провайдером kind = "openai_compatible"; флаги --endpoint/--token
+    на текст больше не влияют.
+
+    КАРТИНКИ (--column img_path) llmkit не умеет — они по-прежнему идут своим
+    вызовом, и только для них нужны --endpoint/--token (LLM_ENDPOINT/LLM_TOKEN)
+    и модели LLM_IMG_MODELS.
+
     Примеры:
-        # Генерация excerpt на основе title
-        llm --column excerpt --model "gpt-4" --prompt "Напиши короткий lead абзац к услуге [title]"
+        # Генерация excerpt уровнем llmkit
+        llm --column excerpt --level cheap --prompt "Напиши короткий lead абзац к услуге [title]"
 
-        # Несколько моделей с fallback
-        llm --column description --model "grok-4.1-fast,gpt-4,claude-3" --prompt "Опиши [title]"
+        # Явная цепочка моделей с fallback (формат llmkit: провайдер/модель)
+        llm --column description --prompt "Опиши [title]" \
+            --model "ollama/gpt-oss:120b,openrouter/openai/gpt-4o-mini"
 
-        # С конвертацией Markdown в HTML
-        llm --column content --model "gpt-4" --prompt "Напиши статью про [title]" --md-to-html
+        # С конвертацией Markdown в HTML, уровень llmkit по умолчанию
+        llm --column content --prompt "Напиши статью про [title]" --md-to-html
+
+        # Картинка: нужен endpoint + token
+        llm --column img_path --model "some-image-model" \
+            --endpoint https://api.example/v1/chat/completions --token ...
     """
     file = require_excel_file(ctx, file)
     env_file = resolve_env_file(ctx, env_file)
@@ -747,7 +931,7 @@ def llm(
 
     log_file = setup_command_logging(ctx, "llm", verbose)
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         # 1. Загружаем credentials для LLM
         import os
         from dotenv import load_dotenv
@@ -757,42 +941,61 @@ def llm(
         else:
             load_dotenv()
 
+        is_img = (column == "img_path")
+
+        # endpoint/token нужны только картинкам: текст ходит через llmkit,
+        # который берёт ключи из своего конфига, а не из .env проекта.
         final_endpoint = endpoint or os.getenv("LLM_ENDPOINT")
         final_token = token or os.getenv("LLM_TOKEN")
 
         # Для img_path: приоритет LLM_IMG_PROMPT/LLM_IMG_MODELS, потом LLM_PROMPT/LLM_MODELS
-        if column == "img_path":
+        if is_img:
             final_prompt = prompt or os.getenv("LLM_IMG_PROMPT") or os.getenv("LLM_PROMPT")
             final_models = model or os.getenv("LLM_IMG_MODELS") or os.getenv("LLM_MODELS")
+            final_level = None
         else:
             final_prompt = prompt or os.getenv("LLM_PROMPT")
             final_models = model or os.getenv("LLM_MODELS")
+            final_level = level or os.getenv("LLM_LEVEL")
 
-        if not final_endpoint:
+        if is_img and not final_endpoint:
             console.print("[red]ERROR: LLM_ENDPOINT не указан (используйте --endpoint или .env)[/red]\n")
             raise typer.Exit(code=1)
 
-        if not final_token:
+        if is_img and not final_token:
             console.print("[red]ERROR: LLM_TOKEN не указан (используйте --token или .env)[/red]\n")
             raise typer.Exit(code=1)
 
         if not final_prompt:
-            env_hint = "LLM_IMG_PROMPT или LLM_PROMPT" if column == "img_path" else "LLM_PROMPT"
+            env_hint = "LLM_IMG_PROMPT или LLM_PROMPT" if is_img else "LLM_PROMPT"
             console.print(f"[red]ERROR: Промпт не указан (используйте --prompt или .env: {env_hint})[/red]\n")
             raise typer.Exit(code=1)
 
-        if not final_models:
-            env_hint = "LLM_IMG_MODELS или LLM_MODELS" if column == "img_path" else "LLM_MODELS"
-            console.print(f"[red]ERROR: Модели не указаны (используйте --model или .env: {env_hint})[/red]\n")
+        # Картинкам список моделей обязателен; тексту — нет: без --model/--level
+        # llmkit возьмёт свой уровень по умолчанию.
+        if is_img and not final_models:
+            console.print(
+                "[red]ERROR: Модели не указаны "
+                "(используйте --model или .env: LLM_IMG_MODELS или LLM_MODELS)[/red]\n"
+            )
             raise typer.Exit(code=1)
 
         # 2. Парсим список моделей
-        models = [m.strip() for m in final_models.split(",") if m.strip()]
-        logger.info(f"Модели для генерации: {models}")
+        models = [m.strip() for m in (final_models or "").split(",") if m.strip()]
+        logger.info(f"Модели для генерации: {models or 'по конфигу llmkit'}")
 
-        console.print(f"[green]OK[/green] LLM Endpoint: {final_endpoint}")
         console.print(f"[green]OK[/green] Колонка: {column}")
-        console.print(f"[green]OK[/green] Модели: {', '.join(models)}")
+        if is_img:
+            console.print(f"[green]OK[/green] LLM Endpoint (картинки): {final_endpoint}")
+            console.print(f"[green]OK[/green] Модели: {', '.join(models)}")
+        else:
+            console.print("[green]OK[/green] Текст: через llmkit (ключи — из конфига llmkit)")
+            if models:
+                console.print(f"[green]OK[/green] Цепочка моделей: {', '.join(models)}")
+            elif final_level:
+                console.print(f"[green]OK[/green] Уровень: {final_level}")
+            else:
+                console.print("[green]OK[/green] Модели: уровень по умолчанию llmkit")
         console.print(f"[green]OK[/green] Промпт: {final_prompt[:100]}...")
         if dry_run:
             console.print(f"[yellow]DRY-RUN режим: изменения не будут сохранены[/yellow]")
@@ -809,9 +1012,11 @@ def llm(
             sheets=sheets,
             column=column,
             models=models,
+            level=final_level,
             prompt_template=final_prompt,
             endpoint=final_endpoint,
             token=final_token,
+            project_name=proj.name,
             overwrite=overwrite,
             dry_run=dry_run,
             strip_tags=strip_tags,
@@ -829,8 +1034,8 @@ async def _run_llm_generation(
     column: str,
     models: List[str],
     prompt_template: str,
-    endpoint: str,
-    token: str,
+    endpoint: Optional[str],
+    token: Optional[str],
     overwrite: bool,
     dry_run: bool,
     strip_tags: bool,
@@ -838,14 +1043,21 @@ async def _run_llm_generation(
     html_to_md: bool,
     log_file: Path,
     content_folder: Path = Path("data/content"),
-    media_folder: Path = Path("data/media")
+    media_folder: Path = Path("data/media"),
+    level: Optional[str] = None,
+    project_name: Optional[str] = None,
 ):
     """Основная логика генерации через LLM."""
     from ..utils.llm_client import LLMClient
     from ..excel.reader import ExcelReader
     from ..excel.writer import ExcelWriter
 
-    llm_client = LLMClient(endpoint=endpoint, token=token)
+    # Метки уезжают в журнал llmkit: `llm cost --by tool,project`
+    tags = {"tool": "wp-bulk-editor"}
+    if project_name:
+        tags["project"] = project_name
+
+    llm_client = LLMClient(endpoint=endpoint, token=token, tags=tags)
 
     # Определяем режим работы по имени колонки
     is_content_path = (column == "content_path")
@@ -957,7 +1169,7 @@ async def _run_llm_generation(
                     generated_text = await llm_client.generate(
                         prompt=filled_prompt,
                         models=models,
-                        max_retries=3
+                        level=level,
                     )
 
                     # Применяем постобработку к тексту
@@ -996,7 +1208,7 @@ async def _run_llm_generation(
                     generated_text = await llm_client.generate(
                         prompt=filled_prompt,
                         models=models,
-                        max_retries=3
+                        level=level,
                     )
 
                     if strip_tags:
@@ -1134,7 +1346,7 @@ def reshape(
     console.print(f"  Template: [cyan]{template_path}[/cyan]")
     console.print(f"  Output:   [cyan]{output}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         if not source.exists():
             console.print(f"[red]ERROR: Файл-источник не найден: {source}[/red]\n")
             raise typer.Exit(code=1)
@@ -1247,7 +1459,7 @@ def taxonomies(
     env_file = resolve_env_file(ctx, env_file)
     setup_command_logging(ctx, "taxonomies")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(env_file=env_file)
         wp_config = _make_wp_config(domain, username, password)
 

@@ -18,6 +18,7 @@ from ..exceptions import (
     NetworkError,
     ServerError,
     WordPressError,
+    WPBulkEditorError,
     AuthenticationError,
     NotFoundError
 )
@@ -154,11 +155,25 @@ def async_retry(config: Optional[RetryConfig] = None):
                         )
                         raise
 
-                    # Вычисляем delay с exponential backoff
+                    # Вычисляем delay с exponential backoff.
+                    # Если сервер прислал Retry-After (провайдер кладёт его
+                    # в атрибут исключения) — он имеет приоритет.
                     delay = min(
                         config.base_delay * (config.exponential_base ** attempt),
                         config.max_delay
                     )
+                    retry_after = getattr(e, "retry_after", None)
+                    if retry_after is not None:
+                        # Retry-After тоже ограничен max_delay: сайт с
+                        # `Retry-After: 3600` иначе подвесил бы CLI на час,
+                        # и агент не смог бы этого прервать.
+                        requested = float(retry_after)
+                        if requested > config.max_delay:
+                            logger.warning(
+                                f"{func.__name__}: Retry-After={requested:.0f}s превышает "
+                                f"max_delay={config.max_delay:.0f}s, ждём {config.max_delay:.0f}s"
+                            )
+                        delay = max(delay, min(requested, config.max_delay))
 
                     logger.warning(
                         f"{func.__name__}: Attempt {attempt + 1}/{config.max_retries + 1} "
@@ -188,9 +203,17 @@ class CircuitState(Enum):
     HALF_OPEN = "half_open"
 
 
-class CircuitBreakerOpenError(Exception):
-    """Circuit breaker открыт, запросы блокируются."""
-    pass
+class CircuitBreakerOpenError(WPBulkEditorError):
+    """
+    Circuit breaker открыт, запросы блокируются.
+
+    Для CLI это отказ внешнего сервиса → PROVIDER_ERROR (exit 5),
+    а не «неожиданная ошибка».
+    """
+
+    code = "PROVIDER_ERROR"
+    exit_code = 5
+    default_action = "Подождите окончания recovery-таймаута и повторите."
 
 
 class CircuitBreaker:

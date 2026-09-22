@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "wp-bulk-editor"
 version = "1.0.0"
 description = "WordPress Bulk Editor - Excel <-> WordPress sync"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2.0",
     "openpyxl>=3.1.0",
@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
+    "keyring>=25.0.0",
     "PyYAML>=6.0",
     "Pillow>=10.0.0",
     "python-slugify>=8.0.0",
@@ -26,6 +27,7 @@ dependencies = [
     "google-auth>=2.23.0",
     "google-auth-oauthlib>=1.1.0",
     "google-auth-httplib2>=0.1.1",
+    "llmkit",
 ]
 
 [project.scripts]
@@ -34,18 +36,50 @@ wp-bulk = "src.cli:main"
 [tool.setuptools.packages.find]
 include = ["src*"]
 
+# Бандленный SKILL.md должен уехать в wheel: его читают `wp-bulk --ai`
+# и агент, у которого есть только установленный пакет.
+[tool.setuptools.package-data]
+"src" = ["py.typed"]
+"src.data" = ["*.md"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# S — bandit-правила безопасности (обязательны протоколом cli-builder).
+select = ["E", "F", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# В тестах assert — это и есть инструмент (S101).
+"tests/*" = ["S101"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/__main__.py", "src/cli/__main__.py"]
+
+[tool.coverage.report]
+# Нижняя граница по факту текущего прогона, а не по пожеланиям:
+# ронять сборку она не должна, но и опускаться ниже нельзя.
+fail_under = 40
+
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 
+[tool.uv.sources]
+llmkit = { git = "https://github.com/bolandeu/llmkit" }
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.8",
 ]

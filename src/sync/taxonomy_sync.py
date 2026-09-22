@@ -2,56 +2,59 @@
 Синхронизация таксономий (categories, tags, custom taxonomies) — последовательная обработка.
 """
 
-from typing import Dict, List, Optional
-import pandas as pd
+from typing import List, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.taxonomies import normalize_taxonomy_name
-from ..excel.writer import ExcelWriter
+from ..records.base import Record, RecordWriter
 from ..models import SyncReport, SyncResult
 from .taxonomy_sync_base import TaxonomySyncBase
 
 
 class TaxonomySync(TaxonomySyncBase):
-    """Синхронизация таксономий — последовательная обработка строк."""
+    """Синхронизация таксономий — последовательная обработка записей."""
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None
     ) -> SyncReport:
         """
-        Синхронизировать один лист таксономии (последовательно).
+        Синхронизировать группу терминов одной таксономии (последовательно).
 
         Args:
-            sheet_name: Название листа (= название таксономии)
-            df: DataFrame с данными листа
-            excel_writer: Writer для обратной записи (если нужна)
+            discriminator: Название таксономии
+            records: Записи-термины одной таксономии
+            writer: Writer для обратной записи (если нужна)
 
         Returns:
-            SyncReport со статистикой и списком ошибочных строк
+            SyncReport со статистикой и списком ошибочных записей
         """
         stats = self._init_stats()
         error_results: List[SyncResult] = []
 
+        records = list(records)
+
         # Нормализуем имя таксономии для API
-        normalized_taxonomy = normalize_taxonomy_name(sheet_name)
+        normalized_taxonomy = normalize_taxonomy_name(discriminator)
 
         # Создаем endpoint
         taxonomy_endpoint = self._make_taxonomy_endpoint(normalized_taxonomy)
 
         # Обрабатываем в порядке: delete → update → add
-        for action in ["delete", "update", "add"]:
-            # Фильтруем строки по action
-            action_rows = df[df["action"].str.lower().str.strip() == action]
+        by_action = self._group_by_action(records)
+        for action in self.ACTION_ORDER:
+            action_records = by_action[action]
 
-            if len(action_rows) == 0:
+            if not action_records:
                 continue
 
-            logger.info(f"Processing {action}: {len(action_rows)} rows")
+            logger.info(f"Processing {action}: {len(action_records)} rows")
 
-            for idx, row in action_rows.iterrows():
+            for record in action_records:
+                idx = record.write_key
+                row = record.data
                 try:
                     # Обработка в зависимости от action
                     if action == "delete":
@@ -78,10 +81,9 @@ class TaxonomySync(TaxonomySyncBase):
                     elif action == "delete":
                         stats["deleted"] += 1
 
-                    # Записываем обратно в Excel
-                    if excel_writer and result and self.config.sync.update_excel:
-                        excel_writer.update_from_api_response(
-                            sheet_name,
+                    # Записываем обратно в источник
+                    if writer and result and self.config.sync.update_excel:
+                        writer.update_from_result(
                             idx,
                             result,
                             action
@@ -99,9 +101,7 @@ class TaxonomySync(TaxonomySyncBase):
                     ))
 
         # Подсчитываем пропущенные
-        valid_actions = {"add", "update", "delete"}
-        skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
-        stats["skipped"] = len(skipped)
-        stats["total"] = len(df)
+        stats["skipped"] = self._count_skipped(records)
+        stats["total"] = len(records)
 
         return SyncReport.from_stats(stats, error_results)

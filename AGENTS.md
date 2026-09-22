@@ -1,6 +1,6 @@
 # AGENTS.md — WordPress Bulk Editor
 
-Bidirectional CLI: Excel ↔ WordPress. Async-first, project-aware, опциональный Pillow.
+Bidirectional CLI: Excel/JSON ↔ WordPress. Async-first, project-aware, опциональный Pillow.
 
 ---
 
@@ -24,6 +24,43 @@ Bidirectional CLI: Excel ↔ WordPress. Async-first, project-aware, опцион
 Кастомная реализация в `src/utils/retry.py`. Знает иерархию исключений проекта:
 ретраит `NetworkError`, `ServerError`, HTTP 429/502/503/504;
 никогда не ретраит `AuthenticationError`, `NotFoundError`.
+Если исключение несёт атрибут `retry_after` (его ставит провайдер из заголовка
+`Retry-After`), пауза берётся оттуда.
+
+**Весь HTTP идёт через `src/providers/`.**
+`HttpProvider` — общая база (маппинг статусов, ретраи, circuit breaker,
+User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
+`WordPressHttpProvider` — специфика WP (Basic Auth, `verify_ssl`, загрузка медиа).
+`WordPressClient` — тонкая обёртка над провайдером, интерфейс прежний.
+Не создавать свой `httpx.AsyncClient` в endpoint-ах: загрузка медиа тоже идёт
+через провайдер (`upload_binary`), иначе теряются авторизация, retry и CB.
+
+**Необратимое действие — только через гейт.**
+Сначала `--dry-run` (превью, без вопросов и без изменений), затем
+`output.require_confirmation(ctx, описание, confirm)` — и только потом действие.
+Свой `typer.confirm` в командах не писать: под `--non-interactive`, в `--json`
+и когда stdin не терминал, вопрос должен превращаться в `INVALID_ARGUMENTS` (exit 2),
+а не в зависший prompt. Гейт вызывается **после** проверки `--dry-run`, не до.
+
+Что гейтится сейчас: `bulk-delete`; `options` (запись настроек на сайт и
+перезапись xlsx); `fetch` (перезапись существующего xlsx); `sync`/`async` —
+только необратимые пути (`media`-строки с `action=delete` и `--delete-media`:
+там `force=True`, мимо корзины), см. `_confirm_irreversible` в `sync_commands.py`.
+`--delete-media` **не зависит от источника** (featured-изображения удаляются у
+любой записи с `action=delete`, хоть из Excel, хоть из JSON) — гейт вызывается в
+обеих ветках `_open_plan`; Excel-специфичен только подсчёт media-строк.
+Удаление контента идёт в корзину (`force=False`) и подтверждения не требует.
+
+**Цепочка credentials — одна реализация.**
+`utils/auth.resolve_credentials()` возвращает значения **и источник каждого поля**
+(`cli`/`env`/`keychain`/`.env`). На неё опираются и `load_credentials_from_env`
+(реальные команды), и `doctor`. Вторую реализацию цепочки не заводить: разъедутся —
+и диагностика начнёт врать. `.env` без явного пути ищется `find_dotenv(usecwd=True)`
+(от папки пользователя, не от файла вызывающего кода).
+
+**Секреты — keychain или окружение, не файлы проекта.**
+`src/credentials/manager.py` (keyring, provider = домен сайта).
+Порядок: CLI-флаг → переменная окружения → keychain → `.env` (legacy).
 
 **pandas 2.x StringDtype.**
 При записи в колонку с `StringDtype` (`is_string_dtype()`) значение должно быть `str`.
@@ -56,6 +93,101 @@ fetch:
 
 ---
 
+## Источники данных: Excel и JSON
+
+`sync`/`async` читают либо xlsx, либо json — **источник выбирается по расширению
+`--file`**, отдельного `--format` нет. Дальше пайплайн общий: `RecordSource` →
+группировка по дискриминатору (`sync_record_groups`) → content/taxonomy sync →
+`RecordWriter`.
+
+| | Excel (`.xlsx`) | JSON (`.json`) |
+| --- | --- | --- |
+| Набор данных | лист | ключ в `tabs` |
+| Тип записи | имя листа на весь лист | поле `type`/`taxonomy` у каждой записи |
+| Имя записи | `title` / `name` | так же |
+| Ключ writeback | label строки pandas | `_row_num` (иначе позиция в массиве) |
+| Классы | `ExcelRecordSource/Writer` | `JsonRecordSource/Writer` |
+
+Форма JSON-файла:
+
+```json
+{"project": "mw", "tabs": {
+  "options":  [{"_row_num": 2, "key": "phone", "value": "+7"}],
+  "mw.ru":    [{"_row_num": 2, "action": "add", "type": "rb_services",
+                "title": "…", "seo.title": "…", "acf.f1": "…",
+                "rb_services_cat": "Перевозки"}]}}
+```
+
+`_row_num`/`type`/`taxonomy` — метаданные источника: в payload WordPress не
+уходят, но в файле остаются. Запись, где заполнены оба или ни одного из
+`type`/`taxonomy`, — ошибка (`RecordSourceError`, exit 2) с указанием таба и
+номера записи; весь таб проверяется до отправки первой записи.
+
+**Авто-поиск файла данных** (`ProjectContext.find_data_file()`): xlsx **или**
+json в корне проекта, внутри формата приоритет у файла с именем проекта. Если в
+папке лежат оба формата — ошибка со списком кандидатов и требованием `--file`:
+молча выбирать источник нельзя.
+
+Кандидаты отбирает общий `_candidates()` (им же пользуется `find_excel()`):
+`~$*.xlsx` (локи Excel) отбрасываются, а json проверяется на форму
+(`json_source.is_data_file()` — парсится и есть объект `tabs`). Посторонний json
+в папке проекта (service-account Google и т.п.) не становится ни «данными», ни
+поводом объявить форматы неоднозначными.
+
+**Только Excel** (JSON-эквивалента нет): `fetch`, `fetch-media`, `options`,
+`validate`, `reshape`, `llm`, `export*`, `google-*`, `vlookup`. Медиа-лист
+(`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
+
+### Выбор набора данных: `--sheets`
+
+Один и тот же флаг для обоих источников: листы Excel или табы JSON через запятую.
+
+- Excel: не указан → все content-листы (+ taxonomy, если нет `--skip-tax`).
+- JSON: **обязателен**. Значения по умолчанию нет — рядом с контентом в файле
+  лежат служебные табы (`options`, `company` из `{key,label,value}`), синхронизировать
+  «всё» небезопасно. Без флага — ошибка (exit 2) со списком табов файла.
+  Несколько табов за прогон разрешены: обрабатываются по очереди, каждый со
+  своим writer'ом (файл перечитывается перед табом и сохраняется после — в том
+  числе на пути ошибки, через `finally`: иначе id уже созданных в WordPress
+  записей пропали бы и повтор создал бы их заново).
+- Выбор наборов проверяется **до** загрузки credentials: «какие табы есть в
+  файле» — вопрос к файлу, ответ не должен требовать доступа к сайту.
+- Пустой разбор (`--sheets ","`) — ошибка аргументов, а не «нечего делать, всё ок».
+
+Служебный таб, выбранный по ошибке, валится на валидации (`type`/`taxonomy` не
+заполнены) до подключения к сайту. Отдельной синхронизации настроек из JSON нет.
+
+### Фильтр записей: `--filter field=value`
+
+Повторяемый, условия объединяются по И, применяется после чтения записи и до
+маппинга — одинаково для Excel и JSON. Сравнение точное строковое по сырому
+значению поля. Dot-нотация — обычное имя поля (`--filter acf.f1=да`), понимать
+вложенность payload не требуется. `type`/`taxonomy` берутся из дискриминатора
+записи (в `Record.data` их нет). Отфильтрованные записи попадают в отчёт как
+`skipped`. Реализация — `src/records/filters.py`, подключён к `sync`/`async`.
+
+**`--dry-run` не открывает writer'ы — исправление реальной порчи файлов.**
+До этого dry-run проходил полный путь обратной записи и заливал в файл проекта
+заглушки dry-run-ответов: `id=0`, `action` у всех строк → `skip`, часть колонок
+затиралась. То есть прогон «без изменений» молча портил и xlsx, и (после
+подключения JSON) испортил бы json. Теперь `_writeback_enabled()` выключает
+обратную запись и при `--dry-run`, и при `--no-update-excel`. Регрессия закрыта
+тестами `test_dry_run_does_not_touch_the_file` (json, побайтово) и
+`test_dry_run_does_not_touch_the_excel_file` (xlsx, по значениям ячеек).
+
+**`--dry-run` больше не создаёт реальные термины таксономии.** Раньше
+`_process_taxonomies` вызывал `get_or_create`/`get_or_create_cached` безусловно,
+и превью «без изменений» на самом деле создавало на сайте недостающие термины
+(включая предков иерархии `>` и мета-поле primary-термина). Теперь `dry_run`
+пробрасывается до `TaxonomiesEndpoint.get_or_create`/`get_or_create_cached`:
+поиск существующего термина выполняется как обычно (для точного превью), а
+create-запрос — нет; отсутствующий термин возвращается плейсхолдером с ID=0
+и не кладётся в кэш как настоящий. Тесты — `TestProcessTaxonomyStringDryRun`
+(`tests/test_taxonomies.py`) и `TestTaxonomyDryRunDoesNotCreate`
+(`tests/test_content_sync.py`).
+
+---
+
 ## Обнаружение полей (FieldDetector)
 
 Колонки Excel делятся на категории в таком порядке приоритета:
@@ -63,7 +195,7 @@ fetch:
 | Категория | Признак | Куда идёт |
 | --- | --- | --- |
 | system | action, id, img_path, content_path, image_url, alt_text, caption | не в API |
-| taxonomy | slug из WP_TAXONOMIES / discovery / `*-cat` суффикс | terms endpoint |
+| taxonomy | slug из WP_TAXONOMIES / discovery / суффикс `_cat -cat _tag -tag _tax -tax` (суффикс не применяется к dot-нотации и `acf_`) | terms endpoint |
 | acf | префикс `acf_` | ACF meta |
 | nested | содержит `.` (dot-нотация) | `build_nested_payload()` |
 | legacy seo | `seo_*` без точки | Yoast-стиль, устарело но работает |
@@ -78,9 +210,18 @@ fetch:
 
 1. `WP_TAXONOMIES=slug1,slug2` в `.env` — абсолютный приоритет (override)
 2. `WordPressDiscovery` — опрос API сайта
-3. Стандартный набор (`category`, `post_tag`) + листы с суффиксом `-cat`
+3. Стандартный набор (`category`, `post_tag`) + колонки/листы с суффиксом
+   `_cat -cat _tag -tag _tax -tax` (регистронезависимо)
 
 `ExcelReader` умеет override имён листов: лист `categories` → таксономия `category`.
+
+**Значение поля таксономии:** термины разделены `"; "`, внутри одного термина
+уровни иерархии — `>`: `"термин1; термин2>термин2.1"`. Предки создаются слева
+направо, записи присваивается последний уровень. `>` допустим только для
+иерархических таксономий: если WP проигнорировал `parent` (таксономия плоская) —
+`ValidationError`, а не тихие дубликаты терминов на каждом прогоне. Первый термин строки — основной
+(primary), пишется в мету Yoast `_yoast_wpseo_primary_<taxonomy>` best-effort:
+ошибка этой записи не валит синхронизацию.
 
 ---
 
@@ -123,50 +264,129 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | `WP_API_TIMEOUT` / `WP_MEDIA_TIMEOUT` | таймауты httpx |
 | `WP_MAX_RETRIES` / `WP_RETRY_DELAY` | retry параметры |
 | `WP_CIRCUIT_BREAKER_THRESHOLD` / `WP_CIRCUIT_BREAKER_RECOVERY` | CB настройки |
-| `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_MODELS` / `LLM_PROMPT` | LLM генерация |
+| `LLM_PROMPT` | промпт команды `llm` |
+| `LLM_LEVEL` / `LLM_MODELS` | ТЕКСТ: уровень или цепочка моделей llmkit |
+| `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_IMG_PROMPT` / `LLM_IMG_MODELS` | ТОЛЬКО картинки (`--column img_path`) |
 | `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_CREDENTIALS_PATH` | Google Sheets |
+| `WP_BULK_MIN_VERSION=1.2.0` | минимальная версия CLI для этого проекта |
+
+### Команда `llm`: текст через llmkit, картинки — свои
+
+Генерация **текста** идёт через общую библиотеку
+[llmkit](https://github.com/bolandeu/llmkit) (`LLMClient.generate` → `LlmKit.generate`):
+цепочки моделей с фолбэком, ретраи по типу ошибки, кэш и учёт стоимости — её,
+а не наши. Ключи провайдеров llmkit берёт из **своего** конфига
+(`~/Library/Application Support/llmkit/config.toml`) → переменной окружения →
+связки ключей ОС; `.env` проекта на это не влияет. Расходы смотреть её же CLI:
+`llm cost --by tool` (вызовы помечаются `tool=wp-bulk-editor`, `project=<имя>`).
+
+- `--level`/`LLM_LEVEL` — именованный уровень из конфига llmkit (`cheap`/`judge`/…).
+- `--model`/`LLM_MODELS` — явная цепочка `провайдер/модель` через запятую, перекрывает уровень.
+- Не задано ни то, ни другое — берётся `[defaults] level` конфига llmkit.
+- **`--endpoint`/`--token` на текст больше не действуют** (раньше — действовали).
+  Нужен свой OpenAI-совместимый сервер для текста: провайдер
+  `kind = "openai_compatible"` в конфиге llmkit, не флаг этого CLI.
+
+Генерация **картинок** (`--column img_path`) в llmkit отсутствует, поэтому
+осталась своим вызовом в `src/utils/llm_client.py::generate_image`: ей и только
+ей нужны `--endpoint`/`--token` (`LLM_ENDPOINT`/`LLM_TOKEN`), модели из
+`LLM_IMG_MODELS` и промпт из `LLM_IMG_PROMPT`.
 
 ---
 
 ## Система проектов
 
-`--project mysite` / `-P mysite` → `projects/mysite/` содержит `.env`, Excel, `media/`, `content/`, `logs/`.
+Проект (данные сайта: `.env`, Excel/JSON, `media/`, `content/`, `logs/`) живёт вне
+этого репозитория — `--project`/`-P` (или `WP_PROJECT`) находит его директорию,
+`resolve_project()` в `src/cli/project.py`, порядок разрешения:
+
+1. **Явный путь** — `--project /path/to/project` (абсолютный или относительно cwd)
+   указывает на существующую директорию → используется как есть. Побеждает
+   безусловно, даже если ниже совпало бы legacy-имя.
+2. **Legacy-имя** — `--project mysite`, не являющееся путём к существующей
+   директории, резолвится в `<repo_root>/projects/mysite/` (для проектов, всё ещё
+   физически лежащих внутри этого репозитория).
+3. **cwd-walk** — `--project` не передан вовсе: подъём от текущей директории вверх
+   в поисках `.env` (тот же маркер, что `ProjectContext.env_file`), не выше домашней
+   директории пользователя и не глубже ~15 уровней.
+4. **Глобальный режим** — ничего не найдено → `ProjectContext()` неактивен, команды
+   работают без проекта (там, где это возможно).
+
 Приоритет: CLI флаги > `.env` проекта > глобальный `.env`.
 
-**Авто-обнаружение Excel** — только для `fetch`. Остальные команды (`sync`, `async`, `llm`, `validate`, `fetch-media`) требуют явный `--file`.
+**Авто-обнаружение файла данных** — `sync`/`async` ищут xlsx **или** json в папке
+проекта (`find_data_file()`, см. «Источники данных»), Excel-специфичные команды —
+только xlsx (`find_excel()`). Явный `--file` всегда в приоритете и обязателен,
+когда в папке лежат оба формата.
 
 **Авто-обнаружение output** — `export` → `projects/<name>/exported_content/`, `export-media` → `projects/<name>/export_media/`.
+
+**Минимальная версия CLI.** Проект объявляет её в своём `.env`:
+`WP_BULK_MIN_VERSION=1.2.0`. Читает `ProjectContext.min_version`, проверяет
+`check_cli_compat()` в callback приложения: версия старее — `CliTooOld` (exit 6)
+до выполнения команды. Исключение — `doctor`: он обязан уметь диагностировать
+именно несовместимую версию, поэтому показывает её проверкой `cli_compat`.
+Запуск из исходников (пакет не установлен) версии не имеет — проверка пропускается.
+
+---
+
+## Диагностика и бандленная документация
+
+`wp-bulk doctor [--json] [--check-connection]` — единственная команда проверки
+готовности окружения. Проверки: `project`, `cli_compat`, `config`, `credentials`
+(с источником: cli/env/keychain/.env), `credential_store`, и `connection` —
+только по явному флагу, чтобы doctor оставался быстрым и офлайновым.
+Статусы: `ok` / `warn` / `fail`; сам запуск диагностики всегда exit 0.
+
+`src/data/SKILL.md` — соглашения CLI для агента, едет внутри пакета
+(`[tool.setuptools.package-data]`). Печатается флагом `wp-bulk --ai`.
+**Списка команд там нет и быть не должно:** его печатает голый `wp-bulk` из
+docstring'ов. Добавили команду — написали хороший docstring, SKILL.md не трогаем.
 
 ---
 
 ## Добавление новой команды
 
 1. Выбрать нужный файл в `src/cli/` по теме или создать новый.
-2. Обернуть тело в `handle_command_errors()` (context manager из `common.py`).
-3. Credentials грузить через `load_and_print_credentials()`.
+2. Навесить `@output.guard` под `@app.command()`, добавить `json_output: bool = output.JsonOption`
+   и `quiet: bool = output.QuietOption`, результат отдавать через `output.emit_success(ctx, payload, render)`.
+   (Ещё не переведённые команды используют `handle_command_errors(ctx)` из `common.py` — то же самое,
+   но context manager'ом.) В docstring указать exit-коды.
+3. Credentials грузить через `load_and_print_credentials(..., ctx=ctx)`.
 4. Если нужен файл: `resolve_excel_file(ctx, file)` — разруливает explicit > project xlsx > None.
 5. Если нужен `.env`: `resolve_env_file(ctx, env_file)`.
-6. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
+6. Если команда что-то спрашивает или необратимо меняет сайт — добавить
+   `confirm: bool = output.ConfirmOption` и `non_interactive: bool = output.NonInteractiveOption`,
+   вопрос задавать только через `output.require_confirmation`.
+7. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
 
 ---
 
 ## Исключения — иерархия
 
+Каждое исключение несёт `code` и `exit_code` (контракт cli-builder), их печатает
+`src/output/`. `CliError` — алиас `WPBulkEditorError`.
+
 ```
-WPBulkEditorError
-├── ConfigurationError
-├── ExcelError
+WPBulkEditorError                       UNEXPECTED (1)
+├── ConfigurationError                  INVALID_ARGUMENTS (2)
+├── ExcelError                          INVALID_ARGUMENTS (2)
 │   ├── ExcelStructureError
 │   ├── ExcelValidationError
 │   └── ProfileSheetMissingError
-├── WordPressError
-│   ├── AuthenticationError   ← не ретраить
+├── RecordSourceError                   INVALID_ARGUMENTS (2)
+├── WordPressError                      PROVIDER_ERROR (5)
+│   ├── AuthenticationError   ← не ретраить   AUTH_REQUIRED (3)
 │   ├── NotFoundError         ← не ретраить
 │   ├── ServerError           ← ретраить
 │   ├── NetworkError          ← ретраить
 │   └── MediaUploadError
-├── ValidationError
-└── ImageProcessingError
+├── ValidationError                     INVALID_ARGUMENTS (2)
+├── Aborted            ← отказ в confirm-гейте   ABORTED (1)
+├── CliTooOld          ← WP_BULK_MIN_VERSION     CLI_TOO_OLD (6)
+├── CredentialStoreUnavailable          CREDENTIAL_STORE_UNAVAILABLE (1)
+├── ImageProcessingError                UNEXPECTED (1)
+└── CircuitBreakerOpenError (utils/retry.py)   PROVIDER_ERROR (5)
 ```
 
 ---
@@ -180,3 +400,42 @@ WPBulkEditorError
 - Разделитель таксономий в Excel: `"; "` (точка с запятой + пробел).
 - Path traversal: валидировать через `resolve().relative_to()` для всех пользовательских путей.
 - Async: все WP API calls через `async with WordPressClient(...)`. `asyncio.run()` только на CLI-уровне.
+- Кроссплатформенность: `pathlib`/`shutil`, никаких `os.system`, `shell=True` и
+  POSIX-путей строкой. Пакет должен ставиться и работать на macOS/Linux/Windows.
+
+---
+
+## Тесты и качество
+
+```bash
+uv sync
+uv run python -m pytest -q                     # (uv run pytest не резолвится в PATH)
+uv run python -m pytest -q --cov=src --cov-report=term-missing   # fail_under в pyproject
+uv run ruff check .
+```
+
+Конвенции тестов: плоские `tests/test_<module>.py`, группировка в `class Test<Thing>:`,
+`asyncio_mode = "auto"`. HTTP мокается через `httpx.MockTransport` + хелпер
+`mock_transport(responses)` (`tests/test_wordpress_client.py`), настоящий OS keychain
+в тестах подменяется (`tests/test_credentials.py::FakeKeyring`).
+
+E2E не автоматизированы: нужен живой WordPress (docker-compose с `wordpress` + `mysql`,
+Application Password в отдельном `.env.test`). Основной сценарий для ручной проверки —
+`fetch` → правка Excel (`action=update/add/delete`) → `async` → сверка через WP API и
+проверка, что новой строке записан `id`, а `action` стал `skip`.
+
+---
+
+## Windows
+
+- Ставить через `uv tool install "git+<repo-url>"` — тогда `wp-bulk` попадает в PATH.
+  При работе из клона (`uv pip install -e .`) `wp-bulk.exe` лежит в `.venv\Scripts\`,
+  которая в PATH не добавляется: запускать `uv run wp-bulk ...` из папки проекта.
+- `uv sync` ставит точно по `uv.lock` (воспроизводимо), `uv pip install -e .` — свежие
+  совместимые версии по `pyproject.toml`.
+- Кириллица «кракозябрами» в консоли: `chcp 65001` на сессию или `PYTHONUTF8=1` в
+  переменных окружения системы.
+- `uv` не найден сразу после установки — открыть терминал заново (PATH обновляется
+  только в новой сессии).
+- `SSL: CERTIFICATE_VERIFY_FAILED` на локальном Docker с самоподписанным сертификатом:
+  `WP_VERIFY_SSL=false` в `.env` проекта.

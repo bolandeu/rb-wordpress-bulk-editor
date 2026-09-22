@@ -40,7 +40,7 @@ def export(
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "exported_content")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         log_file = setup_command_logging(ctx, "export", verbose)
 
         console.print("\n[bold cyan]WordPress Content Exporter[/bold cyan]")
@@ -112,7 +112,7 @@ def export_media(
     console.print(f"\n[bold blue]WordPress Bulk Editor - Export Media[/bold blue]\n")
     console.print(f"Папка экспорта: [cyan]{output}[/cyan]\n")
 
-    with handle_command_errors():
+    with handle_command_errors(ctx):
         domain, username, password = load_and_print_credentials(
             env_file=env_file, domain=domain,
             username=username, password=password,

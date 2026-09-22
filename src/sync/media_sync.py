@@ -3,13 +3,12 @@
 """
 
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-import pandas as pd
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.media import MediaEndpoint
-from ..excel.writer import ExcelWriter
 from ..config import AppConfig
+from ..records.base import Record, RecordWriter, is_blank, is_missing
 from ..models import SyncReport, SyncResult
 from .base_sync import BaseSync
 
@@ -23,36 +22,40 @@ class MediaSync(BaseSync):
 
     async def sync_media(
         self,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None
     ) -> SyncReport:
         """
-        Синхронизировать лист media.
+        Синхронизировать медиа-записи.
 
         Args:
-            df: DataFrame с данными media
-            excel_writer: Writer для обратной записи
+            records: Записи медиафайлов
+            writer: Writer для обратной записи
 
         Returns:
-            SyncReport со статистикой и списком ошибочных строк
+            SyncReport со статистикой и списком ошибочных записей
         """
         stats = self._init_stats()
         error_results: List[SyncResult] = []
+
+        records = list(records)
 
         # Создаем endpoint
         media_endpoint = self._make_media_endpoint()
 
         # Обрабатываем в порядке: delete → update → add
-        for action in ["delete", "update", "add"]:
-            # Фильтруем строки по action
-            action_rows = df[df["action"].str.lower().str.strip() == action]
+        by_action = self._group_by_action(records)
+        for action in self.ACTION_ORDER:
+            action_records = by_action[action]
 
-            if len(action_rows) == 0:
+            if not action_records:
                 continue
 
-            logger.info(f"Processing media {action}: {len(action_rows)} rows")
+            logger.info(f"Processing media {action}: {len(action_records)} rows")
 
-            for idx, row in action_rows.iterrows():
+            for record in action_records:
+                idx = record.write_key
+                row = record.data
                 try:
                     # Валидация
                     is_valid, error_msg = self._validate_row(row, action)
@@ -77,10 +80,9 @@ class MediaSync(BaseSync):
                     elif action == "delete":
                         stats["deleted"] += 1
 
-                    # Записываем обратно в Excel
-                    if excel_writer and result and self.config.sync.update_excel:
-                        excel_writer.update_from_api_response(
-                            "media",
+                    # Записываем обратно в источник
+                    if writer and result and self.config.sync.update_excel:
+                        writer.update_from_result(
                             idx,
                             result,
                             action
@@ -98,19 +100,17 @@ class MediaSync(BaseSync):
                     ))
 
         # Подсчитываем пропущенные
-        valid_actions = {"add", "update", "delete"}
-        skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
-        stats["skipped"] = len(skipped)
-        stats["total"] = len(df)
+        stats["skipped"] = self._count_skipped(records)
+        stats["total"] = len(records)
 
         return SyncReport.from_stats(stats, error_results)
 
-    def _validate_row(self, row: pd.Series, action: str) -> tuple[bool, Optional[str]]:
+    def _validate_row(self, row: Mapping[str, Any], action: str) -> tuple[bool, Optional[str]]:
         """
-        Валидация строки перед обработкой.
+        Валидация записи перед обработкой.
 
         Args:
-            row: pandas Series
+            row: Запись (Mapping поле → значение)
             action: Тип действия
 
         Returns:
@@ -118,20 +118,20 @@ class MediaSync(BaseSync):
         """
         if action == "add":
             # Для add обязателен img_path
-            if "img_path" not in row.index:
+            if "img_path" not in row:
                 return False, "Отсутствует обязательное поле: img_path"
 
             value = row["img_path"]
-            if pd.isna(value) or value == "":
+            if is_blank(value):
                 return False, "Поле 'img_path' не может быть пустым для action=add"
 
         elif action in ("update", "delete"):
             # Для update/delete обязателен ID
-            if "id" not in row.index:
+            if "id" not in row:
                 return False, "Отсутствует обязательное поле: id"
 
             value = row["id"]
-            if pd.isna(value) or value == "":
+            if is_blank(value):
                 return False, "Поле 'id' не может быть пустым"
 
         return True, None
@@ -139,15 +139,15 @@ class MediaSync(BaseSync):
     async def _add_media(
         self,
         media_endpoint: MediaEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Загрузить новый медиафайл."""
         media_path = str(row["img_path"]).strip()
 
         # Получаем метаданные
-        title = row.get("title", "") if "title" in row.index and pd.notna(row.get("title")) else None
-        alt_text = row.get("alt_text", "") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else None
-        caption = row.get("caption", "") if "caption" in row.index and pd.notna(row.get("caption")) else None
+        title = row.get("title", "") if "title" in row and not is_missing(row.get("title")) else None
+        alt_text = row.get("alt_text", "") if "alt_text" in row and not is_missing(row.get("alt_text")) else None
+        caption = row.get("caption", "") if "caption" in row and not is_missing(row.get("caption")) else None
 
         # Определяем это URL или локальный файл
         if media_path.startswith("http://") or media_path.startswith("https://"):
@@ -180,16 +180,16 @@ class MediaSync(BaseSync):
     async def _update_media(
         self,
         media_endpoint: MediaEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Обновить метаданные медиафайла."""
         media_id = int(row["id"])
 
         # Собираем метаданные для обновления
-        title = row.get("title") if "title" in row.index and pd.notna(row.get("title")) else None
-        alt_text = row.get("alt_text") if "alt_text" in row.index and pd.notna(row.get("alt_text")) else None
-        caption = row.get("caption") if "caption" in row.index and pd.notna(row.get("caption")) else None
-        description = row.get("description") if "description" in row.index and pd.notna(row.get("description")) else None
+        title = row.get("title") if "title" in row and not is_missing(row.get("title")) else None
+        alt_text = row.get("alt_text") if "alt_text" in row and not is_missing(row.get("alt_text")) else None
+        caption = row.get("caption") if "caption" in row and not is_missing(row.get("caption")) else None
+        description = row.get("description") if "description" in row and not is_missing(row.get("description")) else None
 
         logger.debug(f"Updating media ID={media_id}")
         result = await media_endpoint.update(
@@ -206,7 +206,7 @@ class MediaSync(BaseSync):
     async def _delete_media(
         self,
         media_endpoint: MediaEndpoint,
-        row: pd.Series
+        row: Mapping[str, Any]
     ) -> Dict[str, Any]:
         """Удалить медиафайл (полностью с всеми размерами)."""
         media_id = int(row["id"])

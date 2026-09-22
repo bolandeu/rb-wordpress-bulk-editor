@@ -1,17 +1,16 @@
 """
-Асинхронная синхронизация таксономий с параллельной обработкой строк.
+Асинхронная синхронизация таксономий с параллельной обработкой записей.
 """
 
 from functools import partial
 import asyncio
-from typing import Dict, List, Optional
-import pandas as pd
+from typing import List, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.client import WordPressClient
 from ..wordpress.taxonomies import normalize_taxonomy_name
-from ..excel.writer import ExcelWriter
 from ..config import AppConfig
+from ..records.base import Record, RecordWriter
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
 from ..models import SyncReport, SyncResult
 from .taxonomy_sync_base import TaxonomySyncBase
@@ -19,10 +18,10 @@ from .taxonomy_sync_base import TaxonomySyncBase
 
 class TaxonomySyncAsync(TaxonomySyncBase):
     """
-    Асинхронная версия TaxonomySync с параллельной обработкой строк.
+    Асинхронная версия TaxonomySync с параллельной обработкой записей.
 
     Отличия от TaxonomySync:
-    - Строки обрабатываются параллельно с ограничением Semaphore
+    - Записи обрабатываются параллельно с ограничением Semaphore
     - Используется AsyncBatchProcessor для управления concurrency
     - Результаты собираются через asyncio.gather()
     """
@@ -35,45 +34,50 @@ class TaxonomySyncAsync(TaxonomySyncBase):
         super().__init__(wp_client, config)
         self.batch_processor = AsyncBatchProcessor(config.sync.concurrency)
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None
     ) -> SyncReport:
         """
-        Асинхронная синхронизация листа таксономии с параллельной обработкой строк.
+        Асинхронная синхронизация группы терминов с параллельной обработкой.
 
         Args:
-            sheet_name: Название листа (= название таксономии)
-            df: DataFrame с данными листа
-            excel_writer: Writer для обратной записи (если нужна)
+            discriminator: Название таксономии
+            records: Записи-термины одной таксономии
+            writer: Writer для обратной записи (если нужна)
 
         Returns:
-            SyncReport со статистикой и списком ошибочных строк
+            SyncReport со статистикой и списком ошибочных записей
         """
         stats = self._init_stats()
         error_results: List[SyncResult] = []
 
+        records = list(records)
+
         # Нормализуем имя таксономии для API
-        normalized_taxonomy = normalize_taxonomy_name(sheet_name)
+        normalized_taxonomy = normalize_taxonomy_name(discriminator)
 
         # Создаем endpoint
         taxonomy_endpoint = self._make_taxonomy_endpoint(normalized_taxonomy)
 
         # Обрабатываем в порядке: delete → update → add
-        for action in ["delete", "update", "add"]:
-            # Фильтруем строки по action
-            action_rows = df[df["action"].str.lower().str.strip() == action]
+        by_action = self._group_by_action(records)
+        for action in self.ACTION_ORDER:
+            action_records = by_action[action]
 
-            if len(action_rows) == 0:
+            if not action_records:
                 continue
 
-            logger.info(f"Processing {action}: {len(action_rows)} rows (PARALLEL)")
+            logger.info(f"Processing {action}: {len(action_records)} rows (PARALLEL)")
 
-            # ✨ Создаем задачи для параллельной обработки
+            # Создаем задачи для параллельной обработки
             tasks = []
-            for idx, row in action_rows.iterrows():
+            for record in action_records:
+                idx = record.write_key
+                row = record.data
+
                 # Функция обработки (partial для передачи в process_row)
                 if action == "delete":
                     process_func = partial(
@@ -100,7 +104,7 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                 )
                 tasks.append(task)
 
-            # ✨ Выполняем ВСЕ задачи параллельно
+            # Выполняем ВСЕ задачи параллельно
             if tasks:
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -125,10 +129,9 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                         elif action == "delete":
                             stats["deleted"] += 1
 
-                        # Записываем в Excel через ASYNC метод
-                        if excel_writer and result.api_response and self.config.sync.update_excel:
-                            await excel_writer.update_from_api_response_async(
-                                sheet_name,
+                        # Записываем в источник через ASYNC метод
+                        if writer and result.api_response and self.config.sync.update_excel:
+                            await writer.update_from_result_async(
                                 result.row_index,
                                 result.api_response,
                                 action
@@ -144,9 +147,7 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                         ))
 
         # Подсчитываем пропущенные
-        valid_actions = {"add", "update", "delete"}
-        skipped = df[~df["action"].str.lower().str.strip().isin(valid_actions)]
-        stats["skipped"] = len(skipped)
-        stats["total"] = len(df)
+        stats["skipped"] = self._count_skipped(records)
+        stats["total"] = len(records)
 
         return SyncReport.from_stats(stats, error_results)

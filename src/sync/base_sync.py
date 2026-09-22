@@ -5,7 +5,8 @@
 """
 
 from abc import ABC
-from typing import Dict
+from typing import Dict, Iterable, List, Sequence
+from ..records.base import Record, is_blank
 from ..wordpress.client import WordPressClient
 from ..config import AppConfig
 
@@ -17,8 +18,12 @@ class BaseSync(ABC):
     Предоставляет:
     - Валидацию action
     - Инициализацию статистики
+    - Группировку записей по action
     - Общие вспомогательные методы
     """
+
+    # Порядок обработки: сначала удаляем, потом обновляем, потом создаём
+    ACTION_ORDER = ("delete", "update", "add")
 
     def __init__(self, wp_client: WordPressClient, config: AppConfig):
         """
@@ -64,3 +69,26 @@ class BaseSync(ABC):
             "skipped": 0,
             "total": 0
         }
+
+    @staticmethod
+    def _record_action(record: Record) -> str:
+        """Нормализованное значение action записи ("" если поле пустое/отсутствует)."""
+        value = record.data.get("action")
+        if is_blank(value):
+            return ""
+        return str(value).strip().lower()
+
+    @classmethod
+    def _group_by_action(cls, records: Sequence[Record]) -> Dict[str, List[Record]]:
+        """Разложить записи по action в порядке ACTION_ORDER."""
+        grouped: Dict[str, List[Record]] = {action: [] for action in cls.ACTION_ORDER}
+        for record in records:
+            action = cls._record_action(record)
+            if action in grouped:
+                grouped[action].append(record)
+        return grouped
+
+    @classmethod
+    def _count_skipped(cls, records: Iterable[Record]) -> int:
+        """Сколько записей не попало ни в один валидный action."""
+        return sum(1 for r in records if cls._record_action(r) not in cls.ACTION_ORDER)

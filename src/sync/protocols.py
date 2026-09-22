@@ -2,33 +2,31 @@
 Protocol-интерфейсы для sync-классов (для тестирования и статической проверки типов)
 """
 
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Sequence
 
-import pandas as pd
-
-from ..excel.writer import ExcelWriter
 from ..models import SyncReport
+from ..records.base import Record, RecordWriter
 
 
 class ContentSyncProtocol(Protocol):
     """Протокол для синхронизации контента."""
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None,
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None,
     ) -> SyncReport: ...
 
 
 class TaxonomySyncProtocol(Protocol):
     """Протокол для синхронизации таксономий."""
 
-    async def sync_sheet(
+    async def sync_records(
         self,
-        sheet_name: str,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None,
+        discriminator: str,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None,
     ) -> SyncReport: ...
 
 
@@ -37,6 +35,6 @@ class MediaSyncProtocol(Protocol):
 
     async def sync_media(
         self,
-        df: pd.DataFrame,
-        excel_writer: Optional[ExcelWriter] = None,
+        records: Sequence[Record],
+        writer: Optional[RecordWriter] = None,
     ) -> SyncReport: ...

@@ -1,11 +1,11 @@
 """
-Маппинг Excel строк в WordPress API payload
+Маппинг записей источника (Excel/JSON) в WordPress API payload
 """
 
-from typing import Dict, Any, List, Set, Optional, Tuple
-import pandas as pd
+from typing import Dict, Any, List, Mapping, Set, Optional, Tuple
 from loguru import logger
 
+from ..records.base import is_blank, is_missing
 from .field_detector import FieldDetector
 from .value_converter import convert_acf_value, parse_bool_default_true
 from ..constants import (
@@ -41,14 +41,14 @@ class ContentMapper:
 
     def map_row(
         self,
-        row: pd.Series,
+        row: Mapping[str, Any],
         taxonomy_ids: Dict[str, List[int]] = None
     ) -> Dict[str, Any]:
         """
-        Преобразовать строку Excel в WordPress API payload.
+        Преобразовать запись источника в WordPress API payload.
 
         Args:
-            row: pandas Series (строка из DataFrame)
+            row: Запись (Mapping поле → значение)
             taxonomy_ids: Словарь {taxonomy_name: [term_ids]} для таксономий
 
         Returns:
@@ -63,14 +63,14 @@ class ContentMapper:
         
         # Полная структура строки для диагностики
         logger.debug(f"Row structure (all fields):")
-        for field_name in row.index:
+        for field_name in row.keys():
             value = row[field_name]
-            logger.debug(f"  {field_name}: {repr(value)} (type={type(value).__name__}, isna={pd.isna(value)})")
+            logger.debug(f"  {field_name}: {repr(value)} (type={type(value).__name__}, isna={is_blank(value)})")
 
         # 1. Обычные поля контента
         logger.debug(f"Processing content fields: {self.analysis['content']}")
         for field in self.analysis["content"]:
-            if field in row.index:
+            if field in row:
                 value = row[field]
                 
                 # Поля, которые нужно отправлять всегда (включая пустые значения для обнуления)
@@ -96,12 +96,12 @@ class ContentMapper:
                     logger.debug(
                         f"SEO field '{field}': raw_value={repr(value)}, "
                         f"type={type(value).__name__}, "
-                        f"isna={pd.isna(value)}"
+                        f"isna={is_blank(value)}"
                     )
 
                 # Для обычных полей пропускаем пустые значения
                 # Для полей из send_empty_fields отправляем пустые значения
-                if pd.notna(value) and value != "":
+                if not is_blank(value):
                     converted = self._convert_value(value)
                     payload[field] = converted
                     
@@ -120,7 +120,7 @@ class ContentMapper:
         nested_cols = self.analysis.get("nested", [])
         if nested_cols:
             for col in nested_cols:
-                if col not in row.index:
+                if col not in row:
                     continue
                 value = row[col]
                 # bool-поля с дефолтом true: пустое → True, парсим всегда
@@ -128,7 +128,7 @@ class ContentMapper:
                     build_nested_payload(col, parse_bool_default_true(value), payload)
                     continue
                 # Обычные nested-поля: пустые значения пропускаем
-                if pd.isna(value) or value == "":
+                if is_blank(value):
                     continue
                 build_nested_payload(col, self._convert_value(value), payload)
             logger.debug(f"Nested fields (dot-notation): {nested_cols}")
@@ -151,7 +151,7 @@ class ContentMapper:
             logger.debug(f"Taxonomies: {list(taxonomy_ids.keys())}")
 
         # 4. Featured media (если есть)
-        if "featured_media" in row.index and pd.notna(row["featured_media"]):
+        if "featured_media" in row and not is_blank(row["featured_media"]):
             value = row["featured_media"]
             if value != "":
                 try:
@@ -202,8 +202,8 @@ class ContentMapper:
         Returns:
             Сконвертированное значение
         """
-        # Если это pandas NaT или NaN
-        if pd.isna(value):
+        # Пропуск (None / NaN / NaT)
+        if is_missing(value):
             return None
 
         # Строка
@@ -225,14 +225,14 @@ class ContentMapper:
         return str(value)
 
     @staticmethod
-    def _extract_acf_from_row(row: pd.Series) -> Dict[str, Any]:
-        """Извлечь ACF поля из строки Excel и конвертировать значения."""
+    def _extract_acf_from_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+        """Извлечь ACF поля из записи и конвертировать значения."""
         acf_data = {}
-        for col in row.index:
+        for col in row.keys():
             if col.startswith(ACF_PREFIX):
                 field_name = col[len(ACF_PREFIX):]
                 value = row[col]
-                if pd.notna(value) and value != "":
+                if not is_blank(value):
                     acf_data[field_name] = convert_acf_value(value)
         return acf_data
 
@@ -254,12 +254,12 @@ class ContentMapper:
 
         return set()
 
-    def validate_row(self, row: pd.Series, action: str) -> tuple[bool, Optional[str]]:
+    def validate_row(self, row: Mapping[str, Any], action: str) -> tuple[bool, Optional[str]]:
         """
-        Валидация строки перед обработкой.
+        Валидация записи перед обработкой.
 
         Args:
-            row: pandas Series
+            row: Запись (Mapping поле → значение)
             action: Тип действия
 
         Returns:
@@ -268,40 +268,40 @@ class ContentMapper:
         required = self.get_required_fields(action)
 
         for field in required:
-            if field not in row.index:
+            if field not in row:
                 return False, f"Отсутствует обязательное поле: {field}"
 
             value = row[field]
-            if pd.isna(value) or value == "":
+            if is_blank(value):
                 return False, f"Поле '{field}' не может быть пустым"
 
         return True, None
 
-    def extract_media_path(self, row: pd.Series) -> Optional[str]:
+    def extract_media_path(self, row: Mapping[str, Any]) -> Optional[str]:
         """
-        Извлечь путь к медиафайлу из колонки 'img_path'.
+        Извлечь путь к медиафайлу из поля 'img_path'.
 
         Args:
-            row: pandas Series
+            row: Запись (Mapping поле → значение)
 
         Returns:
             Путь к медиа или None
         """
-        if "img_path" not in row.index:
+        if "img_path" not in row:
             return None
 
         value = row["img_path"]
-        if pd.notna(value) and value != "":
+        if not is_blank(value):
             return str(value).strip()
 
         return None
 
-    def should_upload_media(self, row: pd.Series) -> bool:
+    def should_upload_media(self, row: Mapping[str, Any]) -> bool:
         """
-        Проверить нужно ли загружать медиа для этой строки.
+        Проверить нужно ли загружать медиа для этой записи.
 
         Args:
-            row: pandas Series
+            row: Запись (Mapping поле → значение)
 
         Returns:
             True если нужно загрузить медиа

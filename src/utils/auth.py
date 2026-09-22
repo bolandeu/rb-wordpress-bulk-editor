@@ -1,12 +1,132 @@
 """
-Утилиты для загрузки credentials из .env файлов
+Утилиты для загрузки credentials.
+
+Порядок разрешения (протокол cli-builder): CLI-флаг → переменная окружения →
+OS keychain. Файл `.env` остаётся последним, legacy-слоем: он ещё работает для
+существующих проектов, но новый путь секреты в файлах проекта не требует —
+`wp-bulk` берёт их из keychain (`src/credentials/manager.py`) или из окружения.
 """
 
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple, Optional
-from dotenv import load_dotenv
+from typing import Dict, Tuple, Optional
+from dotenv import find_dotenv, load_dotenv
 from loguru import logger
+
+from ..exceptions import AuthenticationError, ConfigurationError
+from ..credentials.manager import CREDENTIAL_FIELDS, get_credential, read_fields_from_env
+
+# Legacy-имена переменных в .env проекта (последний слой цепочки).
+_LEGACY_ENV_VARS = {"username": "WP_API_USER", "password": "WP_API_TOKEN"}
+
+
+@dataclass
+class ResolvedCredentials:
+    """Результат разрешения credentials плюс источник каждого поля."""
+
+    domain: str = ""
+    username: str = ""
+    password: str = ""
+    # field → "cli" | "env" | "keychain" | ".env" | None (не найдено)
+    sources: Dict[str, Optional[str]] = field(default_factory=dict)
+
+    @property
+    def missing(self) -> list:
+        """Поля, которые не удалось разрешить."""
+        return [name for name in ("domain", "username", "password") if not getattr(self, name)]
+
+
+def resolve_credentials(
+    env_file: Optional[Path] = None,
+    domain_override: Optional[str] = None,
+    username_override: Optional[str] = None,
+    password_override: Optional[str] = None,
+) -> ResolvedCredentials:
+    """
+    Пройти цепочку разрешения credentials и запомнить, откуда взято каждое поле.
+
+    Единственная реализация цепочки: на неё опираются и реальные команды
+    (`load_credentials_from_env`), и `doctor`. Разные реализации разъезжаются —
+    diagnostics обязаны видеть ровно то, что увидит sync.
+
+    Приоритет:
+    1. CLI параметры (--domain/--username/--password)
+    2. Переменные окружения (WP_DOMAIN, WP_API_USER/WP_API_TOKEN,
+       либо их версии для конкретного сайта — WP_<DOMAIN>_API_USER и т.д.)
+    3. OS keychain (provider = домен сайта)
+    4. .env файл — legacy, только если выше ничего не нашлось
+
+    Ничего не найдено — не ошибка: read-only операции работают анонимно,
+    а решение «хватает или нет» принимает вызывающий.
+
+    Raises:
+        ConfigurationError: Если указанный .env файл не найден
+    """
+    # Снимок окружения процесса ДО загрузки .env: так значения из .env
+    # не маскируются под «переменную окружения» и честно остаются последними.
+    process_env = dict(os.environ)
+
+    # .env всё ещё загружается: оттуда берутся не-секретные настройки
+    # (WP_VERIFY_SSL, таймауты, WP_TAXONOMIES...), которые читает Settings().
+    if env_file:
+        if not env_file.exists():
+            raise ConfigurationError(f".env файл не найден: {env_file}")
+        logger.debug(f"Загрузка .env: {env_file}")
+        load_dotenv(dotenv_path=env_file, override=True)
+    else:
+        # usecwd=True обязателен: без него find_dotenv ищет не от текущей папки
+        # пользователя, а от файла вызывающего кода (в установленном пакете —
+        # site-packages), и `.env` рядом с пользователем просто не находится.
+        logger.debug("Загрузка .env (поиск от текущей папки)")
+        load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
+
+    sources: Dict[str, Optional[str]] = {}
+
+    if domain_override:
+        domain, sources["domain"] = domain_override.strip(), "cli"
+    elif process_env.get("WP_DOMAIN"):
+        domain, sources["domain"] = process_env["WP_DOMAIN"].strip(), "env"
+    elif os.getenv("WP_DOMAIN"):
+        domain, sources["domain"] = os.environ["WP_DOMAIN"].strip(), ".env"
+    else:
+        domain, sources["domain"] = "", None
+
+    # Окружение + keychain для этого домена (окружение перекрывает keychain).
+    from_env: Dict[str, str] = {}
+    from_keychain: Dict[str, str] = {}
+    if domain:
+        from_env = read_fields_from_env(domain, list(CREDENTIAL_FIELDS), environ=process_env)
+        merged = get_credential(
+            domain, env_fields=list(CREDENTIAL_FIELDS), environ=process_env
+        ) or {}
+        from_keychain = {k: v for k, v in merged.items() if k not in from_env}
+
+    overrides = {"username": username_override, "password": password_override}
+    values: Dict[str, str] = {}
+    for name in CREDENTIAL_FIELDS:
+        legacy_var = _LEGACY_ENV_VARS[name]
+        if overrides[name]:
+            values[name], sources[name] = overrides[name].strip(), "cli"
+        elif from_env.get(name):
+            values[name], sources[name] = from_env[name].strip(), "env"
+        elif from_keychain.get(name):
+            values[name], sources[name] = from_keychain[name].strip(), "keychain"
+        elif os.getenv(legacy_var):
+            values[name], sources[name] = os.environ[legacy_var].strip(), ".env"
+            logger.warning(
+                f"{legacy_var} взят из .env — перенесите credentials в keychain "
+                "или переменные окружения, файлы проекта для секретов устарели"
+            )
+        else:
+            values[name], sources[name] = "", None
+
+    return ResolvedCredentials(
+        domain=domain,
+        username=values["username"],
+        password=values["password"],
+        sources=sources,
+    )
 
 
 def load_credentials_from_env(
@@ -16,11 +136,7 @@ def load_credentials_from_env(
     password_override: Optional[str] = None
 ) -> Tuple[str, str, str]:
     """
-    Загрузить credentials из .env файла или CLI параметров.
-
-    Приоритет:
-    1. CLI параметры (если указаны)
-    2. .env файл (default .env или кастомный --env-file)
+    Разрешить credentials WordPress (см. `resolve_credentials`) и потребовать их наличия.
 
     Args:
         env_file: Путь к кастомному .env файлу (если None - используется default .env)
@@ -32,22 +148,16 @@ def load_credentials_from_env(
         (domain, username, password)
 
     Raises:
-        ValueError: Если credentials не найдены
+        ConfigurationError: Если указанный .env файл не найден
+        AuthenticationError: Если credentials не найдены ни в одном источнике
     """
-    # Загружаем .env файл
-    if env_file:
-        if not env_file.exists():
-            raise ValueError(f".env файл не найден: {env_file}")
-        logger.debug(f"Загрузка credentials из: {env_file}")
-        load_dotenv(dotenv_path=env_file, override=True)
-    else:
-        logger.debug("Загрузка credentials из .env (default)")
-        load_dotenv(override=True)
-
-    # Получаем значения (приоритет у CLI параметров)
-    domain = (domain_override or os.getenv("WP_DOMAIN") or "").strip()
-    username = (username_override or os.getenv("WP_API_USER") or "").strip()
-    password = (password_override or os.getenv("WP_API_TOKEN") or "").strip()
+    resolved = resolve_credentials(
+        env_file=env_file,
+        domain_override=domain_override,
+        username_override=username_override,
+        password_override=password_override,
+    )
+    domain, username, password = resolved.domain, resolved.username, resolved.password
 
     # Валидация
     missing = []
@@ -59,9 +169,10 @@ def load_credentials_from_env(
         missing.append("WP_API_TOKEN (или --password)")
 
     if missing:
-        raise ValueError(
-            f"Отсутствуют обязательные параметры: {', '.join(missing)}\n"
-            f"Укажите их в .env файле или через параметры командной строки."
+        raise AuthenticationError(
+            f"Отсутствуют обязательные параметры: {', '.join(missing)}. "
+            f"Укажите их флагами командной строки, переменными окружения "
+            f"или сохраните в OS keychain."
         )
 
     logger.debug(f"Credentials загружены: domain={domain}, user={username[:3]}***")
@@ -103,12 +214,12 @@ def load_async_config_from_env(
     # Загружаем .env файл
     if env_file:
         if not env_file.exists():
-            raise ValueError(f".env файл не найден: {env_file}")
+            raise ConfigurationError(f".env файл не найден: {env_file}")
         logger.debug(f"Загрузка async config из: {env_file}")
         load_dotenv(dotenv_path=env_file, override=True)
     else:
-        logger.debug("Загрузка async config из .env (default)")
-        load_dotenv(override=True)
+        logger.debug("Загрузка async config из .env (поиск от текущей папки)")
+        load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
     # Создаем Settings (читает из .env с префиксом WP_)
     settings = Settings()
