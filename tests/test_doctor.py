@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from src.cli import app, doctor_commands
 from src.credentials import manager
+from src.utils.auth import load_credentials_from_env
 
 runner = CliRunner()
 
@@ -70,6 +71,28 @@ class TestDoctorOutput:
         # Пароль наружу не отдаётся, username — только префикс.
         assert "secret" not in json.dumps(payload, ensure_ascii=False)
         assert creds["details"]["username"] == "adm***"
+
+    def test_env_file_in_cwd_is_seen(self, tmp_path):
+        """
+        Регрессия: doctor обязан видеть тот же `.env`, что и sync.
+
+        Без проекта `.env` берётся из текущей папки — если doctor его не
+        находит, он рапортует «credentials не разрешены» там, где реальная
+        команда спокойно работает.
+        """
+        (tmp_path / ".env").write_text(
+            "WP_DOMAIN=https://example.com\nWP_API_USER=admin\nWP_API_TOKEN=secret\n",
+            encoding="utf-8",
+        )
+
+        payload = json.loads(runner.invoke(app, ["doctor", "--json"]).stdout.strip())
+        creds = next(c for c in payload["checks"] if c["name"] == "credentials")
+
+        assert creds["status"] == "ok"
+        assert creds["details"]["domain"] == "https://example.com"
+        assert set(creds["details"]["sources"].values()) == {".env"}
+        # Та же цепочка, что у реальных команд, даёт тот же результат.
+        assert load_credentials_from_env() == ("https://example.com", "admin", "secret")
 
     def test_credentials_from_cli_flags_win(self):
         payload = json.loads(

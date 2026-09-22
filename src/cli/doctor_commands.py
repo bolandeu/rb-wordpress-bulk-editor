@@ -7,12 +7,10 @@
 """
 
 import asyncio
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import typer
-from dotenv import dotenv_values
 
 from . import app, console
 from .helpers import get_project, resolve_env_file
@@ -20,14 +18,9 @@ from . import project as project_module
 from .project import MIN_VERSION_KEY, PACKAGE_NAME
 from .. import output
 from ..config import Settings, WordPressConfig
-from ..credentials.manager import (
-    CREDENTIAL_FIELDS,
-    env_var_names,
-    get_credential,
-    read_fields_from_env,
-    store_backend,
-)
+from ..credentials.manager import env_var_names, store_backend
 from ..exceptions import CliTooOld, WPBulkEditorError
+from ..utils.auth import ResolvedCredentials, resolve_credentials
 
 # Статусы проверки: ok — всё хорошо, warn — работает, но с оговоркой,
 # fail — эта часть окружения сломана.
@@ -124,82 +117,20 @@ def _settings_check(env_file: Optional[Path]) -> Dict[str, Any]:
     )
 
 
-def _resolve_credentials(
-    env_file: Optional[Path],
-    domain: Optional[str],
-    username: Optional[str],
-    password: Optional[str],
-) -> Dict[str, Any]:
-    """
-    Пройти цепочку CLI → окружение → keychain → .env и запомнить, что откуда.
-
-    Окружение процесса читается до значений .env, поэтому источник не
-    маскируется: `.env` честно остаётся последним, legacy-слоем.
-    """
-    process_env = dict(os.environ)
-    file_values = dotenv_values(env_file) if env_file else {}
-
-    sources: Dict[str, Optional[str]] = {}
-
-    resolved_domain = domain or process_env.get("WP_DOMAIN") or file_values.get("WP_DOMAIN")
-    sources["domain"] = (
-        "cli" if domain else
-        "env" if process_env.get("WP_DOMAIN") else
-        ".env" if file_values.get("WP_DOMAIN") else None
-    )
-    resolved_domain = (resolved_domain or "").strip() or None
-
-    from_env: Dict[str, str] = {}
-    from_keychain: Dict[str, str] = {}
-    if resolved_domain:
-        from_env = read_fields_from_env(
-            resolved_domain, list(CREDENTIAL_FIELDS), environ=process_env
-        )
-        merged = get_credential(
-            resolved_domain, env_fields=list(CREDENTIAL_FIELDS), environ=process_env
-        ) or {}
-        from_keychain = {k: v for k, v in merged.items() if k not in from_env}
-
-    overrides = {"username": username, "password": password}
-    legacy = {"username": "WP_API_USER", "password": "WP_API_TOKEN"}
-
-    values: Dict[str, Optional[str]] = {}
-    for field in CREDENTIAL_FIELDS:
-        if overrides[field]:
-            values[field], sources[field] = overrides[field], "cli"
-        elif from_env.get(field):
-            values[field], sources[field] = from_env[field], "env"
-        elif from_keychain.get(field):
-            values[field], sources[field] = from_keychain[field], "keychain"
-        elif file_values.get(legacy[field]):
-            values[field], sources[field] = file_values[legacy[field]], ".env"
-        else:
-            values[field], sources[field] = None, None
-
-    return {
-        "domain": resolved_domain,
-        "username": values["username"],
-        "password": values["password"],
-        "sources": sources,
-    }
-
-
-def _credentials_check(resolved: Dict[str, Any]) -> Dict[str, Any]:
+def _credentials_check(resolved: ResolvedCredentials) -> Dict[str, Any]:
     """Разрешаются ли credentials (не проверяя их валидность на сайте)."""
-    sources = resolved["sources"]
-    missing = [
-        name for name in ("domain", "username", "password") if not resolved.get(name)
-    ]
+    sources = resolved.sources
+    missing = resolved.missing
 
     details = {
-        "domain": resolved["domain"],
+        "domain": resolved.domain or None,
         "sources": sources,
         # Значения секретов наружу не отдаём — только факт наличия и источник.
-        "username": (resolved["username"] or "")[:3] + "***" if resolved["username"] else None,
+        "username": resolved.username[:3] + "***" if resolved.username else None,
     }
 
     if missing:
-        hint_var = env_var_names(resolved["domain"] or "", "password")[0]
+        hint_var = env_var_names(resolved.domain, "password")[0]
         return _check(
             "credentials",
             WARN,
@@ -209,7 +140,7 @@ def _credentials_check(resolved: Dict[str, Any]) -> Dict[str, Any]:
             **details,
         )
 
-    chain = ", ".join(f"{field}: {sources[field]}" for field in ("domain", "username", "password"))
+    chain = ", ".join(f"{name}: {sources[name]}" for name in ("domain", "username", "password"))
     return _check("credentials", OK, f"Разрешены ({chain}).", **details)
 
 
@@ -226,18 +157,18 @@ def _credential_store_check() -> Dict[str, Any]:
     return _check("credential_store", OK, f"OS keychain доступен: {backend}.", backend=backend)
 
 
-def _connection_check(resolved: Dict[str, Any]) -> Dict[str, Any]:
+def _connection_check(resolved: ResolvedCredentials) -> Dict[str, Any]:
     """Опциональная проверка доступности сайта (только по --check-connection)."""
-    domain = resolved["domain"]
+    domain = resolved.domain
     if not domain:
         return _check(
             "connection", WARN, "Домен не разрешён — проверять нечего.", domain=None
         )
 
-    authenticated = bool(resolved["username"] and resolved["password"])
+    authenticated = bool(resolved.username and resolved.password)
     try:
         config = WordPressConfig.from_credentials(
-            domain, resolved["username"] or "", resolved["password"] or ""
+            domain, resolved.username, resolved.password
         )
         asyncio.run(_probe(config, authenticated))
     except WPBulkEditorError as e:
@@ -311,7 +242,14 @@ def doctor(
     """
     env_file = resolve_env_file(ctx, env_file)
 
-    resolved = _resolve_credentials(env_file, domain, username, password)
+    # Та же функция, что использует sync: doctor обязан видеть ровно то же,
+    # что увидит реальная команда (включая .env в текущей папке).
+    resolved = resolve_credentials(
+        env_file=env_file,
+        domain_override=domain,
+        username_override=username,
+        password_override=password,
+    )
 
     checks = [
         _project_check(ctx),

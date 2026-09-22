@@ -36,11 +36,24 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 через провайдер (`upload_binary`), иначе теряются авторизация, retry и CB.
 
 **Необратимое действие — только через гейт.**
-`bulk-delete` сначала даёт `--dry-run` (превью, без вопросов и без изменений),
-затем `output.require_confirmation(ctx, описание, confirm)` — и только потом удаляет.
+Сначала `--dry-run` (превью, без вопросов и без изменений), затем
+`output.require_confirmation(ctx, описание, confirm)` — и только потом действие.
 Свой `typer.confirm` в командах не писать: под `--non-interactive`, в `--json`
 и когда stdin не терминал, вопрос должен превращаться в `INVALID_ARGUMENTS` (exit 2),
 а не в зависший prompt. Гейт вызывается **после** проверки `--dry-run`, не до.
+
+Что гейтится сейчас: `bulk-delete`; `options` (запись настроек на сайт и
+перезапись xlsx); `fetch` (перезапись существующего xlsx); `sync`/`async` —
+только необратимые пути (`media`-строки с `action=delete` и `--delete-media`:
+там `force=True`, мимо корзины), см. `_confirm_irreversible` в `sync_commands.py`.
+Удаление контента идёт в корзину (`force=False`) и подтверждения не требует.
+
+**Цепочка credentials — одна реализация.**
+`utils/auth.resolve_credentials()` возвращает значения **и источник каждого поля**
+(`cli`/`env`/`keychain`/`.env`). На неё опираются и `load_credentials_from_env`
+(реальные команды), и `doctor`. Вторую реализацию цепочки не заводить: разъедутся —
+и диагностика начнёт врать. `.env` без явного пути ищется `find_dotenv(usecwd=True)`
+(от папки пользователя, не от файла вызывающего кода).
 
 **Секреты — keychain или окружение, не файлы проекта.**
 `src/credentials/manager.py` (keyring, provider = домен сайта).

@@ -3,6 +3,7 @@ Tests for WP_BULK_MIN_VERSION: объявление в .env проекта и е
 """
 
 import json
+import sys
 
 import pytest
 from typer.testing import CliRunner
@@ -66,14 +67,25 @@ class TestCliEnforcement:
         monkeypatch.setattr(cli, "resolve_project", lambda name: project)
         return project
 
-    def test_too_old_cli_fails_command_with_exit_6(self, project_env, monkeypatch):
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--json", "--project", "mysite", "validate"],
+            ["--project", "mysite", "validate", "--json"],
+        ],
+        ids=["глобальный --json", "локальный --json"],
+    )
+    def test_too_old_cli_fails_command_with_exit_6(self, project_env, monkeypatch, argv):
         monkeypatch.setattr(project_module, "installed_version", lambda: "1.0.0")
+        # Локальную форму callback видит только через argv — подменяем его.
+        monkeypatch.setattr(sys, "argv", ["wp-bulk", *argv])
 
-        result = runner.invoke(app, ["--json", "--project", "mysite", "validate"])
+        result = runner.invoke(app, argv)
 
         assert result.exit_code == 6
         payload = json.loads(result.stdout.strip())
         assert payload["error"]["code"] == "CLI_TOO_OLD"
+        assert "uv tool upgrade" in payload["error"]["action"]
 
     def test_doctor_reports_instead_of_failing(self, project_env, monkeypatch):
         monkeypatch.setattr(project_module, "installed_version", lambda: "1.0.0")

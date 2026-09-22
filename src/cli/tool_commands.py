@@ -137,7 +137,12 @@ def options(
     Без --fetch: обновление WordPress из Excel
     С --fetch: выгрузка настроек из WordPress в Excel
 
-    Exit-коды: 0 — успех, 2 — аргументы/файл, 3 — нет credentials,
+    Запись настроек на сайт и перезапись существующего xlsx откатить нельзя:
+    сначала доступен --dry-run, затем спрашивается подтверждение, а под
+    --non-interactive требуется явный --confirm.
+
+    Exit-коды: 0 — успех, 2 — аргументы/файл или отсутствующий --confirm,
+    3 — нет credentials,
     5 — недоступен WordPress, 1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
@@ -252,7 +257,16 @@ def options(
             )
             return
 
-        # 3. Подключаемся к WordPress и отправляем
+        # 3. Перезапись настроек живого сайта — операция без отката:
+        # прежние значения нигде не сохраняются (гейт после проверки --dry-run).
+        output.require_confirmation(
+            ctx,
+            f"Перезаписать {len(site_options)} настроек сайта {domain} "
+            f"значениями из {file.name}? Прежние значения не сохраняются.",
+            confirm,
+        )
+
+        # 4. Подключаемся к WordPress и отправляем
         output.vecho(ctx, "Отправка настроек в WordPress...")
 
         wp_config = _make_wp_config(domain, username, password)
@@ -343,6 +357,8 @@ def bulk_delete(
     ),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -373,11 +389,21 @@ def bulk_delete(
     5 — недоступен WordPress.
     """
     env_file = resolve_env_file(ctx, env_file)
-    if non_interactive:
-        output.get_options(ctx).non_interactive = True
+    # Локальные флаги (`bulk-delete --json`) работают так же, как глобальные
+    # (`--json bulk-delete`): команда идёт не через @output.guard, поэтому
+    # подмешиваем их сами.
+    opts = output.get_options(ctx)
+    opts.json = opts.json or json_output
+    opts.quiet = opts.quiet or quiet
+    opts.non_interactive = opts.non_interactive or non_interactive
 
-    console.print("\n[bold red]Bulk Delete[/bold red]")
-    console.print("=" * 60 + "\n")
+    def say(message: str = "") -> None:
+        """Человеческий вывод. В --json stdout занят конвертом, значит молчим."""
+        if not opts.json and not opts.quiet:
+            console.print(message)
+
+    say("\n[bold red]Bulk Delete[/bold red]")
+    say("=" * 60 + "\n")
 
     with handle_command_errors(ctx):
         log_file = setup_command_logging(ctx, "bulk_delete", verbose)
@@ -396,16 +422,17 @@ def bulk_delete(
             env_file=env_file,
             domain=domain,
             username=username,
-            password=password
+            password=password,
+            ctx=ctx,
         )
 
-        console.print(f"[yellow]->[/yellow] Тип контента: {post_type}")
-        console.print(f"[yellow]->[/yellow] Статус: {status}")
-        console.print(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
-        console.print(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
+        say(f"[yellow]->[/yellow] Тип контента: {post_type}")
+        say(f"[yellow]->[/yellow] Статус: {status}")
+        say(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
+        say(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
         if dry_run:
-            console.print(f"[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
-        console.print()
+            say("[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
+        say()
 
         # Создаем WordPress клиент
         wp_config = _make_wp_config(domain, username, password)
@@ -413,17 +440,35 @@ def bulk_delete(
         # Сначала читаем список — он же и есть превью для --dry-run,
         # и количество записей для вопроса о подтверждении.
         all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
-        console.print(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
+        say(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
+
+        targets = [
+            {"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")}
+            for post in all_posts
+        ]
 
         if dry_run:
             # Превью никогда не спрашивает и ничего не меняет.
-            console.print(f"[yellow]DRY-RUN: Будет удалено {len(all_posts)} записей[/yellow]")
-            for post in all_posts[:10]:
-                title_text = wp_rendered(post.get("title", {}), "No title")
-                console.print(f"  ID={post['id']}: {title_text}")
-            if len(all_posts) > 10:
-                console.print(f"  ... и еще {len(all_posts) - 10} записей")
-            console.print()
+            def _render_dry(payload: Dict):
+                console.print(f"[yellow]DRY-RUN: Будет удалено {payload['found']} записей[/yellow]")
+                for item in payload["posts"][:10]:
+                    console.print(f"  ID={item['id']}: {item['title']}")
+                if payload["found"] > 10:
+                    console.print(f"  ... и еще {payload['found'] - 10} записей")
+                console.print()
+
+            output.emit_success(
+                ctx,
+                {
+                    "dry_run": True,
+                    "post_type": post_type,
+                    "status": status,
+                    "found": len(targets),
+                    "deleted": 0,
+                    "posts": targets,
+                },
+                _render_dry,
+            )
             return
 
         if all_posts:
@@ -446,14 +491,28 @@ def bulk_delete(
         ))
 
         # Показываем результаты
-        console.print("\n[bold green]Операция завершена![/bold green]")
-        console.print("=" * 60)
-        console.print(f"  Найдено записей: [cyan]{stats['found']}[/cyan]")
-        console.print(f"  Удалено записей: [cyan]{stats['deleted']}[/cyan]")
-        if delete_media:
-            console.print(f"  Удалено медиа: [cyan]{stats['media_deleted']}[/cyan]")
-        console.print(f"  Ошибок: [{'red' if stats['errors'] > 0 else 'green'}]{stats['errors']}[/{'red' if stats['errors'] > 0 else 'green'}]")
-        console.print(f"\n[dim]Логи: {log_file}[/dim]")
+        def _render_done(payload: Dict):
+            errors_color = "red" if payload["errors"] > 0 else "green"
+            console.print("\n[bold green]Операция завершена![/bold green]")
+            console.print("=" * 60)
+            console.print(f"  Найдено записей: [cyan]{payload['found']}[/cyan]")
+            console.print(f"  Удалено записей: [cyan]{payload['deleted']}[/cyan]")
+            if delete_media:
+                console.print(f"  Удалено медиа: [cyan]{payload['media_deleted']}[/cyan]")
+            console.print(f"  Ошибок: [{errors_color}]{payload['errors']}[/{errors_color}]")
+            console.print(f"\n[dim]Логи: {log_file}[/dim]")
+
+        output.emit_success(
+            ctx,
+            {
+                "dry_run": False,
+                "post_type": post_type,
+                "status": status,
+                "force": force,
+                **stats,
+            },
+            _render_done,
+        )
 
 
 async def _collect_posts(

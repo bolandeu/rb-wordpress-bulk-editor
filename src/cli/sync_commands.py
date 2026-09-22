@@ -87,6 +87,61 @@ def _empty_stats(total: int = 0, skipped: int = 0, errors: int = 0) -> dict:
 # Unified sync engine (used by both sync and async commands)
 # ============================================================
 
+def _count_permanent_media_deletes(
+    reader: ExcelReader,
+    sheets_to_process: list,
+    config: AppConfig,
+) -> int:
+    """
+    Сколько медиафайлов этот прогон удалит навсегда (media-строки с action=delete).
+
+    MediaSync удаляет вложения с `force=True` — мимо корзины, без отката.
+    Остальные удаления (`action=delete` на контенте) идут в корзину и обратимы.
+    """
+    if config.sync.skip_media:
+        return 0
+
+    count = 0
+    for sheet_name in sheets_to_process:
+        if reader.classify_sheet(sheet_name) != "media":
+            continue
+        for record in ExcelRecordSource(reader, sheet_name).read():
+            if str(record.data.get("action", "")).strip().lower() == "delete":
+                count += 1
+    return count
+
+
+def _confirm_irreversible(
+    ctx,
+    reader: ExcelReader,
+    sheets_to_process: list,
+    config: AppConfig,
+    confirm: bool,
+) -> None:
+    """
+    Гейт перед необратимой частью синхронизации.
+
+    Сам по себе sync обратим (перезапуск даёт тот же результат, контент
+    удаляется в корзину), но два пути удаляют навсегда: media-строки с
+    `action=delete` и `--delete-media` (featured-изображения). Только они и
+    требуют подтверждения — вызывается до подключения к сайту.
+    """
+    if config.sync.dry_run:
+        return
+
+    reasons = []
+    media_deletes = _count_permanent_media_deletes(reader, sheets_to_process, config)
+    if media_deletes:
+        reasons.append(f"{media_deletes} медиафайлов будут удалены навсегда (action=delete)")
+    if config.sync.delete_featured_media:
+        reasons.append("--delete-media: featured-изображения удаляемых записей удаляются навсегда")
+
+    if not reasons:
+        return
+
+    output.require_confirmation(ctx, "Необратимо: " + "; ".join(reasons) + ". Продолжить?", confirm)
+
+
 async def _run_sync_engine(
     config: AppConfig,
     sheets_filter: Optional[str] = None,
@@ -96,6 +151,8 @@ async def _run_sync_engine(
     retry_config=None,
     circuit_breaker=None,
     command_name: str = "sync",
+    ctx=None,
+    confirm: bool = False,
 ):
     """
     Единый движок синхронизации для sync и async команд.
@@ -140,6 +197,9 @@ async def _run_sync_engine(
             if config.sync.skip_media:
                 logger.info("--skip-media: загрузка медиа пропускается")
             logger.info(f"Листы для обработки: {sheets_to_process}")
+
+            # Подтверждение необратимых удалений — до любого запроса к сайту.
+            _confirm_irreversible(ctx, reader, sheets_to_process, config, confirm)
 
             # WordPressClient — async версия передаёт retry/circuit_breaker/timeout
             wp_kwargs = {"config": config.wordpress}
@@ -316,6 +376,8 @@ def sync(
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"),
     columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
 ):
@@ -375,7 +437,9 @@ def sync(
         console_stream=output.log_stream(ctx),
     )
 
-    stats = asyncio.run(_run_sync_engine(config, sheets, test_mode=test_mode, command_name="sync"))
+    stats = asyncio.run(_run_sync_engine(
+        config, sheets, test_mode=test_mode, command_name="sync", ctx=ctx, confirm=confirm,
+    ))
 
     def _render(payload: dict):
         console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")
@@ -416,6 +480,8 @@ def async_sync(
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки"),
     columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
 ):
     """
      Асинхронная синхронизация Excel -> WordPress
@@ -429,6 +495,9 @@ def async_sync(
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
     file = require_excel_file(ctx, file)
+    if non_interactive:
+        # Команда идёт не через @output.guard, локальный флаг подмешиваем сами.
+        output.get_options(ctx).non_interactive = True
 
     console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
@@ -478,6 +547,8 @@ def async_sync(
             retry_config=retry_cfg,
             circuit_breaker=circuit_breaker_obj,
             command_name="async_sync",
+            ctx=ctx,
+            confirm=confirm,
         ))
 
         console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")

@@ -13,6 +13,7 @@ CLI интерфейс для WordPress Bulk Editor
 - image_commands.py   - image-crop, image-compress, image-convert
 """
 
+import sys
 from typing import Optional
 
 import typer
@@ -88,6 +89,10 @@ def app_callback(
         try:
             check_cli_compat(project_ctx)
         except CliTooOld as e:
+            # Локальный `--json` (после имени команды) click ещё не разбирал, а
+            # конверт агент ждёт в обеих формах — здесь смотрим argv напрямую.
+            if "--json" in sys.argv[1:]:
+                options.json = True
             output.emit_error(ctx, e)
             return
 
