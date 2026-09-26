@@ -1506,7 +1506,7 @@ def taxonomies(
     include_system: bool = typer.Option(
         False,
         "--include-system",
-        help="Включать служебные таксономии (nav_menu, link_category, post_format)",
+        help="Включать служебные таксономии (nav_menu, post_format, wp_pattern_category и т.п.)",
     ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,

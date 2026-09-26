@@ -55,8 +55,13 @@ STANDARD_TAXONOMIES = {"categories", "tags", "category", "tag"}
 # Паттерны для фильтрации служебных типов записей (по умолчанию)
 DEFAULT_SKIP_POST_TYPE_PATTERNS = ["wp_", "attachment", "nav_menu", "spectra", "revision"]
 
-# Паттерны для фильтрации служебных таксономий (по умолчанию)
-DEFAULT_SKIP_TAXONOMY_PATTERNS = ["nav_menu", "link_category", "post_format"]
+# Паттерны для фильтрации служебных таксономий (по умолчанию): меню, ссылки,
+# форматы записей и внутренние таксономии блочного редактора (категории
+# шаблонов блоков, привязка шаблонов к теме, области частей шаблона)
+DEFAULT_SKIP_TAXONOMY_PATTERNS = [
+    "nav_menu", "link_category", "post_format",
+    "wp_pattern_category", "wp_theme", "wp_template_part_area",
+]
 
 # Разделитель таксономий в Excel
 TAXONOMY_DELIMITER = "; "

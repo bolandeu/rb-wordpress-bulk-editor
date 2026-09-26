@@ -449,6 +449,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | 1.2.0 | Проверка перед отправкой (`validate`, автоматически в `sync`/`async`, `--skip-checks`, `WP_EXTRA_FIELDS`); таксономия — по части имени `cat`/`tax`/`term`/`tag` |
 | 1.3.0 | `async` отдаёт тот же JSON-конверт, что `sync` (`--json`/`--quiet`, статистика, `log_file`); `--quiet` у `sync`/`async` глушит консольный лог |
 | 1.4.0 | `taxonomies` отдаёт конверт (`taxonomies`, `env_line`, `needs_env` — имена не по соглашению); `bulk-delete` на `@output.guard`; google-команды и зависимости Google API удалены |
+| 1.4.1 | Служебные таксономии блочного редактора (`wp_pattern_category`, `wp_theme`, `wp_template_part_area`) скрыты по умолчанию в `taxonomies` и discovery |
 
 Поменялось поведение, на которое может опираться вызывающий (новая проверка,
 флаг, exit-код) — поднять `version` в том же коммите, иначе пакет с изменением
