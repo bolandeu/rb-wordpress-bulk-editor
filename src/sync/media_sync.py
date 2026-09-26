@@ -10,6 +10,7 @@ from ..wordpress.media import MediaEndpoint
 from ..config import AppConfig
 from ..records.base import Record, RecordWriter, is_blank, is_missing
 from ..models import SyncReport, SyncResult
+from .progress import Progress
 from .base_sync import BaseSync
 
 
@@ -23,7 +24,8 @@ class MediaSync(BaseSync):
     async def sync_media(
         self,
         records: Sequence[Record],
-        writer: Optional[RecordWriter] = None
+        writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport:
         """
         Синхронизировать медиа-записи.
@@ -62,6 +64,8 @@ class MediaSync(BaseSync):
                     if not is_valid:
                         logger.warning(f"Row {idx}: Validation failed: {error_msg}")
                         stats["errors"] += 1
+                        if progress:
+                            progress.record_done(record, action, error=True)
                         continue
 
                     # Обработка в зависимости от action
@@ -88,9 +92,14 @@ class MediaSync(BaseSync):
                             action
                         )
 
+                    if progress:
+                        progress.record_done(record, action, result)
+
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    if progress:
+                        progress.record_done(record, action, error=True)
                     error_results.append(SyncResult(
                         row_index=idx,
                         action=action,

@@ -13,7 +13,7 @@ class RecordingSync:
     def __init__(self):
         self.calls = []
 
-    async def sync_records(self, discriminator, records, writer=None):
+    async def sync_records(self, discriminator, records, writer=None, progress=None):
         self.calls.append((discriminator, list(records)))
         return SyncReport.from_stats({"total": len(records), "added": len(records)})
 

@@ -8,6 +8,7 @@ from loguru import logger
 from ..wordpress.taxonomies import normalize_taxonomy_name
 from ..records.base import Record, RecordWriter
 from ..models import SyncReport, SyncResult
+from .progress import Progress
 from .taxonomy_sync_base import TaxonomySyncBase
 
 
@@ -18,7 +19,8 @@ class TaxonomySync(TaxonomySyncBase):
         self,
         discriminator: str,
         records: Sequence[Record],
-        writer: Optional[RecordWriter] = None
+        writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport:
         """
         Синхронизировать группу терминов одной таксономии (последовательно).
@@ -89,9 +91,14 @@ class TaxonomySync(TaxonomySyncBase):
                             action
                         )
 
+                    if progress:
+                        progress.record_done(record, action, result)
+
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    if progress:
+                        progress.record_done(record, action, error=True)
                     error_results.append(SyncResult(
                         row_index=idx,
                         action=action,

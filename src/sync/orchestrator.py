@@ -12,6 +12,8 @@ from loguru import logger
 
 from ..models import SyncReport, SyncResult
 from ..records.base import Record, RecordWriter, group_by_discriminator
+from .base_sync import BaseSync
+from .progress import Progress
 from .protocols import ContentSyncProtocol, TaxonomySyncProtocol
 
 
@@ -33,6 +35,7 @@ async def sync_record_groups(
     content_sync: ContentSyncProtocol,
     taxonomy_sync: TaxonomySyncProtocol,
     writer: Optional[RecordWriter] = None,
+    progress: Optional[Progress] = None,
 ) -> SyncReport:
     """
     Сгруппировать записи по дискриминатору и синхронизировать каждую группу.
@@ -42,11 +45,14 @@ async def sync_record_groups(
         content_sync: Синхронизация контента
         taxonomy_sync: Синхронизация таксономий
         writer: Writer для обратной записи (если нужна)
+        progress: Счётчик [n/total] набора (пропущенные засчитываются сразу)
 
     Returns:
         Суммарный SyncReport по всем группам
     """
     reports: List[SyncReport] = []
+    if progress:
+        progress.skipped(BaseSync._count_skipped(records))
 
     for group in group_by_discriminator(records):
         discriminator = group[0].discriminator
@@ -56,6 +62,6 @@ async def sync_record_groups(
         logger.info(f"Группа '{discriminator}' ({kind}): {len(group)} записей")
 
         sync = taxonomy_sync if is_taxonomy else content_sync
-        reports.append(await sync.sync_records(discriminator, group, writer))
+        reports.append(await sync.sync_records(discriminator, group, writer, progress))
 
     return merge_reports(reports)

@@ -5,7 +5,7 @@
 """
 
 from abc import ABC
-from typing import Dict, Iterable, List, Sequence
+from typing import Any, Awaitable, Dict, Iterable, List, Optional, Sequence
 from ..constants import VALID_ACTIONS, normalize_action
 from ..records.base import Record, is_blank
 from ..wordpress.client import WordPressClient
@@ -70,6 +70,21 @@ class BaseSync(ABC):
             "skipped": 0,
             "total": 0
         }
+
+    @staticmethod
+    async def _tracked(task: Awaitable[Any], record: Record, action: str, progress: Optional[Any]) -> Any:
+        """Дождаться задачи async-обработки записи и сразу отметить прогресс.
+
+        Отметка — в момент завершения записи, а не после gather всей пачки:
+        иначе в логе все строки [n/total] появились бы разом в конце.
+        """
+        result = await task
+        if progress:
+            if getattr(result, "success", False):
+                progress.record_done(record, action, result.api_response)
+            else:
+                progress.record_done(record, action, error=True)
+        return result
 
     @staticmethod
     def _record_action(record: Record) -> str:

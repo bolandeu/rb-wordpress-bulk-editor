@@ -10,6 +10,7 @@ Tests for выбора источника данных и фильтрации �
 """
 
 import json
+import re
 
 import pytest
 from openpyxl import Workbook, load_workbook
@@ -219,7 +220,7 @@ class TestSourceSelection:
         У JSON writer свой на таб: результат уже созданных записей должен
         сохраниться, даже если обработка таба упала дальше по ходу.
         """
-        async def explode(records, content_sync, taxonomy_sync, writer=None):
+        async def explode(records, content_sync, taxonomy_sync, writer=None, progress=None):
             writer.update_from_result(
                 records[0].write_key, {"id": 777, "link": "https://example.com/777"}, "add"
             )
@@ -299,6 +300,19 @@ class TestAsyncEnvelope:
 
         assert result.exit_code == 0, result.stdout
         assert result.stdout.strip() == ""
+
+
+
+class TestProgressLines:
+    """Каждая запись оставляет строку [n/total] — и в sync, и в async."""
+
+    @pytest.mark.parametrize("command", ["sync", "async"])
+    def test_every_record_has_a_progress_line(self, fake_wp, json_project, command):
+        result = runner.invoke(app, [command, "--file", str(json_project), "--sheets", CONTENT_TAB])
+
+        assert result.exit_code == 0, result.stdout
+        numbers = sorted(int(n) for n in re.findall(r"\[(\d+)/3\] id=\d+ added", result.stdout))
+        assert numbers == [1, 2, 3]
 
 
 # ── Выбор таба ───────────────────────────────────────────────────────

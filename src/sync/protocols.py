@@ -6,6 +6,7 @@ from typing import Optional, Protocol, Sequence
 
 from ..models import SyncReport
 from ..records.base import Record, RecordWriter
+from .progress import Progress
 
 
 class ContentSyncProtocol(Protocol):
@@ -16,6 +17,7 @@ class ContentSyncProtocol(Protocol):
         discriminator: str,
         records: Sequence[Record],
         writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport: ...
 
 
@@ -27,6 +29,7 @@ class TaxonomySyncProtocol(Protocol):
         discriminator: str,
         records: Sequence[Record],
         writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport: ...
 
 
@@ -37,4 +40,5 @@ class MediaSyncProtocol(Protocol):
         self,
         records: Sequence[Record],
         writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport: ...

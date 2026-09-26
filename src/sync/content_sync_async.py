@@ -16,6 +16,7 @@ from ..utils.content_processor import ContentProcessor
 from ..utils.file_values import FileValueResolver
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
 from ..models import SyncReport, SyncResult
+from .progress import Progress
 from .content_sync_base import ContentSyncBase
 
 
@@ -42,7 +43,8 @@ class ContentSyncAsync(ContentSyncBase):
         self,
         discriminator: str,
         records: Sequence[Record],
-        writer: Optional[RecordWriter] = None
+        writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport:
         """
         Асинхронная синхронизация группы записей с параллельной обработкой.
@@ -95,6 +97,8 @@ class ContentSyncAsync(ContentSyncBase):
                 if not is_valid:
                     logger.warning(f"Row {idx}: Validation failed: {error_msg}")
                     stats["errors"] += 1
+                    if progress:
+                        progress.record_done(record, action, error=True)
                     continue
 
                 # Функция обработки (partial для передачи в process_row)
@@ -124,8 +128,9 @@ class ContentSyncAsync(ContentSyncBase):
                     )
 
                 # Создаем задачу через AsyncBatchProcessor
-                task = self.batch_processor.process_row(
-                    action, idx, row, process_func
+                task = self._tracked(
+                    self.batch_processor.process_row(action, idx, row, process_func),
+                    record, action, progress,
                 )
                 tasks.append(task)
 

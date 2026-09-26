@@ -13,6 +13,7 @@ from ..config import AppConfig
 from ..records.base import Record, RecordWriter
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
 from ..models import SyncReport, SyncResult
+from .progress import Progress
 from .taxonomy_sync_base import TaxonomySyncBase
 
 
@@ -38,7 +39,8 @@ class TaxonomySyncAsync(TaxonomySyncBase):
         self,
         discriminator: str,
         records: Sequence[Record],
-        writer: Optional[RecordWriter] = None
+        writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport:
         """
         Асинхронная синхронизация группы терминов с параллельной обработкой.
@@ -99,8 +101,9 @@ class TaxonomySyncAsync(TaxonomySyncBase):
                     )
 
                 # Создаем задачу через AsyncBatchProcessor
-                task = self.batch_processor.process_row(
-                    action, idx, row, process_func
+                task = self._tracked(
+                    self.batch_processor.process_row(action, idx, row, process_func),
+                    record, action, progress,
                 )
                 tasks.append(task)
 

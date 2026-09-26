@@ -10,6 +10,7 @@ from ..records.base import Record, RecordWriter, collect_fields
 from ..utils.content_processor import ContentProcessor
 from ..utils.file_values import FileValueResolver
 from ..models import SyncReport, SyncResult
+from .progress import Progress
 from .content_sync_base import ContentSyncBase
 
 
@@ -20,7 +21,8 @@ class ContentSync(ContentSyncBase):
         self,
         discriminator: str,
         records: Sequence[Record],
-        writer: Optional[RecordWriter] = None
+        writer: Optional[RecordWriter] = None,
+        progress: Optional[Progress] = None,
     ) -> SyncReport:
         """
         Синхронизировать группу записей одного типа контента (последовательно).
@@ -71,6 +73,8 @@ class ContentSync(ContentSyncBase):
                     if not is_valid:
                         logger.warning(f"Row {idx}: Validation failed: {error_msg}")
                         stats["errors"] += 1
+                        if progress:
+                            progress.record_done(record, action, error=True)
                         continue
 
                     # Обработка в зависимости от action
@@ -113,9 +117,14 @@ class ContentSync(ContentSyncBase):
                             columns_filter=self.config.sync.columns_filter
                         )
 
+                    if progress:
+                        progress.record_done(record, action, result)
+
                 except Exception as e:
                     logger.error(f"Row {idx}: Error during {action}: {e}")
                     stats["errors"] += 1
+                    if progress:
+                        progress.record_done(record, action, error=True)
                     error_results.append(SyncResult(
                         row_index=idx,
                         action=action,

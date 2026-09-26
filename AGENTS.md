@@ -292,6 +292,23 @@ create-запрос — нет; отсутствующий термин возв
 (`tests/test_taxonomies.py`) и `TestTaxonomyDryRunDoesNotCreate`
 (`tests/test_content_sync.py`).
 
+### Прогресс: `[n/total]` в логе
+
+По завершении каждой записи `sync`/`async` пишут в лог (INFO) строку
+`[17/104] id=3425 updated` — `src/sync/progress.py`. Это контракт: antagor
+читает поток лога и по нему показывает долю сделанного — снаружи номер записи
+не вычислить. Не менять формат без поднятия версии.
+
+- `total` — записи набора (лист/таб) после `--filter`/`--skip-tax`/`--test-mode`;
+  на каждый набор свой счётчик.
+- `skip`/пустой action засчитываются сразу одной строкой
+  `[16/104] пропущено записей (skip/пустой action): 16`.
+- Итог: `added`/`updated`/`deleted`/`error`. id — из ответа API, иначе из записи;
+  нет ни того ни другого (ошибка `add`) — `id=- error (запись 7)`.
+- В async номер — сколько сделано, а не позиция в файле; отметка ставится в
+  момент завершения задачи (`BaseSync._tracked`), а не после `gather` пачки.
+- Под `--json` лог идёт в stderr, под `--quiet` строки прогресса скрыты (уровень ERROR).
+
 ---
 
 ## Обнаружение полей (FieldDetector)
@@ -450,6 +467,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | 1.3.0 | `async` отдаёт тот же JSON-конверт, что `sync` (`--json`/`--quiet`, статистика, `log_file`); `--quiet` у `sync`/`async` глушит консольный лог |
 | 1.4.0 | `taxonomies` отдаёт конверт (`taxonomies`, `env_line`, `needs_env` — имена не по соглашению); `bulk-delete` на `@output.guard`; google-команды и зависимости Google API удалены |
 | 1.4.1 | Служебные таксономии блочного редактора (`wp_pattern_category`, `wp_theme`, `wp_template_part_area`) скрыты по умолчанию в `taxonomies` и discovery |
+| 1.5.0 | Прогресс `sync`/`async`: строка `[n/total] id=… added\|updated\|deleted\|error` по завершении каждой записи |
 
 Поменялось поведение, на которое может опираться вызывающий (новая проверка,
 флаг, exit-код) — поднять `version` в том же коммите, иначе пакет с изменением

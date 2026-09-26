@@ -35,6 +35,7 @@ from ..sync.content_sync import ContentSync
 from ..sync.content_sync_async import ContentSyncAsync
 from ..sync.media_sync import MediaSync
 from ..sync.orchestrator import sync_record_groups
+from ..sync.progress import Progress
 from ..sync.taxonomy_sync import TaxonomySync
 from ..sync.taxonomy_sync_async import TaxonomySyncAsync
 from ..utils.logger import setup_logger, log_summary
@@ -541,11 +542,13 @@ async def _process_dataset(
         if own_file:
             writer.load()
 
+        progress = Progress(total=len(records))
         try:
             if dataset.kind == "media":
-                report = await media_sync.sync_media(records, writer)
+                progress.skipped(MediaSync._count_skipped(records))
+                report = await media_sync.sync_media(records, writer, progress)
             else:
-                report = await sync_record_groups(records, content_sync, taxonomy_sync, writer)
+                report = await sync_record_groups(records, content_sync, taxonomy_sync, writer, progress)
         finally:
             # Сохраняем и на пути ошибки: у JSON writer свой на таб, и без
             # этого id уже созданных в WordPress записей пропали бы — повтор
