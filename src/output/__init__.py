@@ -117,8 +117,9 @@ def configure_logging(options: OutputOptions) -> None:
 
 
 def log_stream(ctx: Optional[typer.Context]):
-    """Куда команде выводить консольный лог: в JSON-режиме только stderr."""
-    return sys.stderr if get_options(ctx).json else sys.stdout
+    """Куда команде выводить консольный лог: при --json/--quiet только stderr."""
+    options = get_options(ctx)
+    return sys.stderr if options.json or options.quiet else sys.stdout
 
 
 def vecho(ctx: Optional[typer.Context], message: str) -> None:

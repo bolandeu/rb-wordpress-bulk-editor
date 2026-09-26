@@ -13,7 +13,7 @@ from loguru import logger
 
 from . import app, console
 from .helpers import get_project, resolve_env_file, require_data_file
-from .common import handle_command_errors, load_and_print_credentials, parse_comma_list
+from .common import load_and_print_credentials, parse_comma_list
 from .. import output
 from ..config import AppConfig, SyncConfig, LoggingConfig
 from ..excel.reader import ExcelReader
@@ -87,6 +87,13 @@ def _build_sync_config(
         columns_filter=parse_comma_list(columns),
         skip_checks=skip_checks,
     )
+
+
+def _console_log_level(verbose: bool, opts) -> str:
+    """Уровень консольного лога: --quiet оставляет только ошибки (в файл пишется всё)."""
+    if verbose or opts.verbose:
+        return "DEBUG"
+    return "ERROR" if opts.quiet else "INFO"
 
 
 def _empty_stats(total: int = 0, skipped: int = 0, errors: int = 0) -> dict:
@@ -663,7 +670,7 @@ def sync(
     config = AppConfig.from_excel(
         excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
         project_root=proj.root, sync=sync_config,
-        logging=LoggingConfig(level="DEBUG" if (verbose or opts.verbose) else "INFO"),
+        logging=LoggingConfig(level=_console_log_level(verbose, opts)),
     )
 
     if config.sync.columns_filter and human_mode:
@@ -694,6 +701,7 @@ def sync(
 # ============================================================
 
 @app.command(name="async")
+@output.guard
 def async_sync(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
@@ -734,83 +742,92 @@ def async_sync(
     ),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
 ):
     """
-     Асинхронная синхронизация файла данных -> WordPress
+    Асинхронная синхронизация файла данных -> WordPress
 
     Источник (.xlsx или .json), --sheets, --filter и проверка перед
-    отправкой (--skip-checks) — как у sync.
+    отправкой (--skip-checks) — как у sync. Результат — тот же конверт,
+    что у sync (--json: статистика по наборам, log_file, cli_version).
 
     Отличия от sync:
     - Параллельная обработка строк (Semaphore)
     - Retry с exponential backoff
     - Circuit breaker для устойчивости
     - Настраиваемые таймауты
+
+    Exit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед
+    отправкой, 3 — нет credentials, 5 — недоступен WordPress,
+    1 — непредвиденная ошибка.
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
     file = require_data_file(ctx, file)
-    if non_interactive:
-        # Команда идёт не через @output.guard, локальный флаг подмешиваем сами.
-        output.get_options(ctx).non_interactive = True
+    record_filters = record_filters_mod.parse_filters(filters)
 
-    console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
-    console.print(f"Файл данных: [cyan]{file}[/cyan]\n")
+    opts = output.get_options(ctx)
+    human_mode = not opts.json and not opts.quiet
+
+    if human_mode:
+        console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
+        console.print(f"Файл данных: [cyan]{file}[/cyan]\n")
 
     _validate_test_mode(test_mode, sheets)
+    _validate_dataset_selection(file, sheets)
+    domain, username, password = load_and_print_credentials(
+        env_file=env_file, domain=domain, username=username, password=password, ctx=ctx,
+    )
 
-    with handle_command_errors(ctx):
-        record_filters = record_filters_mod.parse_filters(filters)
-        _validate_dataset_selection(file, sheets)
-        domain, username, password = load_and_print_credentials(
-            env_file=env_file, domain=domain, username=username, password=password,
-        )
+    concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
+        env_file=env_file, cli_concurrency=concurrency, cli_max_retries=max_retries,
+    )
+    if not enable_circuit_breaker:
+        circuit_breaker_obj = None
 
-        concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
-            env_file=env_file, cli_concurrency=concurrency, cli_max_retries=max_retries,
-        )
-        if not enable_circuit_breaker:
-            circuit_breaker_obj = None
+    sync_config = _build_sync_config(
+        dry_run=dry_run, concurrency=concurrency_val,
+        skip_media=skip_media, skip_tax=skip_tax,
+        no_update_excel=no_update_excel, delete_media=delete_media,
+        skip_existing_media=skip_existing_media, columns=columns,
+        timeout=api_timeout or 30, skip_checks=skip_checks,
+    )
 
-        sync_config = _build_sync_config(
-            dry_run=dry_run, concurrency=concurrency_val,
-            skip_media=skip_media, skip_tax=skip_tax,
-            no_update_excel=no_update_excel, delete_media=delete_media,
-            skip_existing_media=skip_existing_media, columns=columns,
-            timeout=api_timeout or 30, skip_checks=skip_checks,
-        )
+    config = AppConfig.from_excel(
+        excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
+        project_root=proj.root, sync=sync_config,
+        logging=LoggingConfig(level=_console_log_level(verbose, opts)),
+    )
 
-        config = AppConfig.from_excel(
-            excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
-            project_root=proj.root, sync=sync_config,
-            logging=LoggingConfig(level="DEBUG" if verbose else "INFO"),
-        )
+    if config.sync.columns_filter and human_mode:
+        console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
 
-        if config.sync.columns_filter:
-            console.print(f"[yellow]--columns: обновляются только {', '.join(config.sync.columns_filter)}[/yellow]\n")
+    config.paths.ensure_dirs()
+    log_file = setup_logger(
+        logs_folder=config.paths.logs_folder,
+        config=config.logging,
+        command_name="async_sync",
+        console_stream=output.log_stream(ctx),
+    )
 
-        config.paths.ensure_dirs()
-        log_file = setup_logger(
-            logs_folder=config.paths.logs_folder,
-            config=config.logging,
-            command_name="async_sync",
-            console_stream=output.log_stream(ctx),
-        )
+    stats = asyncio.run(_run_sync_engine(
+        config, sheets, test_mode=test_mode,
+        content_sync_cls=ContentSyncAsync,
+        taxonomy_sync_cls=TaxonomySyncAsync,
+        retry_config=retry_cfg,
+        circuit_breaker=circuit_breaker_obj,
+        command_name="async_sync",
+        ctx=ctx,
+        confirm=confirm,
+        filters=record_filters,
+    ))
 
-        asyncio.run(_run_sync_engine(
-            config, sheets, test_mode=test_mode,
-            content_sync_cls=ContentSyncAsync,
-            taxonomy_sync_cls=TaxonomySyncAsync,
-            retry_config=retry_cfg,
-            circuit_breaker=circuit_breaker_obj,
-            command_name="async_sync",
-            ctx=ctx,
-            confirm=confirm,
-            filters=record_filters,
-        ))
-
+    def _render(payload: dict):
         console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")
-        console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
+        console.print(f"Лог-файл: [cyan]{payload['log_file']}[/cyan]\n")
+
+    output.emit_success(ctx, {**(stats or {}), "log_file": str(log_file)}, _render)
 
 
 # ============================================================

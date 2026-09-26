@@ -263,6 +263,44 @@ class TestSourceSelection:
         assert len(fake_wp[0].created("page")) == 1
 
 
+
+class TestAsyncEnvelope:
+    """async отдаёт тот же конверт, что sync: обёртка (antagor) пишет его в журнал."""
+
+    @pytest.mark.parametrize("position", ["global", "local"])
+    def test_success_envelope_with_stats(self, fake_wp, json_project, position):
+        args = ["async", "--file", str(json_project), "--sheets", CONTENT_TAB]
+        args = ["--json", *args] if position == "global" else [*args, "--json"]
+
+        result = runner.invoke(app, args)
+
+        assert result.exit_code == 0, result.stdout
+        payload = json.loads(result.stdout.strip())  # в stdout только конверт
+        assert payload["ok"] is True
+        assert payload["cli_version"]
+        data = payload  # конверт плоский: {"ok": true, ...статистика, "cli_version"}
+        assert data["overall"]["total"] == 3
+        assert data["sheets"][CONTENT_TAB]["added"] == 3
+        assert data["log_file"].endswith(".log")
+        assert "duration_seconds" in data
+
+    def test_error_envelope(self, fake_wp, json_project):
+        result = runner.invoke(app, ["--json", "async", "--file", str(json_project)])
+
+        assert result.exit_code == 2
+        payload = json.loads(result.stdout.strip())
+        assert payload["ok"] is False
+        assert payload["error"]["code"] == "INVALID_ARGUMENTS"
+
+    def test_quiet_prints_nothing(self, fake_wp, json_project):
+        result = runner.invoke(
+            app, ["async", "--file", str(json_project), "--sheets", CONTENT_TAB, "--quiet"]
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert result.stdout.strip() == ""
+
+
 # ── Выбор таба ───────────────────────────────────────────────────────
 
 class TestTabSelection:

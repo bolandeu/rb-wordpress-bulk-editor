@@ -448,6 +448,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | --- | --- |
 | 1.1.0 | JSON-обмен: `update`/`fetch`/`validate` для JSON, `cli_version` в конверте |
 | 1.2.0 | Проверка перед отправкой (`validate`, автоматически в `sync`/`async`, `--skip-checks`, `WP_EXTRA_FIELDS`); таксономия — по части имени `cat`/`tax`/`term`/`tag` |
+| 1.3.0 | `async` отдаёт тот же JSON-конверт, что `sync` (`--json`/`--quiet`, статистика, `log_file`); `--quiet` у `sync`/`async` глушит консольный лог |
 
 Поменялось поведение, на которое может опираться вызывающий (новая проверка,
 флаг, exit-код) — поднять `version` в том же коммите, иначе пакет с изменением
