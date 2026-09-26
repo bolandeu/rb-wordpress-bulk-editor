@@ -11,6 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from src.cli import app, tool_commands
+from src.version import installed_version
 
 runner = CliRunner()
 
@@ -89,6 +90,7 @@ class TestBulkDeleteGate:
             "deleted": 2,
             "media_deleted": 0,
             "errors": 0,
+            "cli_version": installed_version(),
         }
 
     def test_json_stdout_is_envelope_only_on_dry_run(self, fake_wp):

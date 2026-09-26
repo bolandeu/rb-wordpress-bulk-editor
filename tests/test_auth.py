@@ -11,7 +11,7 @@ import pytest
 
 from src.exceptions import AuthenticationError, ConfigurationError
 from src.credentials import manager
-from src.utils.auth import load_credentials_from_env
+from src.utils.auth import load_credentials_from_env, resolve_credentials
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +20,7 @@ def isolated_env(monkeypatch):
     monkeypatch.setattr(os, "environ", dict(os.environ))
     for name in (
         "WP_DOMAIN", "WP_API_USER", "WP_API_TOKEN",
-        "SITE_DOMAIN", "SITE_REST_API_USER", "SITE_REST_API_PASSWORD", "SITE_CMS",
+        "SITE_DOMAIN", "SITE_REST_API_USER", "SITE_REST_API_PASSWORD", "SITE_CMS", "SITE_PROD",
     ):
         os.environ.pop(name, None)
 
@@ -135,6 +135,36 @@ class TestAntagorAliases:
         )
 
         assert load_credentials_from_env(env_file=env_file) == ("wp.example", "wp-user", "site-pass")
+
+    def test_site_prod_is_never_a_domain(self, tmp_path, keychain):
+        """Замок: SITE_PROD — живой сайт, в цепочку credentials он не входит.
+
+        Имя похоже на SITE_DOMAIN, и добавить его в алиасы «для полноты» —
+        одна строка; цена ошибки — запись на прод, которую пайплайн не откатит.
+        """
+        env_file = write_env(
+            tmp_path,
+            SITE_PROD="mwlogistics.ru",
+            SITE_REST_API_USER="site-user",
+            SITE_REST_API_PASSWORD="site-pass",
+        )
+
+        resolved = resolve_credentials(env_file=env_file)
+        assert resolved.domain == "" and resolved.sources["domain"] is None
+        with pytest.raises(AuthenticationError):
+            load_credentials_from_env(env_file=env_file)
+
+    def test_site_domain_wins_over_site_prod(self, tmp_path, keychain):
+        env_file = write_env(
+            tmp_path,
+            SITE_PROD="mwlogistics.ru",
+            SITE_DOMAIN="mwlogistics.local",
+            SITE_REST_API_USER="site-user",
+            SITE_REST_API_PASSWORD="site-pass",
+        )
+
+        domain, _, _ = load_credentials_from_env(env_file=env_file)
+        assert domain == "mwlogistics.local"
 
     def test_aliases_ignored_for_other_cms(self, tmp_path, keychain):
         env_file = write_env(

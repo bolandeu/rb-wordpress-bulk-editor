@@ -9,6 +9,8 @@ import pytest
 import typer
 
 from src import output
+from src.output import json as output_json
+from src.version import installed_version
 from src.exceptions import (
     Aborted,
     AuthenticationError,
@@ -36,7 +38,20 @@ def read_json(capsys) -> dict:
 class TestEnvelope:
     def test_success_envelope(self, capsys):
         output.emit_success(make_ctx(json_mode=True), {"file": "a.xlsx", "count": 2})
-        assert read_json(capsys) == {"ok": True, "file": "a.xlsx", "count": 2}
+        assert read_json(capsys) == {
+            "ok": True, "file": "a.xlsx", "count": 2, "cli_version": installed_version(),
+        }
+
+    def test_cli_version_in_every_envelope(self, capsys, monkeypatch):
+        """antagor пишет в журнал, чем сделан прогон — в том числе упавший."""
+        monkeypatch.setattr(output_json, "installed_version", lambda: "9.9.9")
+
+        output.emit_success(make_ctx(json_mode=True), {"file": "a.json"})
+        assert read_json(capsys)["cli_version"] == "9.9.9"
+
+        with pytest.raises(typer.Exit):
+            output.emit_error(make_ctx(json_mode=True), ValidationError("x"))
+        assert read_json(capsys)["cli_version"] == "9.9.9"
 
     def test_error_envelope(self, capsys):
         with pytest.raises(typer.Exit):

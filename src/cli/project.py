@@ -6,7 +6,6 @@
 проектов" в AGENTS.md за полным порядком разрешения.
 """
 
-from importlib import metadata
 from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
@@ -16,8 +15,9 @@ from dotenv import dotenv_values
 from ..exceptions import CliTooOld, ValidationError
 from ..records.json_source import is_data_file
 
-# Имя пакета и команды — для importlib.metadata и подсказки об обновлении.
-PACKAGE_NAME = "wp-bulk-editor"
+# PACKAGE_NAME и installed_version — из src/version.py (реэкспорт: их
+# импортируют отсюда команды, а тесты подменяют project.installed_version).
+from ..version import PACKAGE_NAME, installed_version  # noqa: F401
 
 # Ключ в .env проекта: минимальная версия CLI, понимающая этот проект.
 MIN_VERSION_KEY = "WP_BULK_MIN_VERSION"
@@ -230,19 +230,6 @@ def resolve_project(project_value: Optional[str]) -> ProjectContext:
         )
 
     return ProjectContext(name=project_value, root=project_dir.resolve())
-
-
-def installed_version() -> Optional[str]:
-    """
-    Версия установленного пакета или None при запуске из исходников.
-
-    Голый запуск из репозитория (пакет не установлен) версии не имеет —
-    проверку совместимости в этом случае пропускаем, а не проваливаем.
-    """
-    try:
-        return metadata.version(PACKAGE_NAME)
-    except metadata.PackageNotFoundError:
-        return None
 
 
 def _version_key(value: str) -> Tuple[int, ...]:

@@ -20,8 +20,9 @@ uv tool upgrade wp-bulk-editor
 ## Вывод
 
 - `--json` — машиночитаемый конверт; **stdout только данные**.
-  Успех: `{"ok": true, ...поля команды}`.
-  Ошибка: `{"ok": false, "error": {"code", "message", "action"?}}` — тоже в stdout.
+  Успех: `{"ok": true, ...поля команды, "cli_version"}`.
+  Ошибка: `{"ok": false, "error": {"code", "message", "action"?}, "cli_version"}` — тоже в stdout.
+  `cli_version` — версия пакета, которым сделан результат (null при запуске из исходников).
 - Без `--json` — человеческий вывод в stdout, диагностика и ошибки в stderr.
 - `--quiet` — только существенное, `--verbose` — подробная диагностика (stderr).
 - Флаги `--json/--quiet/--verbose/--non-interactive` работают и до команды
