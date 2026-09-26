@@ -6,12 +6,21 @@ _add_term, _update_term, _delete_term, _build_payload
 """
 
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.taxonomies import TaxonomiesEndpoint
-from ..constants import ACF_PREFIX
-from ..records.base import Record, RecordWriter, is_missing
+from ..constants import (
+    ACF_PREFIX,
+    BOOL_FIELDS_DEFAULT_TRUE,
+    SYSTEM_COLUMNS,
+    build_nested_payload,
+    is_dot_notation_column,
+)
+from ..mappers.value_converter import parse_bool_default_true
+from ..records.base import Record, RecordWriter, is_blank, is_missing
+from ..utils.file_values import FileValueResolver
 from .base_sync import BaseSync
 
 
@@ -112,9 +121,23 @@ class TaxonomySyncBase(BaseSync):
         result = await taxonomy_endpoint.delete(term_id, force=False)
         return result
 
+    def _file_resolver(self) -> FileValueResolver:
+        """Подстановка файлов от папки файла данных (как у контента)."""
+        try:
+            base_dir: Optional[Path] = Path(self.config.paths.excel_file).parent
+        except (AttributeError, TypeError):
+            base_dir = None
+        return FileValueResolver(base_dir)
+
     def _build_payload(self, row: Mapping[str, Any]) -> Dict[str, Any]:
         """
         Построить payload для API из записи.
+
+        Dot-нотация (`acf.icon`, `seo.title`) раскладывается во вложенные объекты
+        по тем же правилам, что у контента: пустое значение не отправляется
+        (в общем JSON-табе у термина пусты колонки, которые ему не нужны — они
+        не должны затирать значения на сайте), `seo.robots.*`/`seo.sitemap.include`
+        пустые → true, значение-путь к файлу → содержимое файла.
 
         Args:
             row: Запись (Mapping поле → значение)
@@ -154,6 +177,8 @@ class TaxonomySyncBase(BaseSync):
         # Кастомные мета-поля (все остальные поля из Excel)
         # Пропускаем системные поля
         system_fields = {"id", "action", "name", "slug", "description", "parent", "link", "count"}
+        system_fields |= SYSTEM_COLUMNS
+        resolver = self._file_resolver()
 
         for field_name in row.keys():
             # Пропускаем уже обработанные и системные поля
@@ -162,11 +187,21 @@ class TaxonomySyncBase(BaseSync):
 
             value = row[field_name]
 
+            if is_dot_notation_column(field_name):
+                if field_name in BOOL_FIELDS_DEFAULT_TRUE:
+                    build_nested_payload(field_name, parse_bool_default_true(value), payload)
+                elif not is_blank(value):
+                    value = resolver.resolve(field_name, value)
+                    if isinstance(value, str):
+                        value = value.strip()
+                    build_nested_payload(field_name, value, payload)
+                continue
+
             # ACF поля - группируем в отдельный объект
             if field_name.startswith(ACF_PREFIX):
                 acf_key = field_name[len(ACF_PREFIX):]  # Убираем префикс acf_
                 if not is_missing(value) and str(value).strip() != "":
-                    acf_data[acf_key] = str(value).strip()
+                    acf_data[acf_key] = str(resolver.resolve(field_name, value)).strip()
                 continue
 
             # Остальные кастомные поля отправляем на верхнем уровне
@@ -178,9 +213,12 @@ class TaxonomySyncBase(BaseSync):
 
             logger.debug(f"Custom field '{field_name}': {repr(payload[field_name])}")
 
-        # Добавляем ACF данные если есть
+        # Добавляем ACF данные если есть (поверх уже разложенных acf.*)
         if acf_data:
-            payload["acf"] = acf_data
+            if isinstance(payload.get("acf"), dict):
+                payload["acf"].update(acf_data)
+            else:
+                payload["acf"] = acf_data
             logger.debug(f"ACF fields: {list(acf_data.keys())}")
 
         return payload

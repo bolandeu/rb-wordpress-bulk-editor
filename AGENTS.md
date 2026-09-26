@@ -121,6 +121,10 @@ fetch:
     → PostsEndpoint.list()
     → ResponseMapper
     → ExcelWriter (создаёт или обновляет листы)
+    | json_fetch.build_site_tab → json_source.write_tab   # --file *.json / --to-json
+
+update (WP → файл по id, WordPress только читается):
+  RecordSource (Excel/JSON) → sync/field_pull.pull_fields → RecordWriter.update_record
 ```
 
 ---
@@ -175,9 +179,41 @@ json в корне проекта, внутри формата приорите�
 в папке проекта (service-account Google и т.п.) не становится ни «данными», ни
 поводом объявить форматы неоднозначными.
 
-**Только Excel** (JSON-эквивалента нет): `fetch`, `fetch-media`, `options`,
-`validate`, `reshape`, `llm`, `export*`, `google-*`, `vlook`. Медиа-лист
+**Оба формата:** `sync`, `async`, `update`, `validate`, `fetch`.
+**Только Excel** (JSON-эквивалента нет): `fetch-media`, `options`,
+`reshape`, `llm`, `export*`, `google-*`, `vlook`. Медиа-лист
 (`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
+
+Выбор источника и табов (`is_json_source`, `require_json_tabs`) — общий модуль
+`src/records/selection.py`; своих проверок `--sheets` в командах не заводить.
+
+### Обратное направление для JSON: `update`, `fetch`, `validate`
+
+- **`update`** — один движок для обоих форматов (`sync/field_pull.py`) поверх
+  `RecordSource`/`RecordWriter.update_record`. Термин и контент в одном табе
+  различаются `Record.is_taxonomy`: запрос идёт в endpoint таксономии или типа
+  записи. В Excel пишутся только существующие колонки, в JSON недостающие поля
+  добавляются. `--dry-run` writer не открывает (тот же инвариант, что у `sync`).
+- **`fetch` в JSON** (`--file *.json` или `--to-json` → `<проект>/wp-fetch/<домен>.json`)
+  — один таб на сайт (имя = домен или `--tab`), `records/json_fetch.py`. Термины
+  идут **первыми**: `sync` обрабатывает группы в порядке первого появления.
+  `type` — REST-имя типа (`posts`, `rb_services`), а не поле `type` ответа
+  (`post`): иначе `sync` постучится в несуществующий `/wp/v2/post`. ACF/SEO —
+  dot-нотацией; списки объектов (повторители ACF, JSON-LD) и `seo.schema` не
+  выгружаются — табличной моделью их не отредактировать.
+- **Таб пересобирается целиком**, `_row_num` с 2. Дописывать нельзя: повторный
+  fetch задвоил бы записи по `id`. Непустой таб перезаписывается только через
+  `require_confirmation`. Повторный запуск идемпотентен.
+- **fetch не пишет в реестр** `<проект>/<проект>.json`: antagor пересобирает его
+  из Google-таблицы и молча теряет записи, которых там нет.
+- **Термин обратно на сайт** (`TaxonomySyncBase._build_payload`) — по правилам
+  контента: `acf.*`/`seo.*` раскладываются во вложенные объекты, пустые не
+  отправляются (в общем табе у термина пусты колонки контента — они не должны
+  затирать значения на сайте), `seo.robots.*` пустые → true, значение-путь →
+  содержимое файла, `SYSTEM_COLUMNS` (`date`, `link`…) в API не идут.
+- **`validate` для JSON** — без credentials и сети: `JsonRecordSource.problems()`
+  (все структурные ошибки сразу) + существование значений-путей. Битая ссылка
+  у `add`/`update` — ошибка, у остальных — предупреждение.
 
 ### Выбор набора данных: `--sheets`
 

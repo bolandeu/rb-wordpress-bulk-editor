@@ -11,13 +11,17 @@ from loguru import logger
 
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_excel_file, resolve_output, require_excel_file
+from .helpers import (
+    get_project, require_data_file, require_excel_file, resolve_env_file, resolve_excel_file, resolve_output,
+)
 from .project import find_repo_root
 from .. import output
 from ..config import WordPressConfig
 from ..constants import normalize_action
 from ..exceptions import ValidationError
 from ..excel.reader import ExcelReader
+from ..records.json_validation import check_tab
+from ..records.selection import is_json_source, require_json_tabs
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
@@ -39,7 +43,12 @@ def validate(
         None,
         "--file",
         "-f",
-        help="Путь к Excel файлу (авто-определяется из --project)"
+        help="Файл данных .xlsx или .json (авто-определяется из --project)"
+    ),
+    sheets: Optional[str] = typer.Option(
+        None,
+        "--sheets",
+        help="Табы JSON через запятую (для JSON обязателен)",
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -54,13 +63,24 @@ def validate(
     quiet: bool = output.QuietOption,
 ):
     """
-    Валидация Excel файла без синхронизации.
+    Валидация файла данных без синхронизации.
 
-    Exit-коды: 0 — файл валиден, 2 — структура/аргументы, 3 — нет credentials,
-    5 — недоступен WordPress, 1 — непредвиденная ошибка.
+    Excel: структура листов (нужны credentials).
+
+    JSON (--file *.json, --sheets обязателен): без обращения к сайту —
+    у каждой записи заполнено ровно одно из type/taxonomy, _row_num уникален
+    внутри таба, значения-пути к файлам (acf.more = "content/1.html")
+    существуют. Битая ссылка у записи с action add/update — ошибка, у
+    остальных — предупреждение. Сообщаются все проблемы сразу.
+
+    Exit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах, 3 — нет
+    credentials (Excel), 5 — недоступен WordPress (Excel), 1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
-    file = require_excel_file(ctx, file)
+    file = require_data_file(ctx, file)
+    if is_json_source(file):
+        _validate_json(ctx, file, sheets)
+        return
 
     options = output.get_options(ctx)
     if not options.json and not options.quiet:
@@ -89,6 +109,35 @@ def validate(
             "content_sheets": list(sheets["content"]),
             "taxonomy_sheets": list(sheets["taxonomy"]),
         },
+        _render,
+    )
+
+
+# Сколько ошибок перечислять в сообщении (остальные — числом)
+_MAX_LISTED_ERRORS = 20
+
+
+def _validate_json(ctx: typer.Context, file: Path, sheets: Optional[str]) -> None:
+    """validate для JSON: все проблемы табов сразу, без credentials и сети."""
+    tabs = require_json_tabs(file, sheets)
+    checks = [check_tab(file, tab) for tab in tabs]
+    errors = [error for check in checks for error in check.errors]
+    if errors:
+        listed = "\n".join(f"  - {e}" for e in errors[:_MAX_LISTED_ERRORS])
+        more = len(errors) - _MAX_LISTED_ERRORS
+        tail = f"\n  … и ещё {more}" if more > 0 else ""
+        raise ValidationError(f"{file.name}: ошибок — {len(errors)}:\n{listed}{tail}")
+
+    def _render(payload: dict):
+        for check in payload["tabs"]:
+            console.print(f"[green]OK[/green] Таб '{check['tab']}': {check['records']} записей")
+            for warning in check["warnings"]:
+                console.print(f"  [yellow]WARN[/yellow] {warning}")
+        console.print("\n[bold green]SUCCESS! File is valid![/bold green]\n")
+
+    output.emit_success(
+        ctx,
+        {"file": str(file), "format": "json", "valid": True, "tabs": [c.to_dict() for c in checks]},
         _render,
     )
 

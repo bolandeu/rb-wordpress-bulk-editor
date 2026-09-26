@@ -124,6 +124,7 @@ def app_callback(
 # Импорты размещены после создания app, чтобы подмодули могли импортировать app
 from . import sync_commands  # noqa: E402, F401
 from . import fetch_commands  # noqa: E402, F401
+from . import update_commands  # noqa: E402, F401
 from . import export_commands  # noqa: E402, F401
 from . import google_commands  # noqa: E402, F401
 from . import tool_commands  # noqa: E402, F401

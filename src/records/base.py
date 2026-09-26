@@ -54,6 +54,10 @@ class RecordWriter(Protocol):
         columns_filter: Optional[List[str]] = None,
     ) -> None: ...
 
+    def update_record(self, write_key: WriteKey, data: Dict[str, Any]) -> None:
+        """Записать значения полей в одну запись (команда `update`)."""
+        ...
+
     def save(self) -> None: ...
 
 

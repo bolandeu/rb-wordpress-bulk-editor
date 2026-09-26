@@ -23,7 +23,13 @@ from ..wordpress.client import WordPressClient
 from ..wordpress.taxonomies import TaxonomyCache
 from ..records import filters as record_filters_mod
 from ..records.excel import ExcelRecordSource, ExcelRecordWriter
-from ..records.json_source import JsonRecordSource, JsonRecordWriter, tab_names
+from ..records.json_source import JsonRecordSource, JsonRecordWriter
+from ..records.selection import (
+    dataset_names as _dataset_names,
+    is_json_source,
+    require_json_tabs as _require_json_tabs,
+    validate_dataset_selection as _validate_dataset_selection,
+)
 from ..sync.content_sync import ContentSync
 from ..sync.content_sync_async import ContentSyncAsync
 from ..sync.media_sync import MediaSync
@@ -86,11 +92,6 @@ def _empty_stats(total: int = 0, skipped: int = 0, errors: int = 0) -> dict:
         "total": total, "added": 0, "updated": 0,
         "deleted": 0, "skipped": skipped, "errors": errors,
     }
-
-
-def is_json_source(data_file: Path) -> bool:
-    """Источник выбирается по расширению файла данных: .json → JSON, иначе Excel."""
-    return Path(data_file).suffix.lower() == ".json"
 
 
 def _writeback_enabled(config: AppConfig) -> bool:
@@ -200,66 +201,6 @@ class _JsonPlan:
 
     def save(self) -> None:
         """Ничего: каждый таб сохранён сразу после обработки (own_file)."""
-
-
-def _dataset_names(sheets_filter: str) -> List[str]:
-    """
-    Разобрать `--sheets` в список имён наборов данных.
-
-    Пустой результат (`--sheets ","`, `--sheets ""`) — ошибка аргументов:
-    иначе прогон молча не обработал бы ничего и отчитался успехом.
-
-    Raises:
-        ValidationError: ни одного имени после разбора (exit 2).
-    """
-    names = parse_comma_list(sheets_filter) or []
-    if not names:
-        raise ValidationError(
-            f"--sheets не содержит ни одного имени набора данных: {sheets_filter!r}. "
-            "Укажите листы Excel / табы JSON через запятую."
-        )
-    return names
-
-
-def _validate_dataset_selection(data_file: Path, sheets_filter: Optional[str]) -> None:
-    """
-    Проверить выбор наборов данных до загрузки credentials.
-
-    «Какие табы есть в файле» — вопрос к файлу, а не к сайту: агент должен
-    получить этот список (и ошибку о забытом --sheets) без рабочего
-    подключения к WordPress.
-    """
-    if is_json_source(data_file):
-        _require_json_tabs(data_file, sheets_filter)
-    elif sheets_filter is not None:
-        _dataset_names(sheets_filter)
-
-
-def _require_json_tabs(path: Path, sheets_filter: Optional[str]) -> List[str]:
-    """
-    Проверить выбор табов для JSON-источника.
-
-    Raises:
-        ValidationError: таб не выбран или такого таба в файле нет (exit 2).
-    """
-    available = tab_names(path)
-    listed = ", ".join(available) or "нет"
-
-    if not sheets_filter:
-        raise ValidationError(
-            f"Для JSON-файла {path.name} нужно указать --sheets: значения по умолчанию "
-            "нет, потому что часть табов служебные (options, company), а не контент. "
-            f"Доступные табы: {listed}"
-        )
-
-    requested = _dataset_names(sheets_filter)
-    unknown = [tab for tab in requested if tab not in available]
-    if unknown:
-        raise ValidationError(
-            f"Таб(ы) не найдены в {path.name}: {', '.join(unknown)}. Доступные: {listed}"
-        )
-
-    return requested
 
 
 @contextmanager

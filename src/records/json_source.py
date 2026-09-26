@@ -114,6 +114,26 @@ def _get_tab(document: Dict[str, Any], path: Path, tab_name: str) -> List[Dict[s
     return records
 
 
+def _discriminator_problem(record: Dict[str, Any]) -> Optional[str]:
+    """Что не так с `type`/`taxonomy` записи (None — всё в порядке).
+
+    Ровно одно из двух: запись либо контент (`type`), либо термин (`taxonomy`).
+    """
+    has_type = not is_blank(record.get(TYPE_FIELD))
+    has_taxonomy = not is_blank(record.get(TAXONOMY_FIELD))
+    if has_type and has_taxonomy:
+        return (
+            f"заполнены одновременно '{TYPE_FIELD}' и '{TAXONOMY_FIELD}' — запись может "
+            "быть либо контентом, либо термином таксономии"
+        )
+    if not has_type and not has_taxonomy:
+        return (
+            f"не заполнено ни '{TYPE_FIELD}', ни '{TAXONOMY_FIELD}' — тип записи не определён "
+            "(служебные табы вроде 'options' этим источником не читаются)"
+        )
+    return None
+
+
 def _write_key_for(record: Dict[str, Any], position: int) -> WriteKey:
     """Ключ обратной записи: `_row_num`, если он есть, иначе позиция в массиве."""
     row_num = record.get(ROW_NUM_FIELD)
@@ -167,7 +187,6 @@ class JsonRecordSource:
 
             post_type = record.get(TYPE_FIELD)
             taxonomy = record.get(TAXONOMY_FIELD)
-            has_type = not is_blank(post_type)
             has_taxonomy = not is_blank(taxonomy)
             write_key = _write_key_for(record, position)
 
@@ -179,18 +198,9 @@ class JsonRecordSource:
                 )
             seen_keys[write_key] = position
 
-            if has_type and has_taxonomy:
-                raise RecordSourceError(
-                    f"{self._where(position, write_key)}: заполнены одновременно "
-                    f"'{TYPE_FIELD}' и '{TAXONOMY_FIELD}' — запись может быть "
-                    "либо контентом, либо термином таксономии"
-                )
-            if not has_type and not has_taxonomy:
-                raise RecordSourceError(
-                    f"{self._where(position, write_key)}: не заполнено ни "
-                    f"'{TYPE_FIELD}', ни '{TAXONOMY_FIELD}' — тип записи не определён "
-                    "(служебные табы вроде 'options' этим источником не читаются)"
-                )
+            problem = _discriminator_problem(record)
+            if problem:
+                raise RecordSourceError(f"{self._where(position, write_key)}: {problem}")
 
             # `_row_num`/`type`/`taxonomy` — метаданные источника, а не поля записи:
             # они уже сидят в write_key/discriminator/is_taxonomy и не должны
@@ -206,6 +216,35 @@ class JsonRecordSource:
 
         self._parsed = records
         return records
+
+    def problems(self) -> List[str]:
+        """Все структурные ошибки таба сразу — для `validate`.
+
+        Те же правила, что в `_parse` (объект, `type`/`taxonomy`, уникальный
+        `_row_num`), но без остановки на первой ошибке.
+        """
+        problems: List[str] = []
+        seen_keys: Dict[WriteKey, int] = {}
+        for position, record in enumerate(self._raw_records()):
+            if not isinstance(record, dict):
+                problems.append(f"{self._where(position)}: ожидался объект, получен {type(record).__name__}")
+                continue
+            write_key = _write_key_for(record, position)
+            if write_key in seen_keys:
+                problems.append(
+                    f"{self._where(position, write_key)}: '{ROW_NUM_FIELD}' {write_key!r} "
+                    f"уже занят записью #{seen_keys[write_key]}"
+                )
+            else:
+                seen_keys[write_key] = position
+            problem = _discriminator_problem(record)
+            if problem:
+                problems.append(f"{self._where(position, write_key)}: {problem}")
+        return problems
+
+    def raw_records(self) -> List[Dict[str, Any]]:
+        """Записи таба как есть (с метаданными источника), без проверки."""
+        return self._raw_records()
 
     def fields(self) -> List[str]:
         """Объединение полей всех записей таба (без метаданных источника)."""
@@ -363,3 +402,43 @@ class JsonRecordWriter:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if exc_type is None:
             self.save()
+
+
+def read_tab_if_exists(path: Path, tab_name: str) -> Optional[List[Any]]:
+    """Записи таба существующего файла; None — нет файла или такого таба."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    tabs = _tabs_of(_load_tabs(path), path)
+    records = tabs.get(tab_name)
+    return records if isinstance(records, list) else None
+
+
+def write_tab(
+    path: Path,
+    tab_name: str,
+    records: List[Dict[str, Any]],
+    project: Optional[str] = None,
+) -> None:
+    """Заменить таб файла целиком; остальные табы и ключи файла не трогаются.
+
+    Файла нет — создаётся `{"project", "tabs"}`. Запись атомарная (временный
+    файл + `os.replace`), как в `JsonRecordWriter.save`.
+
+    Raises:
+        RecordSourceError: существующий файл не JSON-файл данных (нет `tabs`).
+    """
+    path = Path(path)
+    if path.exists():
+        document = _load_tabs(path)
+        _tabs_of(document, path)
+    else:
+        document = {"project": project, "tabs": {}}
+    if project and not document.get("project"):
+        document["project"] = project
+    document["tabs"][tab_name] = records
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    tmp_path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp_path, path)

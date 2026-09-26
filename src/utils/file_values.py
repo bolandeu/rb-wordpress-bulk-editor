@@ -72,6 +72,18 @@ class FileValueResolver:
             text = markdown.markdown(text, extensions=["extra", "nl2br", "sane_lists"])
         return text.strip()
 
+    def check(self, field: str, value: Any) -> Optional[str]:
+        """Проблема со ссылкой на файл без чтения самого файла (None — всё в порядке)."""
+        if field in IDENTITY_FIELDS or not looks_like_file_ref(value):
+            return None
+        try:
+            path = self._resolve_path(field, value.strip())
+        except ValidationError as e:
+            return str(e)
+        if not path.is_file():
+            return f"Поле '{field}': файл не найден: {path}"
+        return None
+
     def _resolve_path(self, field: str, raw: str) -> Path:
         """Абсолютный путь — как есть; относительный — внутри base_dir."""
         path = Path(raw).expanduser()

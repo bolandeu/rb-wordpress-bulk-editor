@@ -88,5 +88,9 @@ class ExcelRecordWriter:
             columns_filter=columns_filter,
         )
 
+    def update_record(self, write_key: WriteKey, data: Dict[str, Any]) -> None:
+        """Записать значения в строку листа; колонок, которых нет, ExcelWriter не создаёт."""
+        self.excel_writer.update_row(self.sheet_name, write_key, data)
+
     def save(self) -> None:
         self.excel_writer.save()

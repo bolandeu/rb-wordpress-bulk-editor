@@ -24,6 +24,7 @@ class ResponseMapper:
         taxonomy_cache: Optional[Dict[str, Dict[int, str]]] = None,
         nested_paths: Optional[List[str]] = None,
         content_output_dir: Optional[Path] = None,
+        excel_cell_limit: bool = True,
     ):
         """
         Args:
@@ -33,10 +34,13 @@ class ResponseMapper:
                 Источник — обычно WP_SEO_FIELDS из .env проекта.
             content_output_dir: Папка для HTML файлов, если content не помещается
                 в одну Excel ячейку.
+            excel_cell_limit: False — контент любой длины остаётся в записи
+                (выгрузка в JSON: ограничения ячейки Excel там нет).
         """
         self.taxonomy_cache = taxonomy_cache or {}
         self.nested_paths = nested_paths or []
         self.content_output_dir = content_output_dir
+        self.excel_cell_limit = excel_cell_limit
 
     def map_post_to_excel(self, post: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -144,6 +148,8 @@ class ResponseMapper:
     def _move_long_content_to_file(self, row: Dict[str, Any], post: Dict[str, Any]):
         """Сохранить слишком длинный HTML в файл, чтобы Excel не обрезал ячейку."""
         content = row.get("content")
+        if not self.excel_cell_limit:
+            return
         if not isinstance(content, str) or len(content) <= LONG_CONTENT_THRESHOLD:
             return
 
