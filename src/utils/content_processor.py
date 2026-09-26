@@ -2,12 +2,16 @@
 Обработка контента из markdown/html файлов
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 import markdown
+from html_to_gutenberg import HtmlToGutenberg
 from loguru import logger
 
-from .html_to_gutenberg import HtmlToGutenberg
+# Библиотека дублирует свои предупреждения в stdlib logging; без обработчика
+# они вылезли бы в stderr вторым экземпляром. Пишем их сами через loguru.
+logging.getLogger("html_to_gutenberg").addHandler(logging.NullHandler())
 
 
 class ContentProcessor:
@@ -99,7 +103,10 @@ class ContentProcessor:
                 html_content = content
 
             # Конвертируем HTML в Gutenberg блоки
-            gutenberg_content = self.gutenberg_converter.convert(html_content)
+            conversion = self.gutenberg_converter.convert_report(html_content)
+            for warning in conversion.warnings:
+                logger.warning(f"{filename}: {warning}")
+            gutenberg_content = conversion.blocks
 
             logger.info(f"Successfully processed content file: {filename}")
             return gutenberg_content

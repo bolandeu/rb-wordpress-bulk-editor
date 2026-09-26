@@ -28,6 +28,7 @@ dependencies = [
     "google-auth-oauthlib>=1.1.0",
     "google-auth-httplib2>=0.1.1",
     "llmkit",
+    "html_to_gutenberg",
 ]
 
 [project.scripts]
@@ -75,6 +76,7 @@ ignore_missing_imports = true
 
 [tool.uv.sources]
 llmkit = { git = "https://github.com/bolandeu/llmkit" }
+html_to_gutenberg = { git = "https://github.com/bolandeu/html-to-gutenberg" }
 
 [dependency-groups]
 dev = [

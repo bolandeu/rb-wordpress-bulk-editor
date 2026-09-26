@@ -926,6 +926,21 @@ wheels = [
 ]
 
 [[package]]
+name = "html-to-gutenberg"
+version = "0.2.0"
+source = { git = "https://github.com/bolandeu/html-to-gutenberg#d6dfd8946c9d4219e0d76af64f04a9a9d45850df" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "httpx" },
+    { name = "packaging" },
+    { name = "platformdirs" },
+    { name = "pydantic" },
+    { name = "rich" },
+    { name = "tomli-w" },
+    { name = "typer" },
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -2679,8 +2694,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography" },
-    { name = "jeepney" },
+    { name = "cryptography", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "jeepney", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -2986,6 +3001,7 @@ dependencies = [
     { name = "google-auth" },
     { name = "google-auth-httplib2" },
     { name = "google-auth-oauthlib" },
+    { name = "html-to-gutenberg" },
     { name = "httpx" },
     { name = "keyring" },
     { name = "llmkit" },
@@ -3018,6 +3034,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.23.0" },
     { name = "google-auth-httplib2", specifier = ">=0.1.1" },
     { name = "google-auth-oauthlib", specifier = ">=1.1.0" },
+    { name = "html-to-gutenberg", git = "https://github.com/bolandeu/html-to-gutenberg" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "keyring", specifier = ">=25.0.0" },
     { name = "llmkit", git = "https://github.com/bolandeu/llmkit" },

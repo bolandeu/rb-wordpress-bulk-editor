@@ -78,6 +78,26 @@ antagor, и вручную из терминала — поэтому `SITE_DOMA
 При записи в колонку с `StringDtype` (`is_string_dtype()`) значение должно быть `str`.
 Иначе pandas бросает TypeError. `_coerce_for_column()` в `writer.py` делает каст.
 
+**HTML → Gutenberg — соседний пакет `html_to_gutenberg`, своего конвертера нет.**
+`ContentProcessor` (`content_path` → `content`) вызывает
+`HtmlToGutenberg().convert_report()` и пишет его `warnings` в лог. Незнакомые теги
+библиотека не выбрасывает, а сохраняет блоком `wp:html`, обёртки (`div`/`section`)
+раскрывает. Чинить конвертацию — в `tools/html-to-gutenberg`, не здесь.
+Источник в `[tool.uv.sources]` — git (как у `llmkit`), чтобы wp-bulk ставился
+из git на любой машине. Новая версия конвертера — push в его репозиторий,
+затем `uv lock --upgrade-package html_to_gutenberg` здесь.
+
+На машине разработки wp-bulk, `html-to-gutenberg` и `llmkit` стоят editable из
+соседних папок — правки любого подхватываются без переустановки:
+
+```bash
+uv tool install --editable . --no-sources \
+  --with-editable ../html-to-gutenberg --with-editable ../llmkit --force
+```
+
+`--no-sources` обязателен: иначе git-источники из `pyproject.toml` конфликтуют с
+`--with-editable` («conflicting URLs»).
+
 **Pillow — ленивый импорт.**
 `image_processor.py` импортирует PIL внутри `__init__`, не на уровне модуля.
 Не переносить на уровень модуля — Pillow опционален, его может не быть.
