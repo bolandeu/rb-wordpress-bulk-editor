@@ -8,6 +8,7 @@ from loguru import logger
 from ..mappers.content_mapper import ContentMapper
 from ..records.base import Record, RecordWriter, collect_fields
 from ..utils.content_processor import ContentProcessor
+from ..utils.file_values import FileValueResolver
 from ..models import SyncReport, SyncResult
 from .content_sync_base import ContentSyncBase
 
@@ -47,6 +48,7 @@ class ContentSync(ContentSyncBase):
             collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
             known_taxonomies=Settings().get_taxonomies(),
+            file_resolver=FileValueResolver(self.config.paths.excel_file.parent),
         )
         content_processor = ContentProcessor(self.config.paths.content_folder)
 

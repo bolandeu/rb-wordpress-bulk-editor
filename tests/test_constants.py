@@ -9,6 +9,7 @@ from src.constants import (
     build_nested_payload,
     is_dot_notation_column,
     is_taxonomy_column,
+    normalize_action,
     read_nested_value,
     TAXONOMY_DELIMITER,
 )
@@ -230,3 +231,16 @@ class TestResolveMediaFile:
         result = resolve_media_file("missing.jpg", tmp_path / "empty")
         assert result == Path("missing.jpg")
         assert not result.exists()
+
+
+class TestNormalizeAction:
+    @pytest.mark.parametrize("raw, expected", [
+        ("update", "update"), ("edit", "update"), ("e", "update"), ("U", "update"), (" Edit ", "update"),
+        ("add", "add"), ("a", "add"), ("A", "add"),
+        ("skip", "skip"), ("s", "skip"), ("0", "skip"), (0, "skip"), (0.0, "skip"),
+        ("delete", "delete"), ("d", "delete"),
+        ("", ""), (None, ""), (float("nan"), ""),
+        ("publish", "publish"),  # неизвестное — как есть, дальше пропускается
+    ])
+    def test_aliases(self, raw, expected):
+        assert normalize_action(raw) == expected

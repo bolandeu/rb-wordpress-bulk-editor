@@ -435,3 +435,60 @@ class TestDeleteMediaGate:
         )
 
         assert result.exit_code == 0, result.stdout
+
+
+# ── Формат antagor: короткие action и значения-пути ──────────────────
+
+def write_json_tab(tmp_path, records):
+    path = tmp_path / "mw.json"
+    document = {"project": "mw", "tabs": {CONTENT_TAB: records}}
+    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+class TestAntagorStyleRecords:
+    def test_short_actions_are_understood(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "a", "type": "posts", "title": "Новая"},
+            {"_row_num": 3, "action": "edit", "id": "5", "type": "posts", "title": "Правка"},
+            {"_row_num": 4, "action": "e", "id": "6", "type": "posts", "title": "Правка 2"},
+            {"_row_num": 5, "action": "0", "id": "7", "type": "posts", "title": "Пропуск"},
+            {"_row_num": 6, "action": "s", "id": "8", "type": "posts", "title": "Пропуск 2"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 0, result.stdout
+        client = fake_wp[0]
+        assert [d["title"] for d in client.created("posts")] == ["Новая"]
+        updated = [url for method, url, _ in client.requests if method == "PUT"]
+        assert updated == ["/wp-json/wp/v2/posts/5", "/wp-json/wp/v2/posts/6"]
+
+    def test_file_path_value_is_replaced_with_file_content(self, fake_wp, tmp_path):
+        (tmp_path / "content-write").mkdir()
+        (tmp_path / "content-write" / "1.html").write_text("<p>Относительный</p>", encoding="utf-8")
+        absolute = tmp_path / "abs.md"
+        absolute.write_text("**Абсолютный**", encoding="utf-8")
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "a", "type": "posts", "title": "Статья",
+             "slug": "page.html", "acf.more": "content-write/1.html", "acf.extra": str(absolute)},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 0, result.stdout
+        created = fake_wp[0].created("posts")[0]
+        assert created["acf"]["more"] == "<p>Относительный</p>"
+        assert created["acf"]["extra"] == "<p><strong>Абсолютный</strong></p>"
+        assert created["slug"] == "page.html"  # идентификатор, не файл
+
+    def test_missing_file_is_a_record_error_not_a_string(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "a", "type": "posts", "title": "Статья",
+             "acf.more": "content-write/404.html"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert stats_of(result)["overall"]["errors"] == 1
+        assert fake_wp[0].created("posts") == []

@@ -32,7 +32,7 @@ from ..sync.taxonomy_sync import TaxonomySync
 from ..sync.taxonomy_sync_async import TaxonomySyncAsync
 from ..utils.logger import setup_logger, log_summary
 from ..utils.auth import load_async_config_from_env
-from ..constants import is_taxonomy_column
+from ..constants import is_taxonomy_column, normalize_action
 
 import typer
 
@@ -337,7 +337,7 @@ def _count_permanent_media_deletes(
         if reader.classify_sheet(sheet_name) != "media":
             continue
         for record in ExcelRecordSource(reader, sheet_name).read():
-            if str(record.data.get("action", "")).strip().lower() == "delete":
+            if normalize_action(record.data.get("action")) == "delete":
                 count += 1
     return count
 

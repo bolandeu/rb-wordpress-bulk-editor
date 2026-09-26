@@ -13,6 +13,7 @@ from ..config import AppConfig
 from ..records.base import Record, RecordWriter, collect_fields
 from ..wordpress.client import WordPressClient
 from ..utils.content_processor import ContentProcessor
+from ..utils.file_values import FileValueResolver
 from ..utils.async_helpers import AsyncBatchProcessor, ProcessResult
 from ..models import SyncReport, SyncResult
 from .content_sync_base import ContentSyncBase
@@ -69,6 +70,7 @@ class ContentSyncAsync(ContentSyncBase):
             collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
             known_taxonomies=Settings().get_taxonomies(),
+            file_resolver=FileValueResolver(self.config.paths.excel_file.parent),
         )
         content_processor = ContentProcessor(self.config.paths.content_folder)
 

@@ -20,6 +20,36 @@ from ..credentials.manager import CREDENTIAL_FIELDS, get_credential, read_fields
 # Legacy-имена переменных в .env проекта (последний слой цепочки).
 _LEGACY_ENV_VARS = {"username": "WP_API_USER", "password": "WP_API_TOKEN"}
 
+# Запасные имена из соглашения antagor (`data/projects/<name>/.env`): один и тот же
+# .env проекта должен работать и при вызове wp-bulk из antagor, и вручную из
+# терминала. Своё имя (WP_*) всегда главнее, алиас — только если его нет.
+_ANTAGOR_ENV_ALIASES = {
+    "domain": "SITE_DOMAIN",
+    "username": "SITE_REST_API_USER",
+    "password": "SITE_REST_API_PASSWORD",
+}
+
+
+def _env_names(field_name: str, own_name: str, environ: Dict[str, str]) -> Tuple[str, ...]:
+    """Имена переменной поля по приоритету: своё, затем алиас antagor.
+
+    Алиас учитывается, только если `SITE_CMS` не задан или равен `wordpress`:
+    доступы от сайта на другой CMS подхватывать нельзя.
+    """
+    cms = (environ.get("SITE_CMS") or "wordpress").strip().lower()
+    if cms != "wordpress":
+        return (own_name,)
+    return (own_name, _ANTAGOR_ENV_ALIASES[field_name])
+
+
+def _first_set(names: Tuple[str, ...], environ: Dict[str, str]) -> Tuple[str, str]:
+    """(имя, значение) первой непустой переменной из `names`; ("", "") — ни одной."""
+    for name in names:
+        value = environ.get(name)
+        if value and value.strip():
+            return name, value.strip()
+    return "", ""
+
 
 @dataclass
 class ResolvedCredentials:
@@ -53,9 +83,12 @@ def resolve_credentials(
     Приоритет:
     1. CLI параметры (--domain/--username/--password)
     2. Переменные окружения (WP_DOMAIN, WP_API_USER/WP_API_TOKEN,
-       либо их версии для конкретного сайта — WP_<DOMAIN>_API_USER и т.д.)
+       либо их версии для конкретного сайта — WP_<DOMAIN>_API_USER и т.д.;
+       домен также из SITE_DOMAIN — алиас antagor)
     3. OS keychain (provider = домен сайта)
     4. .env файл — legacy, только если выше ничего не нашлось
+       (WP_DOMAIN/WP_API_USER/WP_API_TOKEN либо алиасы antagor
+       SITE_DOMAIN/SITE_REST_API_USER/SITE_REST_API_PASSWORD)
 
     Ничего не найдено — не ошибка: read-only операции работают анонимно,
     а решение «хватает или нет» принимает вызывающий.
@@ -83,12 +116,17 @@ def resolve_credentials(
 
     sources: Dict[str, Optional[str]] = {}
 
+    # Окружение после load_dotenv: процесс + .env (для последнего, legacy-слоя).
+    dotenv_env = dict(os.environ)
+    domain_names = _env_names("domain", "WP_DOMAIN", dotenv_env)
+    _, domain_from_env = _first_set(domain_names, process_env)
+    _, domain_from_dotenv = _first_set(domain_names, dotenv_env)
     if domain_override:
         domain, sources["domain"] = domain_override.strip(), "cli"
-    elif process_env.get("WP_DOMAIN"):
-        domain, sources["domain"] = process_env["WP_DOMAIN"].strip(), "env"
-    elif os.getenv("WP_DOMAIN"):
-        domain, sources["domain"] = os.environ["WP_DOMAIN"].strip(), ".env"
+    elif domain_from_env:
+        domain, sources["domain"] = domain_from_env, "env"
+    elif domain_from_dotenv:
+        domain, sources["domain"] = domain_from_dotenv, ".env"
     else:
         domain, sources["domain"] = "", None
 
@@ -105,15 +143,17 @@ def resolve_credentials(
     overrides = {"username": username_override, "password": password_override}
     values: Dict[str, str] = {}
     for name in CREDENTIAL_FIELDS:
-        legacy_var = _LEGACY_ENV_VARS[name]
+        legacy_var, legacy_value = _first_set(
+            _env_names(name, _LEGACY_ENV_VARS[name], dotenv_env), dotenv_env
+        )
         if overrides[name]:
             values[name], sources[name] = overrides[name].strip(), "cli"
         elif from_env.get(name):
             values[name], sources[name] = from_env[name].strip(), "env"
         elif from_keychain.get(name):
             values[name], sources[name] = from_keychain[name].strip(), "keychain"
-        elif os.getenv(legacy_var):
-            values[name], sources[name] = os.environ[legacy_var].strip(), ".env"
+        elif legacy_value:
+            values[name], sources[name] = legacy_value, ".env"
             logger.warning(
                 f"{legacy_var} взят из .env — перенесите credentials в keychain "
                 "или переменные окружения, файлы проекта для секретов устарели"

@@ -18,7 +18,10 @@ from src.utils.auth import load_credentials_from_env
 def isolated_env(monkeypatch):
     """Свой снимок окружения: load_dotenv пишет в os.environ, не пачкаем соседей."""
     monkeypatch.setattr(os, "environ", dict(os.environ))
-    for name in ("WP_DOMAIN", "WP_API_USER", "WP_API_TOKEN"):
+    for name in (
+        "WP_DOMAIN", "WP_API_USER", "WP_API_TOKEN",
+        "SITE_DOMAIN", "SITE_REST_API_USER", "SITE_REST_API_PASSWORD", "SITE_CMS",
+    ):
         os.environ.pop(name, None)
 
 
@@ -103,6 +106,47 @@ class TestResolutionOrder:
         _, _, password = load_credentials_from_env(env_file=env_file)
 
         assert password == "env-pass"
+
+
+class TestAntagorAliases:
+    """.env проекта antagor (SITE_*) работает и без переименования в WP_*."""
+
+    def test_site_vars_resolve_credentials(self, tmp_path, keychain):
+        env_file = write_env(
+            tmp_path,
+            SITE_DOMAIN="mwlogistics.local",
+            SITE_CMS="wordpress",
+            SITE_REST_API_USER="site-user",
+            SITE_REST_API_PASSWORD="site-pass",
+        )
+
+        assert load_credentials_from_env(env_file=env_file) == (
+            "mwlogistics.local", "site-user", "site-pass",
+        )
+
+    def test_own_names_beat_aliases(self, tmp_path, keychain):
+        env_file = write_env(
+            tmp_path,
+            WP_DOMAIN="wp.example",
+            SITE_DOMAIN="site.example",
+            WP_API_USER="wp-user",
+            SITE_REST_API_USER="site-user",
+            SITE_REST_API_PASSWORD="site-pass",
+        )
+
+        assert load_credentials_from_env(env_file=env_file) == ("wp.example", "wp-user", "site-pass")
+
+    def test_aliases_ignored_for_other_cms(self, tmp_path, keychain):
+        env_file = write_env(
+            tmp_path,
+            SITE_DOMAIN="shop.example",
+            SITE_CMS="bitrix",
+            SITE_REST_API_USER="site-user",
+            SITE_REST_API_PASSWORD="site-pass",
+        )
+
+        with pytest.raises(AuthenticationError):
+            load_credentials_from_env(env_file=env_file)
 
 
 class TestFailures:

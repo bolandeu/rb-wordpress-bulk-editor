@@ -21,6 +21,30 @@ SYSTEM_COLUMNS = {
 # Валидные значения для action
 VALID_ACTIONS = {"add", "update", "delete", "skip"}
 
+# Короткие и альтернативные написания action → каноническое значение.
+# Регистр не важен. Всё, чего здесь нет и что не входит в VALID_ACTIONS,
+# остаётся как есть и дальше считается недопустимым (запись пропускается).
+ACTION_ALIASES = {
+    "u": "update", "e": "update", "edit": "update",
+    "a": "add",
+    "s": "skip", "0": "skip",
+    "d": "delete",
+}
+
+
+def normalize_action(value: Any) -> str:
+    """Привести значение action к каноническому виду.
+
+    Пустое значение (None, NaN, "") → "". Число 0 из Excel (0 / 0.0) → "skip".
+    Неизвестное значение возвращается в нижнем регистре как есть.
+    """
+    if value is None or (isinstance(value, float) and value != value):
+        return ""
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value == 0:
+        return "skip"
+    text = str(value).strip().lower()
+    return ACTION_ALIASES.get(text, text)
+
 # Названия служебных листов
 SYSTEM_SHEETS = {"options", "media"}
 

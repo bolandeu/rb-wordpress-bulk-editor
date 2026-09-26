@@ -62,6 +62,18 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 `src/credentials/manager.py` (keyring, provider = домен сайта).
 Порядок: CLI-флаг → переменная окружения → keychain → `.env` (legacy).
 
+**`.env` antagor понимается как есть.** Тот же `.env` проекта
+(`antagor/data/projects/<name>/.env`) должен работать и при вызове wp-bulk из
+antagor, и вручную из терминала — поэтому `SITE_DOMAIN` / `SITE_REST_API_USER` /
+`SITE_REST_API_PASSWORD` — запасные имена `WP_DOMAIN` / `WP_API_USER` /
+`WP_API_TOKEN` (`_ANTAGOR_ENV_ALIASES` в `utils/auth.py`, внутри той же единственной
+цепочки). Свои имена главнее; алиасы игнорируются, если `SITE_CMS` задан и не
+`wordpress` — чтобы не подхватить доступы сайта на другой CMS.
+
+**`action` нормализуется в одном месте.** `constants.normalize_action()`:
+`a`→`add`, `u`/`e`/`edit`→`update`, `d`→`delete`, `s`/`0`→`skip`. Все сравнения
+`action` в коде идут через неё — не сравнивать сырое значение со строкой.
+
 **pandas 2.x StringDtype.**
 При записи в колонку с `StringDtype` (`is_string_dtype()`) значение должно быть `str`.
 Иначе pandas бросает TypeError. `_coerce_for_column()` в `writer.py` делает каст.
@@ -118,6 +130,15 @@ fetch:
                 "rb_services_cat": "Перевозки"}]}}
 ```
 
+**Значение-путь → содержимое файла** (`src/utils/file_values.py`, подключён в
+`ContentMapper.map_row` через `file_resolver`): значение, оканчивающееся на
+`.html .htm .md .markdown .txt` (закрытый список — иначе `example.com` сошёл бы за
+файл), заменяется содержимым файла. Сырой HTML, без конвертации в Gutenberg — в
+отличие от `content_path`, который идёт только в `content`. Относительный путь —
+от папки файла данных с запретом выхода через `..`, абсолютный — как есть.
+Нет файла — `ValidationError` для записи. Поля-идентификаторы (`slug`,
+`custom_permalink`, `title`…) не трогаются: `IDENTITY_FIELDS`.
+
 `_row_num`/`type`/`taxonomy` — метаданные источника: в payload WordPress не
 уходят, но в файле остаются. Запись, где заполнены оба или ни одного из
 `type`/`taxonomy`, — ошибка (`RecordSourceError`, exit 2) с указанием таба и
@@ -135,7 +156,7 @@ json в корне проекта, внутри формата приорите�
 поводом объявить форматы неоднозначными.
 
 **Только Excel** (JSON-эквивалента нет): `fetch`, `fetch-media`, `options`,
-`validate`, `reshape`, `llm`, `export*`, `google-*`, `vlookup`. Медиа-лист
+`validate`, `reshape`, `llm`, `export*`, `google-*`, `vlook`. Медиа-лист
 (`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
 
 ### Выбор набора данных: `--sheets`

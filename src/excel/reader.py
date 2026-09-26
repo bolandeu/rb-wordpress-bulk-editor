@@ -7,7 +7,7 @@ from typing import Dict, List, Literal, Optional
 import pandas as pd
 from loguru import logger
 
-from ..constants import SYSTEM_SHEETS, VALID_ACTIONS, is_taxonomy_column
+from ..constants import SYSTEM_SHEETS, VALID_ACTIONS, is_taxonomy_column, normalize_action
 from ..exceptions import ExcelError, ExcelStructureError
 
 
@@ -273,7 +273,7 @@ class ExcelReader:
             return pd.DataFrame()
 
         # Приводим к нижнему регистру и сравниваем
-        mask = df["action"].str.lower().str.strip() == action.lower()
+        mask = df["action"].map(normalize_action) == normalize_action(action)
         return df[mask].copy()
 
     def get_content_columns(self, sheet_name: str) -> List[str]:
@@ -329,8 +329,8 @@ class ExcelReader:
         if "action" not in df.columns:
             return []
 
-        allowed = VALID_ACTIONS | {"", "skip"}
-        actions = df["action"].str.lower().str.strip()
+        allowed = VALID_ACTIONS | {""}
+        actions = df["action"].map(normalize_action)
         invalid_mask = ~actions.isin(allowed)
         invalid_values = actions[invalid_mask].tolist()
 

@@ -6,6 +6,7 @@
 
 from abc import ABC
 from typing import Dict, Iterable, List, Sequence
+from ..constants import VALID_ACTIONS, normalize_action
 from ..records.base import Record, is_blank
 from ..wordpress.client import WordPressClient
 from ..config import AppConfig
@@ -46,7 +47,7 @@ class BaseSync(ABC):
         Returns:
             True если action валидный, False иначе
         """
-        return action.lower() in {"add", "update", "delete", "skip"}
+        return normalize_action(action) in VALID_ACTIONS
 
     def _init_stats(self) -> Dict[str, int]:
         """
@@ -76,7 +77,7 @@ class BaseSync(ABC):
         value = record.data.get("action")
         if is_blank(value):
             return ""
-        return str(value).strip().lower()
+        return normalize_action(value)
 
     @classmethod
     def _group_by_action(cls, records: Sequence[Record]) -> Dict[str, List[Record]]:

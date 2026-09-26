@@ -50,6 +50,11 @@ uv tool upgrade wp-bulk-editor
 регистре, не-буквенно-цифровые символы → `_`: `example.com` → `WP_EXAMPLE_COM_API_USER`).
 В keychain credential хранится по домену сайта — у каждого сайта свой логин.
 
+`.env` проекта antagor тоже понимается без переименования: `SITE_DOMAIN`,
+`SITE_REST_API_USER`, `SITE_REST_API_PASSWORD` — запасные имена для `WP_DOMAIN`,
+`WP_API_USER`, `WP_API_TOKEN` (свои имена главнее). Учитываются, только если
+`SITE_CMS` не задан или равен `wordpress`.
+
 Проверить готовность окружения: `wp-bulk doctor --json`
 (credentials и их источник, проект, конфиг, совместимость версии;
 `--check-connection` добавляет реальный запрос к сайту).
@@ -100,6 +105,16 @@ uv tool upgrade wp-bulk-editor
 
 Остальные поля одинаковы для обоих источников: `action`, `id`, `slug`,
 `status`, dot-нотация `seo.*` / `acf.*`, поля таксономий по имени таксономии.
+
+`action` (регистр не важен): `add`/`a`; `update`/`u`/`edit`/`e`;
+`delete`/`d`; `skip`/`s`/`0`. Пусто или другое значение — запись пропускается.
+
+**Значение-путь → содержимое файла.** Если значение поля — путь, оканчивающийся
+на `.html`/`.htm`/`.md`/`.markdown`/`.txt` (без `://`), в WordPress уходит
+содержимое файла (markdown → HTML): `"acf.more": "content-write/3425.html"`.
+Относительный путь — от папки файла данных (выйти за неё через `..` нельзя),
+абсолютный — как есть. Файла нет — ошибка записи, путь строкой не отправляется.
+Не применяется к `title`, `name`, `slug`, `custom_permalink`, `link`, `status`, `password`.
 
 ## Таксономии
 

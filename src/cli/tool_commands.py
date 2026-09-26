@@ -15,6 +15,7 @@ from .helpers import get_project, resolve_env_file, resolve_excel_file, resolve_
 from .project import find_repo_root
 from .. import output
 from ..config import WordPressConfig
+from ..constants import normalize_action
 from ..exceptions import ValidationError
 from ..excel.reader import ExcelReader
 from ..wordpress.client import WordPressClient
@@ -1110,7 +1111,7 @@ async def _run_llm_generation(
             console.print(f"  [yellow]Пропущен (нет колонки '{column}')[/yellow]\n")
             continue
 
-        update_rows = df[df["action"] == "update"]
+        update_rows = df[df["action"].map(normalize_action) == "update"]
 
         if len(update_rows) == 0:
             console.print(f"  [yellow]Нет строк с action=update[/yellow]\n")

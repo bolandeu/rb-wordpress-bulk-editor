@@ -2,12 +2,13 @@
 Маппинг записей источника (Excel/JSON) в WordPress API payload
 """
 
-from typing import Dict, Any, List, Mapping, Set, Optional, Tuple
+from typing import Callable, Dict, Any, List, Mapping, Set, Optional, Tuple
 from loguru import logger
 
 from ..records.base import is_blank, is_missing
 from .field_detector import FieldDetector
 from .value_converter import convert_acf_value, parse_bool_default_true
+from ..utils.file_values import FileValueResolver
 from ..constants import (
     ACF_PREFIX,
     BOOL_FIELDS_DEFAULT_TRUE,
@@ -27,17 +28,27 @@ class ContentMapper:
         columns: List[str],
         allowed_columns: Optional[List[str]] = None,
         known_taxonomies: Optional[List[str]] = None,
+        file_resolver: Optional[FileValueResolver] = None,
     ):
         """
         Args:
             columns: Список колонок из Excel
             allowed_columns: Если задан — отправлять в API только эти поля
             known_taxonomies: Явный список таксономий проекта (из .env или WP discovery)
+            file_resolver: Подстановка содержимого файла вместо значения-пути
+                (`acf.more = "content/1.html"`). None — значения уходят как есть.
         """
         self.columns = columns
         self.detector = FieldDetector(columns, known_taxonomies=known_taxonomies)
         self.analysis = self.detector.analyze()
         self.allowed_columns: Optional[Set[str]] = set(allowed_columns) if allowed_columns else None
+        self.file_resolver = file_resolver
+
+    def _file_value(self, field: str, value: Any) -> Any:
+        """Значение-путь → содержимое файла (если подключён file_resolver)."""
+        if self.file_resolver is None:
+            return value
+        return self.file_resolver.resolve(field, value)
 
     def map_row(
         self,
@@ -71,7 +82,7 @@ class ContentMapper:
         logger.debug(f"Processing content fields: {self.analysis['content']}")
         for field in self.analysis["content"]:
             if field in row:
-                value = row[field]
+                value = self._file_value(field, row[field])
                 
                 # Поля, которые нужно отправлять всегда (включая пустые значения для обнуления)
                 send_empty_fields = {
@@ -130,11 +141,12 @@ class ContentMapper:
                 # Обычные nested-поля: пустые значения пропускаем
                 if is_blank(value):
                     continue
+                value = self._file_value(col, value)
                 build_nested_payload(col, self._convert_value(value), payload)
             logger.debug(f"Nested fields (dot-notation): {nested_cols}")
 
         # 2b. ACF поля (legacy acf_* колонки)
-        acf_data = self._extract_acf_from_row(row)
+        acf_data = self._extract_acf_from_row(row, self._file_value)
         if acf_data:
             # Если dot-нотация уже положила что-то в payload["acf"], мержим
             if isinstance(payload.get("acf"), dict):
@@ -225,7 +237,10 @@ class ContentMapper:
         return str(value)
 
     @staticmethod
-    def _extract_acf_from_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+    def _extract_acf_from_row(
+        row: Mapping[str, Any],
+        file_value: Optional[Callable[[str, Any], Any]] = None,
+    ) -> Dict[str, Any]:
         """Извлечь ACF поля из записи и конвертировать значения."""
         acf_data = {}
         for col in row.keys():
@@ -233,6 +248,8 @@ class ContentMapper:
                 field_name = col[len(ACF_PREFIX):]
                 value = row[col]
                 if not is_blank(value):
+                    if file_value is not None:
+                        value = file_value(col, value)
                     acf_data[field_name] = convert_acf_value(value)
         return acf_data
 
