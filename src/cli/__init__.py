@@ -8,6 +8,7 @@ CLI интерфейс для WordPress Bulk Editor
 - tool_commands.py    - validate, options, bulk-delete, counter, llm, reshape, taxonomies
 - doctor_commands.py  - doctor (диагностика окружения)
 - image_commands.py   - image-crop, image-compress, image-convert
+- media_commands.py   - media-upload (файлы с диска → медиатека, id вложений)
 """
 
 import sys
@@ -127,6 +128,7 @@ from . import tool_commands  # noqa: E402, F401
 from . import doctor_commands  # noqa: E402, F401
 from . import image_commands  # noqa: E402, F401
 from . import vlook_commands  # noqa: E402, F401
+from . import media_commands  # noqa: E402, F401
 
 
 def main():
