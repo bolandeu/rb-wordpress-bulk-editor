@@ -119,7 +119,12 @@ class WordPressHttpProvider(HttpProvider):
         некоторых хостингах отдаёт JSON после PHP warnings или только ID в
         заголовке, и это не ошибка (см. `MediaEndpoint._parse_upload_response`).
         """
-        request_headers = {**self._request_headers(), **headers}
+        # Слияние — через httpx.Headers, без учёта регистра: у заголовков
+        # клиента ключи строчные ('content-type': application/json), и в
+        # обычном dict наш 'Content-Type' лёг бы рядом вторым значением —
+        # WordPress брал первое и разбирал картинку как JSON (400).
+        request_headers = httpx.Headers(self._request_headers())
+        request_headers.update(headers)
         logger.debug(f"POST {endpoint} (binary upload, {len(content)} bytes)")
         # timeout=None в httpx означает «без таймаута», поэтому передаём его
         # только когда он действительно задан.

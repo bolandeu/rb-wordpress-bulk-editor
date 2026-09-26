@@ -26,6 +26,9 @@ def site(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         state["requests"].append(request)
         if request.url.path == "/wp-json/wp/v2/media":
+            # как настоящий WordPress: тело разбирается по первому Content-Type
+            if request.headers.get_list("content-type") != ["image/jpeg"]:
+                return httpx.Response(400, json={"code": "rest_invalid_json", "message": "тело не JSON"})
             name = request.headers["Content-Disposition"].split('filename="')[1].rstrip('"')
             if name in state["fail_upload"]:
                 return httpx.Response(state["status"], json={"code": "rest_upload", "message": "отказ"})

@@ -175,3 +175,31 @@ class TestConfigValidation:
     def test_url_with_http_preserved(self):
         config = WordPressConfig(url="http://local.test")
         assert config.url == "http://local.test"
+
+
+# ── Загрузка медиа ────────────────────────────────────────────────────
+
+class TestMediaUploadHeaders:
+    async def test_single_content_type_is_the_file_mime(self):
+        """
+        Регрессия: заголовки клиента несут 'content-type: application/json'
+        строчными, и при слиянии обычным dict наш 'Content-Type' уходил вторым
+        значением — WordPress разбирал JPEG как JSON и отвечал 400.
+        """
+        from src.wordpress.media import MediaEndpoint
+
+        seen = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(201, json={"id": 7, "source_url": "https://example.com/a.jpg"})
+
+        async with WordPressClient(make_config(), transport=httpx.MockTransport(handler)) as client:
+            result = await MediaEndpoint(client)._upload_data(b"\xff\xd8", "a.jpg", "image/jpeg")
+
+        assert result["id"] == 7
+        [request] = seen
+        assert request.headers.get_list("content-type") == ["image/jpeg"]
+        assert request.headers.get_list("content-disposition") == ['attachment; filename="a.jpg"']
+        assert request.headers["authorization"].startswith("Basic ")
+        assert request.content == b"\xff\xd8"
