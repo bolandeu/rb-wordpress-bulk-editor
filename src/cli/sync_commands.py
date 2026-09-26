@@ -828,30 +828,3 @@ def async_sync(
         console.print(f"Лог-файл: [cyan]{payload['log_file']}[/cyan]\n")
 
     output.emit_success(ctx, {**(stats or {}), "log_file": str(log_file)}, _render)
-
-
-# ============================================================
-# Public API для вызова из google_commands
-# ============================================================
-
-async def run_sync(config: AppConfig, sheets_filter: Optional[str] = None, test_mode: bool = False):
-    """Обёртка _run_sync_engine для sync (используется google_commands)."""
-    await _run_sync_engine(config, sheets_filter, test_mode=test_mode, command_name="sync")
-
-
-async def run_sync_async(
-    config: AppConfig,
-    sheets_filter: Optional[str] = None,
-    test_mode: bool = False,
-    retry_config=None,
-    circuit_breaker=None,
-):
-    """Обёртка _run_sync_engine для async (используется google_commands)."""
-    await _run_sync_engine(
-        config, sheets_filter, test_mode=test_mode,
-        content_sync_cls=ContentSyncAsync,
-        taxonomy_sync_cls=TaxonomySyncAsync,
-        retry_config=retry_config,
-        circuit_breaker=circuit_breaker,
-        command_name="async_sync",
-    )

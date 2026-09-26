@@ -5,10 +5,7 @@ CLI интерфейс для WordPress Bulk Editor
 - sync_commands.py    - sync, async (синхронизация Excel -> WordPress)
 - fetch_commands.py   - fetch, fetch-media (загрузка WordPress -> Excel)
 - export_commands.py  - export, export-media (экспорт контента/медиа в файлы)
-- google_commands.py  - download-google-sheet, upload-to-google-sheets,
-                        sync-from-google, sync-google-bidirectional,
-                        async-from-google, async-google-bidirectional
-- tool_commands.py    - validate, options, bulk-delete, counter, llm, reshape
+- tool_commands.py    - validate, options, bulk-delete, counter, llm, reshape, taxonomies
 - doctor_commands.py  - doctor (диагностика окружения)
 - image_commands.py   - image-crop, image-compress, image-convert
 """
@@ -126,7 +123,6 @@ from . import sync_commands  # noqa: E402, F401
 from . import fetch_commands  # noqa: E402, F401
 from . import update_commands  # noqa: E402, F401
 from . import export_commands  # noqa: E402, F401
-from . import google_commands  # noqa: E402, F401
 from . import tool_commands  # noqa: E402, F401
 from . import doctor_commands  # noqa: E402, F401
 from . import image_commands  # noqa: E402, F401

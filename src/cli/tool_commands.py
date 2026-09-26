@@ -17,7 +17,7 @@ from .helpers import (
 from .project import find_repo_root
 from .. import output
 from ..config import WordPressConfig
-from ..constants import normalize_action
+from ..constants import is_taxonomy_column, normalize_action
 from ..exceptions import ValidationError
 from ..excel.reader import ExcelReader
 from ..records.excel import ExcelRecordSource
@@ -367,6 +367,7 @@ async def _fetch_options(wp_config: WordPressConfig) -> dict:
 
 
 @app.command()
+@output.guard
 def bulk_delete(
     ctx: typer.Context,
     domain: Optional[str] = typer.Option(
@@ -454,13 +455,7 @@ def bulk_delete(
     5 — недоступен WordPress.
     """
     env_file = resolve_env_file(ctx, env_file)
-    # Локальные флаги (`bulk-delete --json`) работают так же, как глобальные
-    # (`--json bulk-delete`): команда идёт не через @output.guard, поэтому
-    # подмешиваем их сами.
     opts = output.get_options(ctx)
-    opts.json = opts.json or json_output
-    opts.quiet = opts.quiet or quiet
-    opts.non_interactive = opts.non_interactive or non_interactive
 
     def say(message: str = "") -> None:
         """Человеческий вывод. В --json stdout занят конвертом, значит молчим."""
@@ -470,114 +465,113 @@ def bulk_delete(
     say("\n[bold red]Bulk Delete[/bold red]")
     say("=" * 60 + "\n")
 
-    with handle_command_errors(ctx):
-        log_file = setup_command_logging(ctx, "bulk_delete", verbose)
+    log_file = setup_command_logging(ctx, "bulk_delete", verbose)
 
-        # Неинтерактивный запуск без --confirm отвергаем сразу, до обращения
-        # к сайту: ошибка должна быть про отсутствующий --confirm, а не про сеть.
-        if not dry_run and not confirm and not output.is_interactive(ctx):
-            output.require_confirmation(
-                ctx,
-                f"удаление всех записей типа '{post_type}' (статус: {status})",
-                confirm,
-            )
-
-        # Получаем credentials (приоритет: CLI параметры -> .env файл)
-        domain, username, password = load_and_print_credentials(
-            env_file=env_file,
-            domain=domain,
-            username=username,
-            password=password,
-            ctx=ctx,
+    # Неинтерактивный запуск без --confirm отвергаем сразу, до обращения
+    # к сайту: ошибка должна быть про отсутствующий --confirm, а не про сеть.
+    if not dry_run and not confirm and not output.is_interactive(ctx):
+        output.require_confirmation(
+            ctx,
+            f"удаление всех записей типа '{post_type}' (статус: {status})",
+            confirm,
         )
 
-        say(f"[yellow]->[/yellow] Тип контента: {post_type}")
-        say(f"[yellow]->[/yellow] Статус: {status}")
-        say(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
-        say(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
-        if dry_run:
-            say("[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
-        say()
+    # Получаем credentials (приоритет: CLI параметры -> .env файл)
+    domain, username, password = load_and_print_credentials(
+        env_file=env_file,
+        domain=domain,
+        username=username,
+        password=password,
+        ctx=ctx,
+    )
 
-        # Создаем WordPress клиент
-        wp_config = _make_wp_config(domain, username, password)
+    say(f"[yellow]->[/yellow] Тип контента: {post_type}")
+    say(f"[yellow]->[/yellow] Статус: {status}")
+    say(f"[yellow]->[/yellow] Режим удаления: {'Полное' if force else 'В корзину'}")
+    say(f"[yellow]->[/yellow] Удалять медиа: {'Да' if delete_media else 'Нет'}")
+    if dry_run:
+        say("[yellow]->[/yellow] DRY-RUN режим: изменения не будут применены")
+    say()
 
-        # Сначала читаем список — он же и есть превью для --dry-run,
-        # и количество записей для вопроса о подтверждении.
-        all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
-        say(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
+    # Создаем WordPress клиент
+    wp_config = _make_wp_config(domain, username, password)
 
-        targets = [
-            {"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")}
-            for post in all_posts
-        ]
+    # Сначала читаем список — он же и есть превью для --dry-run,
+    # и количество записей для вопроса о подтверждении.
+    all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
+    say(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
 
-        if dry_run:
-            # Превью никогда не спрашивает и ничего не меняет.
-            def _render_dry(payload: Dict):
-                console.print(f"[yellow]DRY-RUN: Будет удалено {payload['found']} записей[/yellow]")
-                for item in payload["posts"][:10]:
-                    console.print(f"  ID={item['id']}: {item['title']}")
-                if payload["found"] > 10:
-                    console.print(f"  ... и еще {payload['found'] - 10} записей")
-                console.print()
+    targets = [
+        {"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")}
+        for post in all_posts
+    ]
 
-            output.emit_success(
-                ctx,
-                {
-                    "dry_run": True,
-                    "post_type": post_type,
-                    "status": status,
-                    "found": len(targets),
-                    "deleted": 0,
-                    "posts": targets,
-                },
-                _render_dry,
-            )
-            return
-
-        if all_posts:
-            mode = "полностью (минуя корзину)" if force else "в корзину"
-            media_note = " вместе с featured media" if delete_media else ""
-            output.require_confirmation(
-                ctx,
-                f"Удалить {len(all_posts)} записей типа '{post_type}' "
-                f"(статус: {status}) {mode}{media_note}?",
-                confirm,
-            )
-
-        # Запускаем удаление
-        stats = asyncio.run(_run_bulk_delete(
-            wp_config,
-            all_posts,
-            post_type,
-            force,
-            delete_media
-        ))
-
-        # Показываем результаты
-        def _render_done(payload: Dict):
-            errors_color = "red" if payload["errors"] > 0 else "green"
-            console.print("\n[bold green]Операция завершена![/bold green]")
-            console.print("=" * 60)
-            console.print(f"  Найдено записей: [cyan]{payload['found']}[/cyan]")
-            console.print(f"  Удалено записей: [cyan]{payload['deleted']}[/cyan]")
-            if delete_media:
-                console.print(f"  Удалено медиа: [cyan]{payload['media_deleted']}[/cyan]")
-            console.print(f"  Ошибок: [{errors_color}]{payload['errors']}[/{errors_color}]")
-            console.print(f"\n[dim]Логи: {log_file}[/dim]")
+    if dry_run:
+        # Превью никогда не спрашивает и ничего не меняет.
+        def _render_dry(payload: Dict):
+            console.print(f"[yellow]DRY-RUN: Будет удалено {payload['found']} записей[/yellow]")
+            for item in payload["posts"][:10]:
+                console.print(f"  ID={item['id']}: {item['title']}")
+            if payload["found"] > 10:
+                console.print(f"  ... и еще {payload['found'] - 10} записей")
+            console.print()
 
         output.emit_success(
             ctx,
             {
-                "dry_run": False,
+                "dry_run": True,
                 "post_type": post_type,
                 "status": status,
-                "force": force,
-                **stats,
+                "found": len(targets),
+                "deleted": 0,
+                "posts": targets,
             },
-            _render_done,
+            _render_dry,
         )
+        return
+
+    if all_posts:
+        mode = "полностью (минуя корзину)" if force else "в корзину"
+        media_note = " вместе с featured media" if delete_media else ""
+        output.require_confirmation(
+            ctx,
+            f"Удалить {len(all_posts)} записей типа '{post_type}' "
+            f"(статус: {status}) {mode}{media_note}?",
+            confirm,
+        )
+
+    # Запускаем удаление
+    stats = asyncio.run(_run_bulk_delete(
+        wp_config,
+        all_posts,
+        post_type,
+        force,
+        delete_media
+    ))
+
+    # Показываем результаты
+    def _render_done(payload: Dict):
+        errors_color = "red" if payload["errors"] > 0 else "green"
+        console.print("\n[bold green]Операция завершена![/bold green]")
+        console.print("=" * 60)
+        console.print(f"  Найдено записей: [cyan]{payload['found']}[/cyan]")
+        console.print(f"  Удалено записей: [cyan]{payload['deleted']}[/cyan]")
+        if delete_media:
+            console.print(f"  Удалено медиа: [cyan]{payload['media_deleted']}[/cyan]")
+        console.print(f"  Ошибок: [{errors_color}]{payload['errors']}[/{errors_color}]")
+        console.print(f"\n[dim]Логи: {log_file}[/dim]")
+
+    output.emit_success(
+        ctx,
+        {
+            "dry_run": False,
+            "post_type": post_type,
+            "status": status,
+            "force": force,
+            **stats,
+        },
+        _render_done,
+    )
 
 
 async def _collect_posts(
@@ -1497,6 +1491,7 @@ def reshape(
 
 
 @app.command()
+@output.guard
 def taxonomies(
     ctx: typer.Context,
     env_file: Optional[Path] = typer.Option(
@@ -1513,31 +1508,55 @@ def taxonomies(
         "--include-system",
         help="Включать служебные таксономии (nav_menu, link_category, post_format)",
     ),
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
 ):
     """
     Вывести список таксономий сайта в формате для копирования в .env проекта.
 
+    needs_env — таксономии, имена которых не подходят под соглашение
+    (часть имени cat/tax/term/tag через _ или -): без WP_TAXONOMIES sync не
+    узнает в такой колонке таксономию, а проверка перед отправкой сочтёт её
+    неизвестным полем.
+
     Пример:
         wp-bulk --project mysite taxonomies
         → WP_TAXONOMIES=product_cat,brand,regions
+
+    Exit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,
+    1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
     setup_command_logging(ctx, "taxonomies")
 
-    with handle_command_errors(ctx):
-        domain, username, password = load_and_print_credentials(env_file=env_file)
-        wp_config = _make_wp_config(domain, username, password)
+    domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
+    wp_config = _make_wp_config(domain, username, password)
 
-        slugs = asyncio.run(_discover_taxonomy_slugs(wp_config, include_system))
+    slugs = asyncio.run(_discover_taxonomy_slugs(wp_config, include_system))
 
-        if not slugs:
+    def _render(payload: dict):
+        if not payload["taxonomies"]:
             console.print("[yellow]Таксономии не обнаружены.[/yellow]\n")
             return
-
-        line = f"WP_TAXONOMIES={','.join(slugs)}"
-        console.print(f"\n[dim]# Скопируй в .env проекта:[/dim]")
-        console.print(line)
+        console.print("\n[dim]# Скопируй в .env проекта:[/dim]")
+        console.print(payload["env_line"])
+        if payload["needs_env"]:
+            console.print(
+                f"[dim]# Не по соглашению cat/tax/term/tag — без WP_TAXONOMIES не распознаются: "
+                f"{', '.join(payload['needs_env'])}[/dim]"
+            )
         console.print()
+
+    output.emit_success(
+        ctx,
+        {
+            "domain": domain,
+            "taxonomies": slugs,
+            "env_line": f"WP_TAXONOMIES={','.join(slugs)}" if slugs else None,
+            "needs_env": [slug for slug in slugs if not is_taxonomy_column(slug)],
+        },
+        _render,
+    )
 
 
 async def _discover_taxonomy_slugs(

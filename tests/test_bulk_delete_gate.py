@@ -128,3 +128,19 @@ class TestBulkDeleteGate:
 
         assert result.exit_code == 2
         assert fake_wp["deleted"] == []
+
+
+class TestBulkDeleteEnvelope:
+    def test_unexpected_error_is_an_envelope(self, fake_wp, monkeypatch):
+        async def broken_collect(wp_config, post_type, status):
+            raise RuntimeError("сломалось")
+
+        monkeypatch.setattr(tool_commands, "_collect_posts", broken_collect)
+
+        result = runner.invoke(app, ["bulk-delete", "--post-type", "posts", "--dry-run", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout.strip())
+        assert payload["ok"] is False
+        assert payload["error"]["code"] == "UNEXPECTED"
+        assert "сломалось" in payload["error"]["message"]

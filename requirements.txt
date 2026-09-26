@@ -20,8 +20,3 @@ markdown
 beautifulsoup4
 python-slugify
 
-# Google Sheets integration
-google-api-python-client
-google-auth
-google-auth-oauthlib
-google-auth-httplib2

@@ -103,7 +103,7 @@ def require_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
     Разрешить Excel файл с обязательным результатом.
 
     Только для команд, которые по своей природе работают с Excel
-    (fetch-media, export, google-*, reshape и т.п.).
+    (fetch-media, export, reshape и т.п.).
     """
     return _require_file(
         ctx,

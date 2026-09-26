@@ -188,7 +188,7 @@ json в корне проекта, внутри формата приорите�
 
 **Оба формата:** `sync`, `async`, `update`, `validate`, `fetch`.
 **Только Excel** (JSON-эквивалента нет): `fetch-media`, `options`,
-`reshape`, `llm`, `export*`, `google-*`, `vlook`. Медиа-лист
+`reshape`, `llm`, `export*`, `vlook`. Медиа-лист
 (`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
 
 Выбор источника и табов (`is_json_source`, `require_json_tabs`) — общий модуль
@@ -377,7 +377,6 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | `LLM_PROMPT` | промпт команды `llm` |
 | `LLM_LEVEL` / `LLM_MODELS` | ТЕКСТ: уровень или цепочка моделей llmkit |
 | `LLM_ENDPOINT` / `LLM_TOKEN` / `LLM_IMG_PROMPT` / `LLM_IMG_MODELS` | ТОЛЬКО картинки (`--column img_path`) |
-| `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_CREDENTIALS_PATH` | Google Sheets |
 | `WP_BULK_MIN_VERSION=1.2.0` | минимальная версия CLI для этого проекта |
 
 ### Команда `llm`: текст через llmkit, картинки — свои
@@ -449,6 +448,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | 1.1.0 | JSON-обмен: `update`/`fetch`/`validate` для JSON, `cli_version` в конверте |
 | 1.2.0 | Проверка перед отправкой (`validate`, автоматически в `sync`/`async`, `--skip-checks`, `WP_EXTRA_FIELDS`); таксономия — по части имени `cat`/`tax`/`term`/`tag` |
 | 1.3.0 | `async` отдаёт тот же JSON-конверт, что `sync` (`--json`/`--quiet`, статистика, `log_file`); `--quiet` у `sync`/`async` глушит консольный лог |
+| 1.4.0 | `taxonomies` отдаёт конверт (`taxonomies`, `env_line`, `needs_env` — имена не по соглашению); `bulk-delete` на `@output.guard`; google-команды и зависимости Google API удалены |
 
 Поменялось поведение, на которое может опираться вызывающий (новая проверка,
 флаг, exit-код) — поднять `version` в том же коммите, иначе пакет с изменением
