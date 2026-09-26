@@ -30,6 +30,16 @@ class ExcelRecordSource:
         """Колонки листа."""
         return self.reader.read_sheet(self.sheet_name).columns.tolist()
 
+    def where(self, record: Record) -> str:
+        """Место записи для сообщений: строка листа, как её видно в Excel.
+
+        Индекс pandas не сбрасывается и считается от первой строки данных,
+        поэтому номер строки в Excel = label + 2 (строка 1 — шапка).
+        """
+        key = record.write_key
+        row = key + 2 if isinstance(key, int) else key
+        return f"Лист '{self.sheet_name}', строка {row}"
+
     def read(self) -> Iterator[Record]:
         """Строки листа как записи.
 

@@ -20,8 +20,10 @@ from ..config import WordPressConfig
 from ..constants import normalize_action
 from ..exceptions import ValidationError
 from ..excel.reader import ExcelReader
+from ..records.excel import ExcelRecordSource
 from ..records.json_validation import check_tab
-from ..records.selection import is_json_source, require_json_tabs
+from ..records.preflight import FieldRules, check_sources, raise_if_errors
+from ..records.selection import dataset_names, is_json_source, require_json_tabs
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
@@ -48,7 +50,7 @@ def validate(
     sheets: Optional[str] = typer.Option(
         None,
         "--sheets",
-        help="Табы JSON через запятую (для JSON обязателен)",
+        help="Листы Excel / табы JSON через запятую (для JSON обязателен)",
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -63,18 +65,29 @@ def validate(
     quiet: bool = output.QuietOption,
 ):
     """
-    Валидация файла данных без синхронизации.
+    Проверка файла данных перед отправкой — без синхронизации и без сайта.
 
-    Excel: структура листов (нужны credentials).
+    Та же проверка автоматически идёт перед sync/async (отключается
+    --skip-checks). Сообщаются все проблемы сразу:
 
-    JSON (--file *.json, --sheets обязателен): без обращения к сайту —
-    у каждой записи заполнено ровно одно из type/taxonomy, _row_num уникален
-    внутри таба, значения-пути к файлам (acf.more = "content/1.html")
-    существуют. Битая ссылка у записи с action add/update — ошибка, у
-    остальных — предупреждение. Сообщаются все проблемы сразу.
+    - имена полей: всё, кроме acf.* / acf_* / meta.*, — известное поле
+      WordPress, SEO-поле или своё поле из WP_EXTRA_FIELDS; к опечатке
+      подсказывается похожее имя (seo.descripton → seo.description);
+    - имена таксономий: встроенные (categories, tags) или с частью
+      cat / tax / term / tag через _ или - (rb_services_cat, region-term),
+      строчными; свои — в WP_TAXONOMIES;
+    - значения записей add/update/delete: id у update/delete, status,
+      дубли slug, разделитель терминов "; ", да/нет в seo.robots.*,
+      существование файлов в значениях-путях (acf.more = "content/1.html").
+
+    Записи skip / без action на сайт не уходят: их проблемы — предупреждения.
+
+    Excel: content- и taxonomy-листы (или --sheets), затем проверка
+    credentials. JSON: --sheets обязателен, плюс структура таба (ровно одно
+    из type/taxonomy, уникальный _row_num); credentials не нужны.
 
     Exit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах, 3 — нет
-    credentials (Excel), 5 — недоступен WordPress (Excel), 1 — непредвиденная ошибка.
+    credentials (Excel), 1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_data_file(ctx, file)
@@ -88,52 +101,54 @@ def validate(
 
     setup_command_logging(ctx, "validate")
 
-    # Проверка credentials
+    # Файл проверяется до credentials: это вопрос к файлу, не к сайту
+    output.vecho(ctx, "Проверка листов...")
+    rules = FieldRules.from_settings()
+    with ExcelReader(file, known_taxonomies=rules.known_taxonomies) as reader:
+        by_type = reader.get_sheets_by_type()
+        names = dataset_names(sheets) if sheets is not None else by_type["content"] + by_type["taxonomy"]
+        checks = check_sources(
+            [ExcelRecordSource(reader, name) for name in names], rules, base_dir=file.parent,
+        )
+    raise_if_errors(file.name, checks)
+
     domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
 
-    # Проверка структуры
-    output.vecho(ctx, "Проверка структуры листов...")
-    with ExcelReader(file) as reader:
-        sheets = reader.get_sheets_by_type()
-
     def _render(payload: dict):
-        console.print(f"[green]OK[/green] Content sheets: {len(payload['content_sheets'])}")
-        console.print(f"[green]OK[/green] Taxonomy sheets: {len(payload['taxonomy_sheets'])}\n")
-        console.print("[bold green]SUCCESS! File is valid![/bold green]\n")
+        _render_checks(payload["tabs"])
 
     output.emit_success(
         ctx,
         {
             "file": str(file),
+            "format": "xlsx",
+            "valid": True,
             "domain": domain,
-            "content_sheets": list(sheets["content"]),
-            "taxonomy_sheets": list(sheets["taxonomy"]),
+            "content_sheets": list(by_type["content"]),
+            "taxonomy_sheets": list(by_type["taxonomy"]),
+            "tabs": [c.to_dict() for c in checks],
         },
         _render,
     )
 
 
-# Сколько ошибок перечислять в сообщении (остальные — числом)
-_MAX_LISTED_ERRORS = 20
+def _render_checks(tabs: List[dict]) -> None:
+    for check in tabs:
+        console.print(f"[green]OK[/green] '{check['tab']}': {check['records']} записей")
+        for warning in check["warnings"]:
+            console.print(f"  [yellow]WARN[/yellow] {warning}")
+    console.print("\n[bold green]SUCCESS! File is valid![/bold green]\n")
 
 
 def _validate_json(ctx: typer.Context, file: Path, sheets: Optional[str]) -> None:
     """validate для JSON: все проблемы табов сразу, без credentials и сети."""
     tabs = require_json_tabs(file, sheets)
-    checks = [check_tab(file, tab) for tab in tabs]
-    errors = [error for check in checks for error in check.errors]
-    if errors:
-        listed = "\n".join(f"  - {e}" for e in errors[:_MAX_LISTED_ERRORS])
-        more = len(errors) - _MAX_LISTED_ERRORS
-        tail = f"\n  … и ещё {more}" if more > 0 else ""
-        raise ValidationError(f"{file.name}: ошибок — {len(errors)}:\n{listed}{tail}")
+    rules = FieldRules.from_settings()
+    checks = [check_tab(file, tab, rules) for tab in tabs]
+    raise_if_errors(file.name, checks)
 
     def _render(payload: dict):
-        for check in payload["tabs"]:
-            console.print(f"[green]OK[/green] Таб '{check['tab']}': {check['records']} записей")
-            for warning in check["warnings"]:
-                console.print(f"  [yellow]WARN[/yellow] {warning}")
-        console.print("\n[bold green]SUCCESS! File is valid![/bold green]\n")
+        _render_checks(payload["tabs"])
 
     output.emit_success(
         ctx,

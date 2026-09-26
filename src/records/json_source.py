@@ -242,6 +242,10 @@ class JsonRecordSource:
                 problems.append(f"{self._where(position, write_key)}: {problem}")
         return problems
 
+    def where(self, record: Record) -> str:
+        """Место записи для сообщений проверки перед отправкой."""
+        return f"Таб '{self.tab_name}', запись {record.write_key}"
+
     def raw_records(self) -> List[Dict[str, Any]]:
         """Записи таба как есть (с метаданными источника), без проверки."""
         return self._raw_records()

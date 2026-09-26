@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 
-_FALSY_STRINGS = {"0", "нет", "no", "false", "f", "n"}
+FALSY_STRINGS = {"0", "нет", "no", "false", "f", "n"}
 
 
 def parse_bool_default_true(value: Any) -> bool:
@@ -29,7 +29,7 @@ def parse_bool_default_true(value: Any) -> bool:
     s = str(value).strip().lower()
     if not s:
         return True
-    if s in _FALSY_STRINGS:
+    if s in FALSY_STRINGS:
         return False
     return True
 

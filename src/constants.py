@@ -2,6 +2,7 @@
 Константы для WordPress Bulk Editor
 """
 
+import re
 from typing import Any, Dict, Iterable, Optional
 
 # Служебные колонки (не передаются в API)
@@ -66,14 +67,11 @@ TAXONOMY_HIERARCHY_DELIMITER = ">"
 # ACF префикс
 ACF_PREFIX = "acf_"
 
-# Суффиксы таксономии: корень (cat/tag/tax) × разделитель (_/-)
-TAXONOMY_SUFFIX_ROOTS = ("cat", "tag", "tax")
-TAXONOMY_SUFFIX_SEPARATORS = ("_", "-")
-TAXONOMY_SUFFIXES = tuple(
-    f"{sep}{root}"
-    for root in TAXONOMY_SUFFIX_ROOTS
-    for sep in TAXONOMY_SUFFIX_SEPARATORS
-)
+# Имя колонки-таксономии: части через `_`/`-`, одна из частей — корень.
+# Сравнение по целой части, а не по подстроке: `catalog_url`, `category_id`
+# и `terms_of_use` — обычные поля, а не таксономии.
+TAXONOMY_NAME_ROOTS = frozenset({"cat", "tag", "tax", "term"})
+_TAXONOMY_NAME_SEPARATORS = re.compile(r"[-_]")
 
 # Поля, которые всегда отправляются как bool.
 # Если колонка присутствует в Excel — значение парсится (пустое = True),
@@ -100,11 +98,11 @@ def is_taxonomy_column(col: str, known_taxonomies: Optional[Iterable[str]] = Non
             Если задан — имя колонки сравнивается по этому списку; fallback на
             STANDARD_TAXONOMIES и суффиксы TAXONOMY_SUFFIXES сохраняется.
 
-    Суффикс распознаётся регистронезависимо для всех комбинаций
-    `_cat -cat _tag -tag _tax -tax` (реальные данные используют оба разделителя:
-    `genre-cat` в Excel, `rb_services_cat` в JSON).
+    Соглашение об именах: имя разбито `_`/`-` на части, и одна из частей —
+    `cat`, `tag`, `tax` или `term` (регистр не важен), в любом месте:
+    `rb_services_cat`, `genre-cat`, `cat_services`, `region_term`.
 
-    Эвристика по суффиксу не применяется к dot-нотации (`acf.product_cat`,
+    Эвристика по имени не применяется к dot-нотации (`acf.product_cat`,
     `seo.meta_tag`) и к legacy ACF-префиксу (`acf_service_cat`): это явно
     размеченные поля payload, а не таксономии. Явные списки
     (`known_taxonomies`, STANDARD_TAXONOMIES) — осознанный override и работают
@@ -119,9 +117,8 @@ def is_taxonomy_column(col: str, known_taxonomies: Optional[Iterable[str]] = Non
         return True
     if is_dot_notation_column(col) or col_lower.startswith(ACF_PREFIX):
         return False
-    if col_lower.endswith(TAXONOMY_SUFFIXES):
-        return True
-    return False
+    parts = _TAXONOMY_NAME_SEPARATORS.split(col_lower)
+    return len(parts) > 1 and all(parts) and any(p in TAXONOMY_NAME_ROOTS for p in parts)
 
 
 def is_dot_notation_column(col: str) -> bool:

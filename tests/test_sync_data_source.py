@@ -488,7 +488,95 @@ class TestAntagorStyleRecords:
              "acf.more": "content-write/404.html"},
         ])
 
-        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+        # Проверка перед отправкой остановила бы прогон целиком — здесь
+        # проверяется поведение самого sync, когда её отключили.
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--skip-checks")
 
         assert stats_of(result)["overall"]["errors"] == 1
         assert fake_wp[0].created("posts") == []
+
+
+# ── Проверка перед отправкой ─────────────────────────────────────────
+
+class TestPreflight:
+    def test_typo_in_field_blocks_sync_before_any_request(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
+        ])
+        before = path.read_text(encoding="utf-8")
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 2, result.stdout
+        message = stats_of(result)["error"]["message"]
+        assert "seo.descripton" in message and "seo.description" in message
+        assert fake_wp == []  # к сайту даже не подключались
+        assert path.read_text(encoding="utf-8") == before
+
+    def test_dry_run_is_blocked_too(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "update", "type": "posts", "title": "A"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--dry-run")
+
+        assert result.exit_code == 2
+        assert "id" in stats_of(result)["error"]["message"]
+
+    def test_skip_checks_lets_the_run_through(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--skip-checks")
+
+        assert result.exit_code == 0, result.stdout
+        assert len(fake_wp[0].created("posts")) == 1
+
+    def test_filtered_out_records_are_not_checked(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "add", "type": "posts", "title": "A"},
+            {"_row_num": 3, "action": "update", "type": "pages", "title": "Без id"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--filter", "type=posts")
+
+        assert result.exit_code == 0, result.stdout
+
+    def test_excel_typo_blocks_sync(self, fake_wp, tmp_path):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "posts"
+        ws.append(["id", "action", "tilte", "slug"])
+        ws.append(["", "add", "Первая", "first"])
+        path = tmp_path / "export.xlsx"
+        wb.save(path)
+
+        result = run_sync("--file", str(path))
+
+        assert result.exit_code == 2, result.stdout
+        message = stats_of(result)["error"]["message"]
+        assert "Лист 'posts', строка 2" in message and "'title'" in message
+        assert fake_wp == []
+
+
+class TestValidateExcel:
+    def test_typo_found_without_credentials(self, monkeypatch, tmp_path):
+        from src.cli import tool_commands
+
+        def _no_credentials(**kwargs):
+            raise AssertionError("до credentials дойти не должно")
+
+        monkeypatch.setattr(tool_commands, "load_and_print_credentials", _no_credentials)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "posts"
+        ws.append(["id", "action", "title", "Rb_Services_Cat"])
+        ws.append(["", "add", "Первая", "X"])
+        path = tmp_path / "export.xlsx"
+        wb.save(path)
+
+        result = runner.invoke(app, ["--json", "validate", "--file", str(path)])
+
+        assert result.exit_code == 2, result.stdout
+        assert "rb_services_cat" in stats_of(result)["error"]["message"]

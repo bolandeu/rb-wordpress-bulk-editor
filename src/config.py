@@ -117,6 +117,10 @@ class SyncConfig(BaseModel):
         default=None,
         description="Фильтр колонок для отправки в API (None = все)"
     )
+    skip_checks: bool = Field(
+        default=False,
+        description="Не проверять данные перед отправкой (preflight)"
+    )
 
 
 class PathsConfig(BaseModel):
@@ -249,6 +253,10 @@ class Settings(BaseSettings):
     # Dot-путь = вложенность в WP payload: `seo.title`, `meta._yoast_wpseo_title` и т.д.
     seo_fields: str = ""
 
+    # Свои поля проекта, которые проверка перед отправкой должна считать
+    # известными (через запятую). acf.*/acf_*/meta.* проверкой не трогаются.
+    extra_fields: str = ""
+
     # Проверять SSL-сертификат WP. Для локального Docker с самоподписанным сертом: false.
     verify_ssl: bool = True
 
@@ -274,3 +282,7 @@ class Settings(BaseSettings):
     def get_seo_fields(self) -> Optional[List[str]]:
         """Список SEO dot-путей. None если не задан."""
         return self._parse_csv(self.seo_fields) or None
+
+    def get_extra_fields(self) -> List[str]:
+        """Свои известные поля проекта для проверки перед отправкой."""
+        return self._parse_csv(self.extra_fields)

@@ -24,6 +24,7 @@ from ..wordpress.taxonomies import TaxonomyCache
 from ..records import filters as record_filters_mod
 from ..records.excel import ExcelRecordSource, ExcelRecordWriter
 from ..records.json_source import JsonRecordSource, JsonRecordWriter
+from ..records.preflight import FieldRules, check_sources, raise_if_errors
 from ..records.selection import (
     dataset_names as _dataset_names,
     is_json_source,
@@ -71,6 +72,7 @@ def _build_sync_config(
     skip_existing_media: bool,
     columns: Optional[str],
     timeout: int = 30,
+    skip_checks: bool = False,
 ) -> SyncConfig:
     """Создание SyncConfig (общее для sync и async)."""
     return SyncConfig(
@@ -83,6 +85,7 @@ def _build_sync_config(
         skip_existing_media=skip_existing_media,
         timeout=timeout,
         columns_filter=parse_comma_list(columns),
+        skip_checks=skip_checks,
     )
 
 
@@ -203,8 +206,36 @@ class _JsonPlan:
         """Ничего: каждый таб сохранён сразу после обработки (own_file)."""
 
 
+def _preflight(plan, config: AppConfig, filters) -> None:
+    """
+    Проверка данных перед отправкой: ошибки останавливают прогон до
+    подключения к сайту (exit 2), предупреждения только пишутся в лог.
+
+    Проверяются только записи, которые реально пойдут в прогон: --filter и
+    --skip-tax отбрасывают свои. Медиа-наборы — своя схема полей, их не трогаем.
+    """
+    if config.sync.skip_checks:
+        logger.warning("--skip-checks: проверка данных перед отправкой отключена")
+        return
+
+    def keep(record) -> bool:
+        if config.sync.skip_tax and record.is_taxonomy:
+            return False
+        return not filters or record_filters_mod.matches(record, filters)
+
+    data_file = Path(config.paths.excel_file)
+    checks = check_sources(
+        [d.source for d in plan.datasets if d.kind != "media"],
+        FieldRules.from_settings(), base_dir=data_file.parent, keep=keep,
+    )
+    for check in checks:
+        for warning in check.warnings:
+            logger.warning(f"Проверка: {warning}")
+    raise_if_errors(data_file.name, checks)
+
+
 @contextmanager
-def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bool):
+def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bool, filters=None):
     """Открыть источник данных и составить план прогона по его наборам."""
     data_file = Path(config.paths.excel_file)
 
@@ -212,6 +243,7 @@ def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bo
         if config.sync.skip_tax:
             logger.info("--skip-tax: записи таксономий исключены из обработки")
         plan = _JsonPlan(data_file, config, sheets_filter)
+        _preflight(plan, config, filters)
         # media-наборов в JSON нет, но --delete-media действует и здесь.
         _confirm_irreversible(ctx, None, [], config, confirm)
         yield plan
@@ -226,6 +258,7 @@ def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bo
         if config.sync.skip_media:
             logger.info("--skip-media: загрузка медиа пропускается")
         logger.info(f"Листы для обработки: {plan.names}")
+        _preflight(plan, config, filters)
 
         # Подтверждение необратимых удалений — до любого запроса к сайту.
         _confirm_irreversible(ctx, reader, plan.names, config, confirm)
@@ -361,7 +394,7 @@ async def _run_sync_engine(
     }
 
     try:
-        with _open_plan(config, sheets_filter, ctx, confirm) as plan:
+        with _open_plan(config, sheets_filter, ctx, confirm, filters) as plan:
             # WordPressClient — async версия передаёт retry/circuit_breaker/timeout
             wp_kwargs = {"config": config.wordpress}
             if retry_config is not None:
@@ -560,6 +593,10 @@ def sync(
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"),
     columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    skip_checks: bool = typer.Option(
+        False, "--skip-checks",
+        help="Не проверять данные перед отправкой (имена полей, таксономий, значения)",
+    ),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
     json_output: bool = output.JsonOption,
@@ -585,8 +622,14 @@ def sync(
     сравнение точное строковое по сырому значению поля, dot-нотация работает
     как обычное имя поля (--filter acf.f1=value).
 
-    Exit-коды: 0 — успех, 2 — аргументы/структура файла, 3 — нет credentials,
-    5 — недоступен WordPress, 1 — непредвиденная ошибка.
+    Перед отправкой данные проверяются так же, как в `validate` (имена полей
+    и таксономий, id/status/slug, файлы в значениях): при ошибках прогон
+    останавливается до подключения к сайту, включая --dry-run. Отключается
+    --skip-checks.
+
+    Exit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед
+    отправкой, 3 — нет credentials, 5 — недоступен WordPress,
+    1 — непредвиденная ошибка.
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
@@ -614,6 +657,7 @@ def sync(
         skip_media=skip_media, skip_tax=skip_tax,
         no_update_excel=no_update_excel, delete_media=delete_media,
         skip_existing_media=skip_existing_media, columns=columns,
+        skip_checks=skip_checks,
     )
 
     config = AppConfig.from_excel(
@@ -684,13 +728,18 @@ def async_sync(
     skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки"),
     columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    skip_checks: bool = typer.Option(
+        False, "--skip-checks",
+        help="Не проверять данные перед отправкой (имена полей, таксономий, значения)",
+    ),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
 ):
     """
      Асинхронная синхронизация файла данных -> WordPress
 
-    Источник (.xlsx или .json), --sheets и --filter — как у sync.
+    Источник (.xlsx или .json), --sheets, --filter и проверка перед
+    отправкой (--skip-checks) — как у sync.
 
     Отличия от sync:
     - Параллельная обработка строк (Semaphore)
@@ -728,7 +777,7 @@ def async_sync(
             skip_media=skip_media, skip_tax=skip_tax,
             no_update_excel=no_update_excel, delete_media=delete_media,
             skip_existing_media=skip_existing_media, columns=columns,
-            timeout=api_timeout or 30,
+            timeout=api_timeout or 30, skip_checks=skip_checks,
         )
 
         config = AppConfig.from_excel(

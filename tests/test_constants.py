@@ -45,10 +45,19 @@ class TestIsTaxonomyColumn:
         assert is_taxonomy_column(col) is True
 
     @pytest.mark.parametrize("col", [
+        "region_term", "region-term",         # term
+        "cat_services", "tax-region",         # корень в начале
+        "rb_cat_services", "a-term-b",        # корень в середине
+    ])
+    def test_root_anywhere_between_separators(self, col):
+        assert is_taxonomy_column(col) is True
+
+    @pytest.mark.parametrize("col", [
         "title", "content", "slug", "status", "acf_price",
         "id", "action",
         "catalog",     # заканчивается на 'cat', но без разделителя
         "cat", "tag_", "taxonomy", "category_id",
+        "catalog_url", "terms_of_use",   # корень — лишь начало слова
     ])
     def test_negative_cases(self, col):
         assert is_taxonomy_column(col) is False

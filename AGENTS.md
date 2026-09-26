@@ -219,8 +219,30 @@ json в корне проекта, внутри формата приорите�
   затирать значения на сайте), `seo.robots.*` пустые → true, значение-путь →
   содержимое файла, `SYSTEM_COLUMNS` (`date`, `link`…) в API не идут.
 - **`validate` для JSON** — без credentials и сети: `JsonRecordSource.problems()`
-  (все структурные ошибки сразу) + существование значений-путей. Битая ссылка
-  у `add`/`update` — ошибка, у остальных — предупреждение.
+  (все структурные ошибки сразу) + общая проверка перед отправкой (см. ниже).
+
+### Проверка перед отправкой (preflight)
+
+`src/records/preflight.py`, одна для Excel и JSON (работает на `Record`).
+Её показывает `validate`, и она же **автоматически идёт перед `sync`/`async`**
+(`_preflight` в `sync_commands.py`, внутри `_open_plan` — до подтверждения и до
+подключения к сайту, в том числе при `--dry-run`). Ошибки → exit 2 со списком
+всех проблем, предупреждения — в лог. Отключается `--skip-checks`.
+
+- **Имена полей.** Всё, кроме `acf.*` / `acf_*` / `meta.*`, должно быть в
+  `KNOWN_FIELDS`, `DEFAULT_SEO_FIELDS`, `WP_SEO_FIELDS` или `WP_EXTRA_FIELDS`
+  (свои поля проекта). Опечатка иначе молча уходит в payload, а WordPress её
+  молча игнорирует — так в `mw.json` жил `seo.descripton`. Подсказка похожего
+  имени — `difflib`.
+- **Имена таксономий** — строчные, части через `_`/`-` (колонки и записи-термины).
+- **Значения** (только у `add`/`update`/`delete`): `id` у update/delete, `status`,
+  дубли `slug` в пределах типа, `;` без пробела в терминах, да/нет в
+  `BOOL_FIELDS_DEFAULT_TRUE`, существование значений-путей.
+- Записи `skip`/без action на сайт не уходят: их проблемы — предупреждения.
+  Отброшенные `--filter`/`--skip-tax` не проверяются вовсе.
+
+Новое поле, которое понимает маппинг, — добавить в `KNOWN_FIELDS`, иначе
+проверка начнёт блокировать sync.
 
 ### Выбор набора данных: `--sheets`
 
@@ -279,7 +301,7 @@ create-запрос — нет; отсутствующий термин возв
 | Категория | Признак | Куда идёт |
 | --- | --- | --- |
 | system | action, id, img_path, content_path, image_url, alt_text, caption | не в API |
-| taxonomy | slug из WP_TAXONOMIES / discovery / суффикс `_cat -cat _tag -tag _tax -tax` (суффикс не применяется к dot-нотации и `acf_`) | terms endpoint |
+| taxonomy | slug из WP_TAXONOMIES / discovery / часть имени `cat`/`tax`/`term`/`tag` между `_`/`-` (не применяется к dot-нотации и `acf_`) | terms endpoint |
 | acf | префикс `acf_` | ACF meta |
 | nested | содержит `.` (dot-нотация) | `build_nested_payload()` |
 | legacy seo | `seo_*` без точки | Yoast-стиль, устарело но работает |
@@ -294,8 +316,11 @@ create-запрос — нет; отсутствующий термин возв
 
 1. `WP_TAXONOMIES=slug1,slug2` в `.env` — абсолютный приоритет (override)
 2. `WordPressDiscovery` — опрос API сайта
-3. Стандартный набор (`category`, `post_tag`) + колонки/листы с суффиксом
-   `_cat -cat _tag -tag _tax -tax` (регистронезависимо)
+3. Стандартный набор (`category`, `post_tag`) + колонки/листы по соглашению:
+   имя разбито `_`/`-` на части, и одна из частей — `cat` / `tax` / `term` / `tag` (`rb_services_cat`, `cat_services`, `region-term`; не `catalog_url`). Регистр при распознавании не важен, но проверка перед
+   отправкой требует строчных. Правило одно — `constants.is_taxonomy_column`:
+   по нему и распознаёт `FieldDetector`, и проверяет `preflight`, иначе
+   проверка пропустила бы колонку, которую sync отправит как обычное поле.
 
 `ExcelReader` умеет override имён листов: лист `categories` → таксономия `category`.
 
@@ -343,7 +368,8 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 | `WP_URL` / `WP_USERNAME` / `WP_PASSWORD` | credentials |
 | `WP_VERIFY_SSL=false` | отключить SSL (локальный Docker) |
 | `WP_TAXONOMIES=cat,tag,service-cat` | override таксономий |
-| `WP_SEO_FIELDS=seo.title,...` | dot-нотация SEO полей |
+| `WP_SEO_FIELDS=seo.title,...` | dot-нотация SEO полей (и известные поля для проверки перед отправкой) |
+| `WP_EXTRA_FIELDS=my_field,...` | свои поля проекта — проверка перед отправкой считает их известными |
 | `WP_SYNC_CONCURRENCY` | параллельных запросов (async) |
 | `WP_API_TIMEOUT` / `WP_MEDIA_TIMEOUT` | таймауты httpx |
 | `WP_MAX_RETRIES` / `WP_RETRY_DELAY` | retry параметры |
