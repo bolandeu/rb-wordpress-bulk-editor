@@ -15,7 +15,8 @@ from . import app, console
 from .helpers import get_project, resolve_env_file, require_data_file
 from .common import load_and_print_credentials, parse_comma_list
 from .. import output
-from ..config import AppConfig, SyncConfig, LoggingConfig
+from ..config import AppConfig, SyncConfig, LoggingConfig, known_taxonomies
+from ..wordpress.site_schema import load_site_schema
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
 from ..exceptions import ValidationError, WPBulkEditorError
@@ -214,10 +215,13 @@ class _JsonPlan:
         """Ничего: каждый таб сохранён сразу после обработки (own_file)."""
 
 
-def _preflight(plan, config: AppConfig, filters) -> None:
+def _preflight(plan, config: AppConfig, filters, site=None) -> None:
     """
-    Проверка данных перед отправкой: ошибки останавливают прогон до
-    подключения к сайту (exit 2), предупреждения только пишутся в лог.
+    Проверка данных перед отправкой: ошибки останавливают прогон до первого
+    изменения на сайте (exit 2), предупреждения только пишутся в лог.
+
+    `site` — схема сайта (таксономии, типы, привязка): имена колонок-таксономий,
+    `type`/`taxonomy` записей сверяются с ней.
 
     Проверяются только записи, которые реально пойдут в прогон: --filter и
     --skip-tax отбрасывают свои. Медиа-наборы — своя схема полей, их не трогаем.
@@ -234,7 +238,7 @@ def _preflight(plan, config: AppConfig, filters) -> None:
     data_file = Path(config.paths.excel_file)
     checks = check_sources(
         [d.source for d in plan.datasets if d.kind != "media"],
-        FieldRules.from_settings(), base_dir=data_file.parent, keep=keep,
+        FieldRules.from_settings(site=site), base_dir=data_file.parent, keep=keep,
     )
     for check in checks:
         for warning in check.warnings:
@@ -243,22 +247,30 @@ def _preflight(plan, config: AppConfig, filters) -> None:
 
 
 @contextmanager
-def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bool, filters=None):
-    """Открыть источник данных и составить план прогона по его наборам."""
+def _open_plan(
+    config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bool, filters=None, site=None,
+):
+    """
+    Открыть источник данных и составить план прогона по его наборам.
+
+    Вызывается уже после подключения к сайту (только чтение): лист Excel
+    `rb_topic` — таксономия, только если это известно из списка сайта. Проверка
+    перед отправкой и подтверждение необратимого — здесь же, до первого
+    изменения на сайте.
+    """
     data_file = Path(config.paths.excel_file)
 
     if is_json_source(data_file):
         if config.sync.skip_tax:
             logger.info("--skip-tax: записи таксономий исключены из обработки")
         plan = _JsonPlan(data_file, config, sheets_filter)
-        _preflight(plan, config, filters)
+        _preflight(plan, config, filters, site)
         # media-наборов в JSON нет, но --delete-media действует и здесь.
         _confirm_irreversible(ctx, None, [], config, confirm)
         yield plan
         return
 
-    from ..config import Settings
-    with ExcelReader(data_file, known_taxonomies=Settings().get_taxonomies()) as reader:
+    with ExcelReader(data_file, known_taxonomies=known_taxonomies(config)) as reader:
         plan = _ExcelPlan(reader, config, sheets_filter)
 
         if config.sync.skip_tax:
@@ -266,9 +278,9 @@ def _open_plan(config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bo
         if config.sync.skip_media:
             logger.info("--skip-media: загрузка медиа пропускается")
         logger.info(f"Листы для обработки: {plan.names}")
-        _preflight(plan, config, filters)
+        _preflight(plan, config, filters, site)
 
-        # Подтверждение необратимых удалений — до любого запроса к сайту.
+        # Подтверждение необратимых удалений — до первого изменения на сайте.
         _confirm_irreversible(ctx, reader, plan.names, config, confirm)
 
         yield plan
@@ -284,6 +296,7 @@ def _taxonomies_to_cache(datasets: List[_Dataset], config: AppConfig) -> List[st
     if config.sync.skip_tax:
         return []
 
+    known = known_taxonomies(config)
     names = set()
     for dataset in datasets:
         if dataset.kind == "media":
@@ -292,7 +305,7 @@ def _taxonomies_to_cache(datasets: List[_Dataset], config: AppConfig) -> List[st
             if record.is_taxonomy:
                 names.add(record.discriminator)
             else:
-                names.update(field for field in record.data if is_taxonomy_column(field))
+                names.update(field for field in record.data if is_taxonomy_column(field, known))
     return list(names)
 
 
@@ -337,7 +350,8 @@ def _confirm_irreversible(
     Сам по себе sync обратим (перезапуск даёт тот же результат, контент
     удаляется в корзину), но два пути удаляют навсегда: media-строки с
     `action=delete` и `--delete-media` (featured-изображения). Только они и
-    требуют подтверждения — вызывается до подключения к сайту.
+    требуют подтверждения — вызывается до первого изменения на сайте (после
+    чтения схемы сайта, которое ничего не меняет).
 
     `--delete-media` не зависит от источника: featured-изображения удаляются
     из любой записи с `action=delete`, читана она из Excel или из JSON. А вот
@@ -402,19 +416,25 @@ async def _run_sync_engine(
     }
 
     try:
-        with _open_plan(config, sheets_filter, ctx, confirm, filters) as plan:
-            # WordPressClient — async версия передаёт retry/circuit_breaker/timeout
-            wp_kwargs = {"config": config.wordpress}
-            if retry_config is not None:
-                wp_kwargs["retry_config"] = retry_config
-            if circuit_breaker is not None:
-                wp_kwargs["circuit_breaker"] = circuit_breaker
-            if retry_config is not None or circuit_breaker is not None:
-                wp_kwargs["timeout"] = config.sync.timeout
+        # WordPressClient — async версия передаёт retry/circuit_breaker/timeout
+        wp_kwargs = {"config": config.wordpress}
+        if retry_config is not None:
+            wp_kwargs["retry_config"] = retry_config
+        if circuit_breaker is not None:
+            wp_kwargs["circuit_breaker"] = circuit_breaker
+        if retry_config is not None or circuit_breaker is not None:
+            wp_kwargs["timeout"] = config.sync.timeout
 
-            async with WordPressClient(**wp_kwargs) as wp_client:
-                await wp_client.test_connection()
+        async with WordPressClient(**wp_kwargs) as wp_client:
+            await wp_client.test_connection()
 
+            # Таксономии и типы записей — с сайта (только чтение), а не из
+            # списка в .env: новые таксономии подхватываются сами. Ошибка
+            # загрузки — ошибка прогона, без подмены набором по умолчанию.
+            site = await load_site_schema(wp_client)
+            config.sync.site_taxonomies = sorted(site.taxonomy_names())
+
+            with _open_plan(config, sheets_filter, ctx, confirm, filters, site) as plan:
                 # Загрузка кэша таксономий
                 logger.info("Загрузка кэша таксономий...")
                 taxonomy_cache = TaxonomyCache()

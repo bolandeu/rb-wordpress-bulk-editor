@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from src.cli import app
 from src.cli import fetch_commands, tool_commands, update_commands
+from src.exceptions import AuthenticationError
 
 runner = CliRunner()
 
@@ -98,7 +99,8 @@ def _credentials(**kwargs):
 
 
 def _no_credentials(**kwargs):
-    raise AssertionError("credentials не должны загружаться")
+    # Доступов нет — validate проверяет без сайта
+    raise AuthenticationError("нет доступов")
 
 
 @pytest.fixture
@@ -346,6 +348,75 @@ class TestValidateJson:
 
         assert result.exit_code == 2
         assert "--sheets" in payload(result)["error"]["message"]
+
+
+
+class TestValidateWithSite:
+    """Есть доступы — таксономии и типы сверяются с сайтом."""
+
+    @pytest.fixture
+    def online(self, fake_wp, monkeypatch):
+        from src.wordpress.site_schema import SiteSchema
+
+        schema = SiteSchema.from_rest(
+            {"rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]}},
+            {"rb_services": {"slug": "rb_services", "rest_base": "rb_services"}},
+        )
+        state = {"calls": 0}
+
+        async def fake_schema(wp_config):
+            state["calls"] += 1
+            return schema
+
+        monkeypatch.setattr(tool_commands, "load_and_print_credentials", _credentials)
+        monkeypatch.setattr(tool_commands, "_load_site_schema", fake_schema)
+        return state
+
+    def test_site_taxonomy_is_accepted(self, online, tmp_path):
+        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
+            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
+        ]})
+
+        result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
+
+        assert result.exit_code == 0, result.stdout
+        assert payload(result)["site_checked"] is True
+
+    def test_unknown_type_found(self, online, tmp_path):
+        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
+            {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
+        ]})
+
+        result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
+
+        assert result.exit_code == 2
+        assert "rb_services" in payload(result)["error"]["message"]
+
+    def test_offline_flag_does_not_touch_the_site(self, online, tmp_path):
+        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
+            {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
+        ]})
+
+        result = run("validate", "--file", str(path), "--sheets", SITE_TAB, "--offline")
+
+        assert result.exit_code == 0, result.stdout
+        assert payload(result)["site_checked"] is False
+        assert online["calls"] == 0
+
+    def test_site_down_is_an_error_not_a_silent_offline(self, online, monkeypatch, tmp_path):
+        from src.exceptions import NetworkError
+
+        async def down(wp_config):
+            raise NetworkError("сайт не ответил")
+
+        monkeypatch.setattr(tool_commands, "_load_site_schema", down)
+        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
+            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A"},
+        ]})
+
+        result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
+
+        assert result.exit_code == 5
 
 
 # ── Термин: fetch → правка → sync ────────────────────────────────────

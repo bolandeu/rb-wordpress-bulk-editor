@@ -42,9 +42,8 @@ class TestTaxonomiesCommand:
         assert payload["ok"] is True and payload["cli_version"]
         assert payload["taxonomies"] == ["categories", "tags", "rb_services_cat", "brand"]
         assert payload["env_line"] == "WP_TAXONOMIES=categories,tags,rb_services_cat,brand"
-        # Имя не по соглашению cat/tax/term/tag: без WP_TAXONOMIES sync не узнает
-        # в такой колонке таксономию.
-        assert payload["needs_env"] == ["brand"]
+        # sync берёт таксономии с сайта сам — отслеживать «что вписать» не нужно
+        assert "needs_env" not in payload
 
     def test_human_output_has_env_line(self, site):
         result = runner.invoke(app, ["taxonomies"])

@@ -17,8 +17,8 @@ from .helpers import (
 from .project import find_repo_root
 from .. import output
 from ..config import WordPressConfig
-from ..constants import is_taxonomy_column, normalize_action
-from ..exceptions import ValidationError
+from ..constants import normalize_action
+from ..exceptions import AuthenticationError, ValidationError
 from ..excel.reader import ExcelReader
 from ..records.excel import ExcelRecordSource
 from ..records.json_validation import check_tab
@@ -61,11 +61,16 @@ def validate(
         dir_okay=False,
         resolve_path=True
     ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Не обращаться к сайту: таксономии — по соглашению, WP_TAXONOMIES и самому файлу",
+    ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
 ):
     """
-    Проверка файла данных перед отправкой — без синхронизации и без сайта.
+    Проверка файла данных перед отправкой — без синхронизации.
 
     Та же проверка автоматически идёт перед sync/async (отключается
     --skip-checks). Сообщаются все проблемы сразу:
@@ -73,63 +78,95 @@ def validate(
     - имена полей: всё, кроме acf.* / acf_* / meta.*, — известное поле
       WordPress, SEO-поле или своё поле из WP_EXTRA_FIELDS; к опечатке
       подсказывается похожее имя (seo.descripton → seo.description);
-    - имена таксономий: встроенные (categories, tags) или с частью
-      cat / tax / term / tag через _ или - (rb_services_cat, region-term),
-      строчными; свои — в WP_TAXONOMIES;
+    - таксономии и типы — по сайту (только чтение): колонка-таксономия
+      есть на сайте и привязана к типу записи, type / taxonomy записей
+      существуют; к опечатке — похожее имя с сайта;
     - значения записей add/update/delete: id у update/delete, status,
       дубли slug, разделитель терминов "; ", да/нет в seo.robots.*,
       существование файлов в значениях-путях (acf.more = "content/1.html").
 
     Записи skip / без action на сайт не уходят: их проблемы — предупреждения.
 
-    Excel: content- и taxonomy-листы (или --sheets), затем проверка
-    credentials. JSON: --sheets обязателен, плюс структура таба (ровно одно
-    из type/taxonomy, уникальный _row_num); credentials не нужны.
+    Сайт используется, если есть доступы. Без них или с --offline
+    таксономии узнаются по соглашению (cat/tax/term/tag через _ или -),
+    WP_TAXONOMIES и самому файлу (записи-термины, листы таксономий);
+    в ответе site_checked=false.
 
-    Exit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах, 3 — нет
-    credentials (Excel), 1 — непредвиденная ошибка.
+    Exit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах,
+    3 — сайт отверг доступы, 5 — сайт недоступен (повторите с --offline),
+    1 — непредвиденная ошибка.
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_data_file(ctx, file)
-    if is_json_source(file):
-        _validate_json(ctx, file, sheets)
-        return
+    is_json = is_json_source(file)
+    # Выбор табов — вопрос к файлу: проверяется до обращения к сайту
+    tabs = require_json_tabs(file, sheets) if is_json else None
 
     options = output.get_options(ctx)
     if not options.json and not options.quiet:
         console.print(f"\n[bold blue]Валидация файла[/bold blue]: {file}\n")
 
     setup_command_logging(ctx, "validate")
+    domain, site = _site_for_validate(ctx, env_file, offline)
+    rules = FieldRules.from_settings(site=site)
 
-    # Файл проверяется до credentials: это вопрос к файлу, не к сайту
-    output.vecho(ctx, "Проверка листов...")
-    rules = FieldRules.from_settings()
-    with ExcelReader(file, known_taxonomies=rules.known_taxonomies) as reader:
-        by_type = reader.get_sheets_by_type()
-        names = dataset_names(sheets) if sheets is not None else by_type["content"] + by_type["taxonomy"]
-        checks = check_sources(
-            [ExcelRecordSource(reader, name) for name in names], rules, base_dir=file.parent,
-        )
+    by_type = None
+    if is_json:
+        checks = [check_tab(file, tab, rules) for tab in tabs]
+    else:
+        output.vecho(ctx, "Проверка листов...")
+        with ExcelReader(file, known_taxonomies=rules.taxonomies()) as reader:
+            by_type = reader.get_sheets_by_type()
+            names = dataset_names(sheets) if sheets is not None else by_type["content"] + by_type["taxonomy"]
+            checks = check_sources(
+                [ExcelRecordSource(reader, name) for name in names], rules, base_dir=file.parent,
+            )
     raise_if_errors(file.name, checks)
 
-    domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
-
     def _render(payload: dict):
+        if not payload["site_checked"]:
+            console.print("[yellow]Без сайта: таксономии и типы записей с сайтом не сверялись[/yellow]")
         _render_checks(payload["tabs"])
 
-    output.emit_success(
-        ctx,
-        {
-            "file": str(file),
-            "format": "xlsx",
-            "valid": True,
-            "domain": domain,
-            "content_sheets": list(by_type["content"]),
-            "taxonomy_sheets": list(by_type["taxonomy"]),
-            "tabs": [c.to_dict() for c in checks],
-        },
-        _render,
-    )
+    result = {
+        "file": str(file),
+        "format": "json" if is_json else "xlsx",
+        "valid": True,
+        "domain": domain,
+        "site_checked": site is not None,
+        "tabs": [c.to_dict() for c in checks],
+    }
+    if by_type is not None:
+        result["content_sheets"] = list(by_type["content"])
+        result["taxonomy_sheets"] = list(by_type["taxonomy"])
+    output.emit_success(ctx, result, _render)
+
+
+def _site_for_validate(ctx: typer.Context, env_file: Optional[Path], offline: bool):
+    """
+    Схема сайта для validate: (домен, схема) или (None, None) без сайта.
+
+    Без доступов — проверка без сайта (это нормальный режим, не ошибка).
+    Доступы есть, а сайт не ответил — ошибка: тихо проверить хуже, чем
+    обещано, нельзя; для этого есть явный --offline.
+    """
+    if offline:
+        return None, None
+    try:
+        domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
+    except AuthenticationError:
+        logger.warning("Нет доступов к сайту — проверка без сайта (таксономии по соглашению и файлу)")
+        return None, None
+    wp_config = _make_wp_config(domain, username, password)
+    return domain, asyncio.run(_load_site_schema(wp_config))
+
+
+async def _load_site_schema(wp_config: WordPressConfig):
+    from ..wordpress.site_schema import load_site_schema
+
+    async with WordPressClient(wp_config) as client:
+        await client.test_connection()
+        return await load_site_schema(client)
 
 
 def _render_checks(tabs: List[dict]) -> None:
@@ -138,23 +175,6 @@ def _render_checks(tabs: List[dict]) -> None:
         for warning in check["warnings"]:
             console.print(f"  [yellow]WARN[/yellow] {warning}")
     console.print("\n[bold green]SUCCESS! File is valid![/bold green]\n")
-
-
-def _validate_json(ctx: typer.Context, file: Path, sheets: Optional[str]) -> None:
-    """validate для JSON: все проблемы табов сразу, без credentials и сети."""
-    tabs = require_json_tabs(file, sheets)
-    rules = FieldRules.from_settings()
-    checks = [check_tab(file, tab, rules) for tab in tabs]
-    raise_if_errors(file.name, checks)
-
-    def _render(payload: dict):
-        _render_checks(payload["tabs"])
-
-    output.emit_success(
-        ctx,
-        {"file": str(file), "format": "json", "valid": True, "tabs": [c.to_dict() for c in checks]},
-        _render,
-    )
 
 
 @app.command()
@@ -1512,12 +1532,11 @@ def taxonomies(
     quiet: bool = output.QuietOption,
 ):
     """
-    Вывести список таксономий сайта в формате для копирования в .env проекта.
+    Вывести список таксономий сайта (справка).
 
-    needs_env — таксономии, имена которых не подходят под соглашение
-    (часть имени cat/tax/term/tag через _ или -): без WP_TAXONOMIES sync не
-    узнает в такой колонке таксономию, а проверка перед отправкой сочтёт её
-    неизвестным полем.
+    sync/async/validate берут таксономии с сайта сами — вписывать их в
+    WP_TAXONOMIES не нужно. env_line — для ручного исключения или для
+    проверки без сайта (validate --offline).
 
     Пример:
         wp-bulk --project mysite taxonomies
@@ -1538,13 +1557,8 @@ def taxonomies(
         if not payload["taxonomies"]:
             console.print("[yellow]Таксономии не обнаружены.[/yellow]\n")
             return
-        console.print("\n[dim]# Скопируй в .env проекта:[/dim]")
+        console.print("\n[dim]# Таксономии сайта (sync берёт их с сайта сам):[/dim]")
         console.print(payload["env_line"])
-        if payload["needs_env"]:
-            console.print(
-                f"[dim]# Не по соглашению cat/tax/term/tag — без WP_TAXONOMIES не распознаются: "
-                f"{', '.join(payload['needs_env'])}[/dim]"
-            )
         console.print()
 
     output.emit_success(
@@ -1553,7 +1567,6 @@ def taxonomies(
             "domain": domain,
             "taxonomies": slugs,
             "env_line": f"WP_TAXONOMIES={','.join(slugs)}" if slugs else None,
-            "needs_env": [slug for slug in slugs if not is_taxonomy_column(slug)],
         },
         _render,
     )

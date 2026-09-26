@@ -121,6 +121,10 @@ class SyncConfig(BaseModel):
         default=False,
         description="Не проверять данные перед отправкой (preflight)"
     )
+    site_taxonomies: List[str] = Field(
+        default_factory=list,
+        description="Таксономии сайта (slug и REST-имена) — заполняет прогон после подключения"
+    )
 
 
 class PathsConfig(BaseModel):
@@ -286,3 +290,13 @@ class Settings(BaseSettings):
     def get_extra_fields(self) -> List[str]:
         """Свои известные поля проекта для проверки перед отправкой."""
         return self._parse_csv(self.extra_fields)
+
+
+def known_taxonomies(config: "AppConfig") -> Optional[List[str]]:
+    """
+    Имена таксономий для распознавания колонок в прогоне: WP_TAXONOMIES из .env
+    плюс список сайта, полученный после подключения. None — нет ни одного
+    (тогда работает только соглашение об именах cat/tax/term/tag).
+    """
+    names = set(Settings().get_taxonomies() or ()) | set(config.sync.site_taxonomies)
+    return sorted(names) or None

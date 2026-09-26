@@ -22,9 +22,9 @@
 
 import difflib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from ..constants import (
     ACF_PREFIX,
@@ -39,6 +39,9 @@ from ..exceptions import ValidationError
 from ..mappers.value_converter import FALSY_STRINGS
 from ..utils.file_values import FileValueResolver
 from .base import Record, is_blank
+
+if TYPE_CHECKING:
+    from ..wordpress.site_schema import SiteSchema
 
 # Поля WordPress (контент и термины), которые понимает маппинг
 KNOWN_FIELDS = frozenset(SYSTEM_COLUMNS) | {
@@ -85,13 +88,24 @@ MAX_LISTED_ERRORS = 20
 
 @dataclass
 class FieldRules:
-    """Что считается известным: таксономии, SEO-поля и свои поля проекта."""
+    """
+    Что считается известным: таксономии, SEO-поля и свои поля проекта.
+
+    Attributes:
+        known_taxonomies: WP_TAXONOMIES — ручные исключения.
+        site: Схема сайта (таксономии, типы, привязка). None — проверка без
+            сайта: таксономии узнаются по соглашению об именах, WP_TAXONOMIES
+            и по самому файлу (записи-термины с `taxonomy`).
+        declared: Таксономии, объявленные в файле записями-терминами.
+    """
     known_taxonomies: Optional[List[str]] = None
     seo_fields: Iterable[str] = ()
     extra_fields: Iterable[str] = ()
+    site: Optional["SiteSchema"] = None
+    declared: frozenset = frozenset()
 
     @classmethod
-    def from_settings(cls, settings: Any = None) -> "FieldRules":
+    def from_settings(cls, settings: Any = None, site: Optional["SiteSchema"] = None) -> "FieldRules":
         """Правила из .env проекта: WP_TAXONOMIES, WP_SEO_FIELDS, WP_EXTRA_FIELDS."""
         if settings is None:
             from ..config import Settings
@@ -100,7 +114,18 @@ class FieldRules:
             known_taxonomies=settings.get_taxonomies(),
             seo_fields=settings.get_seo_fields() or (),
             extra_fields=settings.get_extra_fields(),
+            site=site,
         )
+
+    def with_declared(self, names: Iterable[str]) -> "FieldRules":
+        return replace(self, declared=self.declared | frozenset(names))
+
+    def taxonomies(self) -> Optional[List[str]]:
+        """Все известные имена таксономий: .env, сайт, файл (None — нет ни одного)."""
+        names = set(self.known_taxonomies or ()) | set(self.declared)
+        if self.site is not None:
+            names |= self.site.taxonomy_names()
+        return sorted(names) or None
 
     def known_names(self) -> Set[str]:
         return set(KNOWN_FIELDS) | set(DEFAULT_SEO_FIELDS) | set(self.seo_fields) | set(self.extra_fields)
@@ -143,6 +168,10 @@ def check_records(
     """
     where = where or _default_where(name)
     result = TabCheck(tab=name, records=len(records))
+    rules = rules.with_declared(r.discriminator for r in records if r.is_taxonomy)
+    taxonomies = rules.taxonomies()
+    # Сверка с сайтом: сообщение → (места, блокирует ли отправку)
+    site_problems: Dict[str, Tuple[List[str], bool]] = {}
     known = rules.known_names()
     resolver = FileValueResolver(base_dir) if base_dir else None
 
@@ -169,6 +198,12 @@ def check_records(
             problem = _taxonomy_name_problem(record.discriminator)
             if problem:
                 result.errors.append(f"{place}: таксономия записи {problem}")
+
+        if rules.site is not None:
+            for problem, blocking in _site_problems(record, rules.site, taxonomies, sending, acting):
+                places, was_blocking = site_problems.get(problem, ([], False))
+                places.append(place)
+                site_problems[problem] = (places, was_blocking or blocking)
 
         if acting:
             result.errors.extend(f"{place}: {p}" for p in _value_problems(record, action, rules))
@@ -197,6 +232,12 @@ def check_records(
                 f"({', '.join(places)}) — вторая перезапишет первую"
             )
 
+    for problem, (places, blocking) in site_problems.items():
+        if blocking:
+            result.errors.append(f"{places[0]}: {problem}{_more(places)}")
+        else:
+            result.warnings.append(f"{places[0]}: {problem}{_more(places)} (на сайт не уйдёт)")
+
     for name_, places in sending_fields.items():
         problem = _field_name_problem(name_, known, rules)
         if problem:
@@ -209,6 +250,53 @@ def check_records(
             result.warnings.append(f"{places[0]}: {problem}{_more(places)} (на сайт не уйдёт)")
 
     return result
+
+
+def _site_problems(
+    record: Record,
+    site: "SiteSchema",
+    taxonomies: Optional[List[str]],
+    sending: bool,
+    acting: bool,
+) -> List[Tuple[str, bool]]:
+    """Расхождения записи с сайтом: (сообщение, блокирует ли отправку)."""
+    problems: List[Tuple[str, bool]] = []
+    discriminator = record.discriminator
+
+    if record.is_taxonomy:
+        if not site.taxonomy(discriminator):
+            problems.append((
+                f"таксономии '{discriminator}' на сайте нет{_hint(site.closest_taxonomy(discriminator))}",
+                acting,
+            ))
+        return problems
+
+    type_known = site.has_type(discriminator)
+    if not type_known:
+        problems.append((
+            f"типа записи '{discriminator}' на сайте нет{_hint(site.closest_type(discriminator))}",
+            acting,
+        ))
+
+    for name, value in record.data.items():
+        if name.startswith(FREE_PREFIXES) or not is_taxonomy_column(name, taxonomies):
+            continue
+        if not site.taxonomy(name):
+            problems.append((
+                f"колонка '{name}': таксономии '{name}' на сайте нет"
+                f"{_hint(site.closest_taxonomy(name))}",
+                sending,
+            ))
+        elif type_known and not is_blank(value) and not site.is_attached(discriminator, name):
+            problems.append((
+                f"таксономия '{name}' не привязана к типу '{discriminator}' — WordPress проигнорирует поле",
+                sending,
+            ))
+    return problems
+
+
+def _hint(suggestion: Optional[str]) -> str:
+    return f" — может, '{suggestion}'?" if suggestion else ""
 
 
 def _more(places: List[str]) -> str:
@@ -226,7 +314,7 @@ def _field_name_problem(name: str, known: Set[str], rules: FieldRules) -> Option
     """Проблема с именем поля (None — имя в порядке)."""
     if name.startswith(FREE_PREFIXES) or name in known:
         return None
-    if is_taxonomy_column(name, rules.known_taxonomies):
+    if is_taxonomy_column(name, rules.taxonomies()):
         problem = _taxonomy_name_problem(name)
         return f"колонка таксономии {problem}" if problem else None
 
@@ -264,7 +352,7 @@ def _value_problems(record: Record, action: str, rules: FieldRules) -> List[str]
         elif (
             isinstance(value, str)
             and not name.startswith(FREE_PREFIXES)
-            and is_taxonomy_column(name, rules.known_taxonomies)
+            and is_taxonomy_column(name, rules.taxonomies())
             and _BAD_TERM_DELIMITER.search(value)
         ):
             problems.append(
@@ -291,7 +379,7 @@ def _value_warnings(record: Record, action: str, rules: FieldRules) -> List[str]
             if (
                 isinstance(value, str)
                 and not name.startswith(FREE_PREFIXES)
-                and is_taxonomy_column(name, rules.known_taxonomies)
+                and is_taxonomy_column(name, rules.taxonomies())
                 and "," in value
             ):
                 warnings.append(
@@ -316,11 +404,18 @@ def check_sources(
         keep: Отбор записей, которые реально пойдут в прогон (--filter,
             --skip-tax): отброшенные не проверяются.
     """
+    read = [(source, list(source.read())) for source in sources]
+    # Таксономии, объявленные файлом (записи-термины, листы таксономий Excel),
+    # действуют на все наборы: лист `rb_topic` делает таксономией колонку
+    # `rb_topic` на листе `rb_services`.
+    rules = rules.with_declared(
+        r.discriminator for _, records in read for r in records if r.is_taxonomy
+    )
     checks = []
-    for source in sources:
+    for source, records in read:
         name = getattr(source, "sheet_name", None) or getattr(source, "tab_name")
-        records = [r for r in source.read() if keep is None or keep(r)]
-        checks.append(check_records(name, records, rules, base_dir=base_dir, where=source.where))
+        kept = [r for r in records if keep is None or keep(r)]
+        checks.append(check_records(name, kept, rules, base_dir=base_dir, where=source.where))
     return checks
 
 

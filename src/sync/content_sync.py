@@ -45,11 +45,11 @@ class ContentSync(ContentSyncBase):
         media_endpoint = self._make_media_endpoint()
 
         # Создаем mapper и content processor
-        from ..config import Settings
+        from ..config import known_taxonomies
         mapper = ContentMapper(
             collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
-            known_taxonomies=Settings().get_taxonomies(),
+            known_taxonomies=known_taxonomies(self.config),
             file_resolver=FileValueResolver(self.config.paths.excel_file.parent),
         )
         content_processor = ContentProcessor(self.config.paths.content_folder)

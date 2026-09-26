@@ -23,6 +23,24 @@ runner = CliRunner()
 
 # ── Фейковый WordPress ───────────────────────────────────────────────
 
+# Таксономии и типы сайта: sync берёт их из REST API, а не из .env
+SITE_SCHEMA = {
+    "/wp-json/wp/v2/taxonomies": {
+        "category": {"slug": "category", "rest_base": "categories", "types": ["post"]},
+        "post_tag": {"slug": "post_tag", "rest_base": "tags", "types": ["post"]},
+        "rb_services_cat": {
+            "slug": "rb_services_cat", "rest_base": "rb_services_cat", "types": ["rb_services"],
+        },
+        "rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]},
+    },
+    "/wp-json/wp/v2/types": {
+        "post": {"slug": "post", "rest_base": "posts"},
+        "page": {"slug": "page", "rest_base": "pages"},
+        "rb_services": {"slug": "rb_services", "rest_base": "rb_services"},
+    },
+}
+
+
 class FakeWordPressClient:
     """Минимальный клиент: списки пустые, создание выдаёт новый id."""
 
@@ -45,7 +63,11 @@ class FakeWordPressClient:
 
     async def get(self, endpoint, params=None):
         self.requests.append(("GET", endpoint, params))
-        return []
+        return SITE_SCHEMA.get(endpoint, [])
+
+    def writes(self):
+        """Запросы, меняющие сайт (всё, кроме GET)."""
+        return [r for r in self.requests if r[0] != "GET"]
 
     async def post(self, endpoint, data=None):
         self.requests.append(("POST", endpoint, data))
@@ -371,8 +393,8 @@ class TestTabSelection:
         message = json.loads(result.stdout.strip())["error"]["message"]
         assert "options" in message
         assert "type" in message and "taxonomy" in message
-        # До сайта дело не дошло.
-        assert fake_wp == []
+        # На сайте ничего не изменилось: было только чтение схемы.
+        assert fake_wp[0].writes() == []
 
     def test_several_tabs_in_one_run(self, fake_wp, json_project):
         document = json.loads(json_project.read_text(encoding="utf-8"))
@@ -468,8 +490,8 @@ class TestDeleteMediaGate:
         assert result.exit_code == 2
         payload = json.loads(result.stdout.strip())
         assert "--delete-media" in payload["error"]["message"]
-        # До сайта дело не дошло: гейт срабатывает до подключения.
-        assert fake_wp == []
+        # Гейт срабатывает до первого изменения на сайте (чтение схемы — не изменение).
+        assert fake_wp[0].writes() == []
 
     def test_json_delete_media_with_confirm_proceeds(self, fake_wp, json_project):
         result = runner.invoke(app, [
@@ -551,7 +573,7 @@ class TestAntagorStyleRecords:
 # ── Проверка перед отправкой ─────────────────────────────────────────
 
 class TestPreflight:
-    def test_typo_in_field_blocks_sync_before_any_request(self, fake_wp, tmp_path):
+    def test_typo_in_field_blocks_sync_before_any_write(self, fake_wp, tmp_path):
         path = write_json_tab(tmp_path, [
             {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
         ])
@@ -562,7 +584,7 @@ class TestPreflight:
         assert result.exit_code == 2, result.stdout
         message = stats_of(result)["error"]["message"]
         assert "seo.descripton" in message and "seo.description" in message
-        assert fake_wp == []  # к сайту даже не подключались
+        assert fake_wp[0].writes() == []  # только чтение схемы сайта
         assert path.read_text(encoding="utf-8") == before
 
     def test_dry_run_is_blocked_too(self, fake_wp, tmp_path):
@@ -609,15 +631,58 @@ class TestPreflight:
         assert result.exit_code == 2, result.stdout
         message = stats_of(result)["error"]["message"]
         assert "Лист 'posts', строка 2" in message and "'title'" in message
-        assert fake_wp == []
+        assert fake_wp[0].writes() == []
+
+
+class TestSiteTaxonomies:
+    """Таксономии берутся с сайта: WP_TAXONOMIES для них не нужен."""
+
+    def test_site_taxonomy_column_is_synced_as_taxonomy(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 0, result.stdout
+        client = fake_wp[0]
+        # Термин создан в таксономии, а поле не ушло в payload строкой.
+        assert [d["name"] for d in client.created("rb_topic")] == ["Логистика"]
+        assert client.created("rb_services")[0].get("rb_topic") != "Логистика"
+
+    def test_taxonomy_typo_blocks_with_suggestion(self, fake_wp, tmp_path):
+        path = write_json_tab(tmp_path, [
+            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_servces_cat": "X"},
+        ])
+
+        result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 2
+        message = stats_of(result)["error"]["message"]
+        assert "rb_servces_cat" in message and "rb_services_cat" in message
+        assert fake_wp[0].writes() == []
+
+    def test_schema_failure_stops_the_run(self, fake_wp, json_project, monkeypatch):
+        from src.exceptions import NetworkError
+
+        async def broken(client):
+            raise NetworkError("сайт не ответил")
+
+        monkeypatch.setattr(sync_commands, "load_site_schema", broken)
+
+        result = run_sync("--file", str(json_project), "--sheets", CONTENT_TAB)
+
+        assert result.exit_code == 5
+        assert fake_wp[0].writes() == []
 
 
 class TestValidateExcel:
     def test_typo_found_without_credentials(self, monkeypatch, tmp_path):
         from src.cli import tool_commands
+        from src.exceptions import AuthenticationError
 
         def _no_credentials(**kwargs):
-            raise AssertionError("до credentials дойти не должно")
+            raise AuthenticationError("нет доступов")
 
         monkeypatch.setattr(tool_commands, "load_and_print_credentials", _no_credentials)
         wb = Workbook()

@@ -211,3 +211,89 @@ def test_location_uses_custom_label():
     )
 
     assert "строка 2" in result.errors[0]
+
+
+# ── Сверка с сайтом ──────────────────────────────────────────────────
+
+from src.wordpress.site_schema import SiteSchema  # noqa: E402
+
+SITE = SiteSchema.from_rest(
+    {
+        "category": {"slug": "category", "rest_base": "categories", "types": ["post"]},
+        "rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]},
+        "rb_services_cat": {
+            "slug": "rb_services_cat", "rest_base": "rb_services_cat", "types": ["rb_services"],
+        },
+    },
+    {
+        "post": {"slug": "post", "rest_base": "posts"},
+        "rb_services": {"slug": "rb_services", "rest_base": "rb_services"},
+    },
+)
+ONLINE = FieldRules(site=SITE)
+
+
+def service(write_key=2, **data):
+    return post(write_key, discriminator="rb_services", **data)
+
+
+class TestSiteChecks:
+    def test_site_taxonomy_without_convention_is_known(self):
+        """rb_topic не подходит под cat/tax/term/tag, но на сайте есть — WP_TAXONOMIES не нужен."""
+        assert check(service(action="add", title="A", rb_topic="Логистика"), rules=ONLINE).errors == []
+
+    def test_same_column_without_site_is_unknown_field(self):
+        assert check(service(action="add", title="A", rb_topic="Логистика")).errors
+
+    def test_taxonomy_missing_on_site_is_error_with_suggestion(self):
+        result = check(service(action="add", title="A", rb_servces_cat="X"), rules=ONLINE)
+
+        assert len(result.errors) == 1
+        assert "на сайте нет" in result.errors[0] and "rb_services_cat" in result.errors[0]
+
+    def test_taxonomy_not_attached_to_type_is_error(self):
+        result = check(service(action="add", title="A", categories="Новости"), rules=ONLINE)
+
+        assert len(result.errors) == 1
+        assert "не привязана" in result.errors[0] and "rb_services" in result.errors[0]
+
+    def test_blank_value_of_foreign_taxonomy_is_fine(self):
+        """В общем табе у записи чужого типа колонка есть, но пустая — на сайт не уходит."""
+        assert check(service(action="add", title="A", categories=""), rules=ONLINE).errors == []
+
+    def test_attachment_reported_once_per_type(self):
+        records = [service(n, action="add", title=f"A{n}", categories="X") for n in range(2, 6)]
+        result = check(*records, rules=ONLINE)
+
+        assert len(result.errors) == 1 and "всего 4" in result.errors[0]
+
+    def test_term_record_taxonomy_missing_on_site(self):
+        result = check(term(action="add", discriminator="rb_servces_cat", name="X"), rules=ONLINE)
+
+        assert len(result.errors) == 1 and "rb_services_cat" in result.errors[0]
+
+    def test_term_record_taxonomy_by_rest_name(self):
+        assert check(term(action="add", discriminator="categories", name="X"), rules=ONLINE).errors == []
+
+    def test_content_type_missing_on_site(self):
+        result = check(post(discriminator="rb_servces", action="add", title="A"), rules=ONLINE)
+
+        assert len(result.errors) == 1
+        assert "rb_servces" in result.errors[0] and "rb_services" in result.errors[0]
+
+    def test_problems_on_skip_records_are_warnings(self):
+        result = check(service(action="skip", id=1, rb_servces_cat="X"), rules=ONLINE)
+
+        assert result.errors == []
+        assert result.warnings
+
+
+class TestOfflineTaxonomiesFromFile:
+    def test_term_records_declare_taxonomy_for_columns(self):
+        """Без сайта: раз в файле есть термины rb_topic, колонка rb_topic — таксономия."""
+        result = check(
+            term(2, action="skip", discriminator="rb_topic", name="Логистика"),
+            service(3, action="add", title="A", rb_topic="Логистика"),
+        )
+
+        assert result.errors == []
