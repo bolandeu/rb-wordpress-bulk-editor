@@ -85,8 +85,8 @@ data/**
 !data/**/
 !data/**/.gitkeep
 
+# Сервис-аккаунт Google — общий, в ~/Projects/credentials, не в репозитории
 /credentials*
-!/credentials/.gitkeep
 
 projects/*
 !projects/.gitkeep
