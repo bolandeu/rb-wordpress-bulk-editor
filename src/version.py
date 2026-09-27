@@ -12,6 +12,12 @@ from typing import Optional
 # importlib.metadata и подсказки `uv tool upgrade`. Команда остаётся `wp-bulk`.
 PACKAGE_NAME = "rb-wordpress-bulk-editor"
 
+# Прежнее имя дистрибутива. Editable-установка `uv tool install -e` под ним
+# исполняет этот же код из рабочего дерева; без запасного имени `cli_version`
+# стал бы null, и antagor отказал бы как «wp-bulk старее 1.1.0». Убрать, когда
+# на машинах не останется установок под старым именем.
+_LEGACY_PACKAGE_NAMES = ("wp-bulk-editor",)
+
 
 def installed_version() -> Optional[str]:
     """
@@ -20,7 +26,9 @@ def installed_version() -> Optional[str]:
     Голый запуск из репозитория (пакет не установлен) версии не имеет —
     проверку совместимости в этом случае пропускаем, а не проваливаем.
     """
-    try:
-        return metadata.version(PACKAGE_NAME)
-    except metadata.PackageNotFoundError:
-        return None
+    for name in (PACKAGE_NAME, *_LEGACY_PACKAGE_NAMES):
+        try:
+            return metadata.version(name)
+        except metadata.PackageNotFoundError:
+            continue
+    return None

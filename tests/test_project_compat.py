@@ -110,3 +110,18 @@ class TestCliEnforcement:
         payload = json.loads(result.stdout.strip())
         compat = next(c for c in payload["checks"] if c["name"] == "cli_compat")
         assert compat["status"] == "ok"
+
+
+def test_installed_version_falls_back_to_legacy_dist_name(monkeypatch):
+    """Editable-установка под старым именем wp-bulk-editor всё ещё сообщает версию."""
+    from importlib import metadata
+
+    from src import version as version_module
+
+    def fake_version(name):
+        if name == "wp-bulk-editor":
+            return "1.7.1"
+        raise metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(version_module.metadata, "version", fake_version)
+    assert version_module.installed_version() == "1.7.1"

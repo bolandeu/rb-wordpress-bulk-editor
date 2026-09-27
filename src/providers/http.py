@@ -20,7 +20,6 @@
 `transport` — тестовый шов для `httpx.MockTransport`; в боевом коде None.
 """
 
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Callable, Dict, Optional, cast
 
 import httpx
@@ -34,6 +33,7 @@ from ..exceptions import (
     WordPressError,
 )
 from ..utils.retry import CircuitBreaker, RetryConfig, async_retry
+from ..version import installed_version
 
 # Статусы, которые значат «не сейчас», а не «нет» — их имеет смысл повторить.
 RETRY_STATUSES = frozenset({429, 502, 503, 504})
@@ -43,10 +43,7 @@ DEFAULT_TIMEOUT = 30.0
 
 def _user_agent() -> str:
     """User-Agent вида `wp-bulk/<version>`."""
-    try:
-        return f"wp-bulk/{version('rb-wordpress-bulk-editor')}"
-    except PackageNotFoundError:
-        return "wp-bulk/dev"
+    return f"wp-bulk/{installed_version() or 'dev'}"
 
 
 class HttpProvider:
