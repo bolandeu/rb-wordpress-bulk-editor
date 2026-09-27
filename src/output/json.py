@@ -32,3 +32,8 @@ def emit_success(data: Dict[str, Any]) -> None:
 def emit_error(error: WPBulkEditorError) -> None:
     """Конверт ошибки: {"ok": false, "error": {...}}."""
     _dump({"ok": False, "error": error.to_dict(), "cli_version": installed_version()})
+
+
+def emit_report(data: Dict[str, Any], error: WPBulkEditorError) -> None:
+    """Отчёт с проблемой: {"ok": false, "error": {...}, ...data} — данные при ошибке тоже нужны."""
+    _dump({"ok": False, "error": error.to_dict(), **data, "cli_version": installed_version()})

@@ -177,3 +177,18 @@ class CredentialStoreUnavailable(WPBulkEditorError):
         "Передайте credentials через переменные окружения "
         "(WP_API_USER / WP_API_TOKEN) вместо keychain."
     )
+
+
+class CredentialsUnhealthy(WPBulkEditorError):
+    """`auth status`: обязательный доступ не в порядке или любой неверен/просрочен (стандарт §8)"""
+
+    code = "CREDENTIALS_UNHEALTHY"
+    exit_code = 3
+
+    def __init__(self, problems: Dict[str, str]) -> None:
+        listed = ", ".join(f"{provider} ({status})" for provider, status in problems.items())
+        super().__init__(
+            f"Доступы требуют внимания ({len(problems)}): {listed}.",
+            action="Смотрите `message` каждой записи; сохранить доступ сайта — "
+            "'wp-bulk auth login --provider wp:<домен>'.",
+        )

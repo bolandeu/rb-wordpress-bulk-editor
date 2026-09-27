@@ -7,6 +7,7 @@ Basic Auth из credentials, `verify_ssl` из конфига, multipart-заг�
 """
 
 import base64
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 import httpx
@@ -15,6 +16,48 @@ from loguru import logger
 from ..config import WordPressConfig
 from ..utils.retry import CircuitBreaker, RetryConfig
 from .http import HttpProvider
+
+
+# Предел проверки доступа для `auth status --check` (стандарт §8): один запрос, без повторов.
+CHECK_TIMEOUT = 10.0
+
+
+@dataclass(frozen=True)
+class Health:
+    """Итог проверки доступа. Значений credentials в `message` не бывает."""
+
+    status: str = "ok"  # ok | invalid | unreachable
+    message: Optional[str] = None
+
+
+def check_credentials(config: WordPressConfig, transport: Optional[httpx.BaseTransport] = None) -> Health:
+    """
+    Один дешёвый read-only запрос, доказывающий, что логин и пароль приложения работают.
+
+    `GET /wp-json/wp/v2/users/me` с Basic Auth: 401/403 — `invalid`; сеть,
+    таймаут (10 с), 5xx и 429 — `unreachable`. Без ретраев и circuit breaker
+    обычного клиента: у проверки жёсткий предел, а не «добиться ответа».
+    """
+    auth = base64.b64encode(f"{config.username}:{config.password}".encode("utf-8")).decode("ascii")
+    try:
+        with httpx.Client(
+            base_url=config.url, verify=config.verify_ssl, timeout=CHECK_TIMEOUT, transport=transport
+        ) as client:
+            response = client.get("/wp-json/wp/v2/users/me", headers={"Authorization": f"Basic {auth}"})
+    except httpx.HTTPError as e:
+        return Health("unreachable", f"{type(e).__name__}: {e}")
+    if response.status_code in (401, 403):
+        return Health("invalid", f"сайт отклонил доступ (HTTP {response.status_code})")
+    if response.status_code == 429:
+        return Health("unreachable", "лимит запросов (HTTP 429), повторите позже")
+    if response.status_code >= 400:
+        return Health("unreachable", f"HTTP {response.status_code} от /wp-json/wp/v2/users/me")
+    try:
+        user = response.json()
+    except ValueError:
+        return Health("unreachable", "ответ /wp-json/wp/v2/users/me — не JSON (REST API выключен?)")
+    name = user.get("slug") or user.get("name") if isinstance(user, dict) else None
+    return Health("ok", f"вход как {name}" if name else None)
 
 
 class WordPressHttpProvider(HttpProvider):

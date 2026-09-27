@@ -30,8 +30,10 @@ __all__ = [
     "VerboseOption",
     "configure_logging",
     "emit_error",
+    "emit_report",
     "emit_success",
     "get_options",
+    "group",
     "guard",
     "help_if_no_command",
     "human",
@@ -54,6 +56,9 @@ ConfirmOption = typer.Option(
 )
 
 _META_KEY = "wp_bulk.output"
+
+# Имя команды: `{cli}` в `Example:`-строках docstring'ов (= --help) заменяется им.
+CLI_NAME = "wp-bulk"
 
 # Имена параметров команды → поля OutputOptions.
 _LOCAL_FLAGS = {
@@ -142,6 +147,31 @@ def emit_success(
         render_human(payload)
 
 
+def emit_report(
+    ctx: Optional[typer.Context],
+    payload: Dict[str, Any],
+    render_human: Callable[[Dict[str, Any]], None],
+    problem: Optional[WPBulkEditorError],
+) -> None:
+    """
+    Отчёт, который остаётся данными, даже если нашёл проблему (`auth status`).
+
+    Без проблемы — ровно `emit_success`. С проблемой — весь payload плюс
+    `ok: false` и стандартный объект `error`, выход с exit-кодом проблемы.
+    """
+    if problem is None:
+        emit_success(ctx, payload, render_human)
+        return
+    options = get_options(ctx)
+    if options.json:
+        json_output.emit_report(payload, problem)
+    else:
+        if not options.quiet:
+            render_human(payload)
+        human.error(problem.message, problem.action or "")
+    raise typer.Exit(code=problem.exit_code)
+
+
 def emit_error(ctx: Optional[typer.Context], error: WPBulkEditorError) -> None:
     """Ошибка: JSON-конверт или строка в stderr. Всегда завершает команду."""
     if get_options(ctx).json:
@@ -204,6 +234,17 @@ def help_if_no_command(ctx: typer.Context) -> None:
     raise typer.Exit()
 
 
+def group(help_text: str) -> typer.Typer:
+    """Группа команд (`wp-bulk auth ...`): голая группа печатает справку с exit 0."""
+    app = typer.Typer(help=help_text)
+
+    @app.callback(invoke_without_command=True)
+    def _default(ctx: typer.Context) -> None:
+        help_if_no_command(ctx)
+
+    return app
+
+
 def guard(func: Callable) -> Callable:
     """
     Обернуть команду: любая ошибка уходит через `emit_error` с нужным exit-кодом.
@@ -248,4 +289,6 @@ def guard(func: Callable) -> Callable:
                 ),
             )
 
+    # Docstring — это --help; `{cli}` в строках `Example:` становится именем команды.
+    wrapper.__doc__ = (func.__doc__ or "").replace("{cli}", CLI_NAME) or None
     return wrapper

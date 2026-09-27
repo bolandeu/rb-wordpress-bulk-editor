@@ -106,6 +106,49 @@ def get_credential(
     return merged or None
 
 
+# Индекс сохранённых доменов: keyring не умеет перечислять свои записи, а
+# `auth status` обязан показать каждую сохранённую цель (стандарт §8).
+_INDEX_USER = "__stored_credentials__"
+
+
+def keychain_service(provider: str) -> str:
+    """Имя сервиса keychain, под которым лежит credential сайта (для `source_ref`)."""
+    return _service_name(provider)
+
+
+def stored_names() -> List[str]:
+    """Домены, чьи credentials сохранены в keychain через `store_credential`."""
+    try:
+        raw = keyring.get_password(_SERVICE_PREFIX, _INDEX_USER)
+    except keyring.errors.KeyringError:
+        return []
+    try:
+        names = json.loads(raw) if raw else []
+    except ValueError:
+        return []
+    return sorted(str(n) for n in names) if isinstance(names, list) else []
+
+
+def stored_fields(provider: str) -> Dict[str, str]:
+    """Поля, сохранённые в keychain для провайдера (без переменных окружения)."""
+    try:
+        raw = keyring.get_password(_service_name(provider), provider)
+    except keyring.errors.KeyringError:
+        return {}
+    return json.loads(raw) if raw else {}
+
+
+def _update_index(provider: str, present: bool) -> None:
+    names = set(stored_names())
+    if (provider in names) == present:
+        return
+    names = names | {provider} if present else names - {provider}
+    try:
+        keyring.set_password(_SERVICE_PREFIX, _INDEX_USER, json.dumps(sorted(names)))
+    except keyring.errors.KeyringError as e:
+        logger.warning(f"Не удалось обновить индекс сохранённых credentials ({e})")
+
+
 def store_backend() -> Optional[str]:
     """
     Имя активного backend'а keyring или None, если пригодного нет.
@@ -127,6 +170,7 @@ def store_credential(provider: str, fields: Dict[str, str]) -> None:
         raise CredentialStoreUnavailable(
             f"Не удалось записать credentials для '{provider}' в OS keychain: {e}"
         )
+    _update_index(provider, present=True)
     logger.debug(f"Credentials сохранены в keychain для {provider}: {sorted(fields)}")
 
 
@@ -140,3 +184,4 @@ def delete_credential(provider: str) -> None:
         raise CredentialStoreUnavailable(
             f"Не удалось удалить credentials для '{provider}' из OS keychain: {e}"
         )
+    _update_index(provider, present=False)

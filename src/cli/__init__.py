@@ -9,6 +9,7 @@ CLI интерфейс для WordPress Bulk Editor
 - doctor_commands.py  - doctor (диагностика окружения)
 - image_commands.py   - image-crop, image-compress, image-convert
 - media_commands.py   - media-upload (файлы с диска → медиатека, id вложений)
+- auth_commands.py    - auth status|login|logout (здоровье и хранение доступов)
 """
 
 import sys
@@ -129,6 +130,7 @@ from . import doctor_commands  # noqa: E402, F401
 from . import image_commands  # noqa: E402, F401
 from . import vlook_commands  # noqa: E402, F401
 from . import media_commands  # noqa: E402, F401
+from . import auth_commands  # noqa: E402, F401
 
 
 def main():
