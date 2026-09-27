@@ -504,24 +504,12 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 **`cli_version` в каждом JSON-конверте** (успех и ошибка) — кладёт
 `src/output/json.py`, не команды: вызывающий (antagor) пишет в журнал, чем сделан
 результат. Версию читает `src/version.py` из метаданных пакета — у editable-установки
-они фиксируются при установке, поэтому после смены `version` в `pyproject.toml`
-переустановить tool. Что с какой версии (для `WP_BULK_MIN_VERSION` вызывающего):
+они фиксируются при установке, поэтому после нового тега переустановить tool. Что с какой версии (для `WP_BULK_MIN_VERSION` вызывающего) — в `CHANGELOG.md`.
 
-| Версия | Что появилось |
-| --- | --- |
-| 1.1.0 | JSON-обмен: `update`/`fetch`/`validate` для JSON, `cli_version` в конверте |
-| 1.2.0 | Проверка перед отправкой (`validate`, автоматически в `sync`/`async`, `--skip-checks`, `WP_EXTRA_FIELDS`); таксономия — по части имени `cat`/`tax`/`term`/`tag` |
-| 1.3.0 | `async` отдаёт тот же JSON-конверт, что `sync` (`--json`/`--quiet`, статистика, `log_file`); `--quiet` у `sync`/`async` глушит консольный лог |
-| 1.4.0 | `taxonomies` отдаёт конверт (`taxonomies`, `env_line`, `needs_env` — имена не по соглашению); `bulk-delete` на `@output.guard`; google-команды и зависимости Google API удалены |
-| 1.4.1 | Служебные таксономии блочного редактора (`wp_pattern_category`, `wp_theme`, `wp_template_part_area`) скрыты по умолчанию в `taxonomies` и discovery |
-| 1.5.0 | Прогресс `sync`/`async`: строка `[n/total] id=… added\|updated\|deleted\|error` по завершении каждой записи |
-| 1.6.0 | Таксономии и типы — с сайта при каждом прогоне (`WP_TAXONOMIES` не нужен); проверка сверяет колонки-таксономии, привязку к типу, `type`/`taxonomy` записей с сайтом; `validate --offline`, `site_checked`; `needs_env` убран из `taxonomies` |
-| 1.7.0 | `media-upload`: файлы с диска → медиатека, ответ `uploaded [{path, id, source_url, meta_error?}]` / `failed`; частичный успех — exit 0 |
-| 1.7.1 | Загрузка медиа уходит с одним `Content-Type` — MIME файла (раньше вторым шёл `application/json` клиента, WordPress отвечал 400) |
-
-Поменялось поведение, на которое может опираться вызывающий (новая проверка,
-флаг, exit-код) — поднять `version` в том же коммите, иначе пакет с изменением
-неотличим от пакета без него.
+Версия — это git-тег `vX.Y.Z` (строки `version =` в `pyproject.toml` нет), журнал
+собирается из фрагментов `changelog.d/`. Поменялось поведение — фрагмент в том же
+коммите (`uv run towncrier create +<slug>.<type>.md -c "…"`), релиз —
+`uv run scripts/release.py patch|minor|major` (см. «Тесты и качество»).
 
 ---
 
@@ -534,7 +522,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 Статусы: `ok` / `warn` / `fail`; сам запуск диагностики всегда exit 0.
 
 `src/data/SKILL.md` — соглашения CLI для агента, едет внутри пакета
-(`[tool.setuptools.package-data]`). Печатается флагом `wp-bulk --ai`.
+(hatchling кладёт в wheel все файлы пакета `src`). Печатается флагом `wp-bulk --ai`.
 **Списка команд там нет и быть не должно:** его печатает голый `wp-bulk` из
 docstring'ов. Добавили команду — написали хороший docstring, SKILL.md не трогаем.
 

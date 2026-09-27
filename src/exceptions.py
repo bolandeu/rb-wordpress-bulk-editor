@@ -165,7 +165,7 @@ class CliTooOld(WPBulkEditorError):
 
     code = "CLI_TOO_OLD"
     exit_code = 6
-    default_action = "Обновите CLI: uv tool upgrade wp-bulk-editor"
+    default_action = "Обновите CLI: uv tool upgrade rb-wordpress-bulk-editor"
 
 
 class CredentialStoreUnavailable(WPBulkEditorError):

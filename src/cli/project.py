@@ -257,11 +257,13 @@ def check_cli_compat(project: ProjectContext, version: Optional[str] = None) -> 
         return
 
     current = version if version is not None else installed_version()
-    if current is None:
+    if current is None or current.startswith("0.0.0"):
+        # Не установлен или dev-сборка без тега в досягаемости (fallback
+        # uv-dynamic-versioning, стандарт §1) — сравнивать не с чем.
         return
 
     if _version_key(current) < _version_key(required):
         raise CliTooOld(
-            f"Проект '{project.name}' требует wp-bulk-editor >= {required}, "
+            f"Проект '{project.name}' требует wp-bulk >= {required}, "
             f"установлена версия {current}."
         )

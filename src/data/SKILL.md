@@ -10,8 +10,12 @@ CLI синхронизации WordPress ↔ данные проекта (Excel 
 
 ```bash
 uv tool install "git+https://github.com/bolandeu/worppress-bulk-editor.git"
-uv tool upgrade wp-bulk-editor
+uv tool upgrade rb-wordpress-bulk-editor
 ```
+
+Дистрибутив называется `rb-wordpress-bulk-editor` (раньше — `wp-bulk-editor`),
+команда — `wp-bulk`. Со старым именем сначала удалить его, иначе два
+инструмента спорят за одну команду: `uv tool uninstall wp-bulk-editor`.
 
 Репозиторий приватный: `uv tool install` ходит через git, авторизация — та же,
 что у `git clone` (credential helper после `gh auth login`, либо форма

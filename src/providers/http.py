@@ -44,7 +44,7 @@ DEFAULT_TIMEOUT = 30.0
 def _user_agent() -> str:
     """User-Agent вида `wp-bulk/<version>`."""
     try:
-        return f"wp-bulk/{version('wp-bulk-editor')}"
+        return f"wp-bulk/{version('rb-wordpress-bulk-editor')}"
     except PackageNotFoundError:
         return "wp-bulk/dev"
 

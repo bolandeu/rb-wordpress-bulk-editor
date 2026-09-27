@@ -807,21 +807,6 @@ wheels = [
 ]
 
 [[package]]
-name = "html-to-gutenberg"
-version = "0.2.0"
-source = { git = "https://github.com/bolandeu/html-to-gutenberg#d6dfd8946c9d4219e0d76af64f04a9a9d45850df" }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "httpx" },
-    { name = "packaging" },
-    { name = "platformdirs" },
-    { name = "pydantic" },
-    { name = "rich" },
-    { name = "tomli-w" },
-    { name = "typer" },
-]
-
-[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1155,21 +1140,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/63/9d/7e19e74d366ec1fafa410c7760131687e516ced9fef312d57340f0969ce0/litellm-1.102.0-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:db15cb7ee0c1afd07c5312039ee248d74f381bbe10eb1b951b4f2e6f358ebbe7", size = 26894580, upload-time = "2026-09-20T04:41:29.148Z" },
     { url = "https://files.pythonhosted.org/packages/03/9e/f98b0937da3027a8c2dbc2a8a5bd8e1d038d3ba2e038e112f83397f4a2d0/litellm-1.102.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:d03e18095383b9a6f22485149d1f11e99c7a0cd9748b4736676bb4d2f89fe5b2", size = 27450189, upload-time = "2026-09-20T04:41:32.829Z" },
     { url = "https://files.pythonhosted.org/packages/ae/15/8e1d939b5b13027c5e8b3f7a5fddeae769bf7d08e67ef922e46af9eb1cf0/litellm-1.102.0-cp310-abi3-win_amd64.whl", hash = "sha256:fbcbaff335ce6ce17aa3c659a5c2b5605a2d8780001abbc1a716c3b10bd55e8e", size = 27382227, upload-time = "2026-09-20T04:41:36.571Z" },
-]
-
-[[package]]
-name = "llmkit"
-version = "0.1.0"
-source = { git = "https://github.com/bolandeu/llmkit#44439434437adf525b3ffe2673d874e619907ff1" }
-dependencies = [
-    { name = "instructor" },
-    { name = "keyring" },
-    { name = "litellm" },
-    { name = "platformdirs" },
-    { name = "pydantic" },
-    { name = "rich" },
-    { name = "tomli-w" },
-    { name = "typer" },
 ]
 
 [[package]]
@@ -2158,6 +2128,103 @@ wheels = [
 ]
 
 [[package]]
+name = "rb-html-to-gutenberg"
+version = "0.4.0"
+source = { git = "https://github.com/bolandeu/html-to-gutenberg?tag=v0.4.0#39a41b925b630a3cc64439697d2d38a0018ff238" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "httpx" },
+    { name = "packaging" },
+    { name = "platformdirs" },
+    { name = "pydantic" },
+    { name = "rich" },
+    { name = "tomli-w" },
+    { name = "typer" },
+]
+
+[[package]]
+name = "rb-llmkit"
+version = "0.4.0"
+source = { git = "https://github.com/bolandeu/llmkit?tag=v0.4.0#9179f1ad01a2afb7097bf680a4231ec03193998b" }
+dependencies = [
+    { name = "httpx" },
+    { name = "instructor" },
+    { name = "keyring" },
+    { name = "litellm" },
+    { name = "platformdirs" },
+    { name = "pydantic" },
+    { name = "rich" },
+    { name = "tomli-w" },
+    { name = "typer" },
+]
+
+[[package]]
+name = "rb-wordpress-bulk-editor"
+source = { editable = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "httpx" },
+    { name = "keyring" },
+    { name = "loguru" },
+    { name = "markdown" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "python-slugify" },
+    { name = "pyyaml" },
+    { name = "rb-html-to-gutenberg" },
+    { name = "rb-llmkit" },
+    { name = "rich" },
+    { name = "typer" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "syrupy" },
+    { name = "towncrier" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "httpx", specifier = ">=0.26.0" },
+    { name = "keyring", specifier = ">=25.0.0" },
+    { name = "loguru", specifier = ">=0.7.0" },
+    { name = "markdown", specifier = ">=3.5.0" },
+    { name = "openpyxl", specifier = ">=3.1.0" },
+    { name = "pandas", specifier = ">=2.2.0" },
+    { name = "pillow", specifier = ">=10.0.0" },
+    { name = "pydantic", specifier = ">=2.5.0" },
+    { name = "pydantic-settings", specifier = ">=2.1.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-slugify", specifier = ">=8.0.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rb-html-to-gutenberg", git = "https://github.com/bolandeu/html-to-gutenberg?tag=v0.4.0" },
+    { name = "rb-llmkit", git = "https://github.com/bolandeu/llmkit?tag=v0.4.0" },
+    { name = "rich", specifier = ">=13.7.0" },
+    { name = "typer", specifier = ">=0.9.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "ruff", specifier = ">=0.16.8" },
+    { name = "syrupy", specifier = ">=4.8" },
+    { name = "towncrier", specifier = ">=24.8" },
+    { name = "ty", specifier = ">=0.0.80" },
+]
+
+[[package]]
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2529,6 +2596,18 @@ wheels = [
 ]
 
 [[package]]
+name = "syrupy"
+version = "6.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/74/2c/8ffc1414d1951895d0d5b7dc83c0b079ebc48c3bf27ffbb0064646367500/syrupy-6.1.1.tar.gz", hash = "sha256:7e584a8df4ede6dd3c1c44a77f9edc46186b6767a73dea6f0083044946839a59", size = 109705, upload-time = "2026-09-13T20:25:21.599Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/b5/bf2a8a335a6a813869dd482cedbcde252f582b5afbfe50eb78ec09962800/syrupy-6.1.1-py3-none-any.whl", hash = "sha256:6ac9ac6a42d70ae44156f5f157a9563b9bb8cc96dcf9364327f330463bff889a", size = 63436, upload-time = "2026-09-13T20:25:20.294Z" },
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2698,6 +2777,19 @@ wheels = [
 ]
 
 [[package]]
+name = "towncrier"
+version = "26.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/d4/e85ce614bf45b1a7fe13b82cc687819c2eaac5a1dd94b84834322095fd98/towncrier-26.9.0.tar.gz", hash = "sha256:ace9031631c718cc0709107b8755e6e31350eb8acdc877af43df3177addb9a55", size = 79338, upload-time = "2026-09-04T12:57:25.341Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/88/f9340b545dafa64de053798e760515a2736fbb60092cf9aa6b146ccf3ede/towncrier-26.9.0-py3-none-any.whl", hash = "sha256:ae4d223e6aadaff98d29b7f09e58d9c9ccf4cd3b455a2d2e0486d432cd8bf660", size = 67030, upload-time = "2026-09-04T12:57:23.986Z" },
+]
+
+[[package]]
 name = "tqdm"
 version = "4.70.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2707,6 +2799,31 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl", hash = "sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73", size = 80199, upload-time = "2026-09-11T07:25:14.599Z" },
+]
+
+[[package]]
+name = "ty"
+version = "0.0.84"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/f6/34f8869c45ea87fe6a931ffa824b1fe4428167173543d92988d631add355/ty-0.0.84.tar.gz", hash = "sha256:0cefdb0cd5d399418dbe83c349ba605047b7dff815ae6f460c80e8522b40be67", size = 7409537, upload-time = "2026-09-24T13:16:24.367Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/0c/600648778e1c79133ce6b6a5c4c2531ae16b90c9b30f5041b38b574f61b8/ty-0.0.84-py3-none-linux_armv6l.whl", hash = "sha256:868438e2b9abfc835dd5b5b07ed693db95d8348ac40e3228252511d63ae87695", size = 13935333, upload-time = "2026-09-24T13:15:31.167Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/3b/27f06f49945c36170765fad82076898039ae3873338e9865f876dd62f12c/ty-0.0.84-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b00f39b521f0b559cde0f6abf8dd47213b513b04f33d58efeb9b98486a16bb17", size = 13511328, upload-time = "2026-09-24T13:15:34.446Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/b6/b12dd130e7f30141f0645614f454c925991cd389b1cc6c8284fd6bf32326/ty-0.0.84-py3-none-macosx_11_0_arm64.whl", hash = "sha256:8f78c2915567f2ee62ce0c24d86091bc76f81577677755e242d09951db588b9a", size = 13445445, upload-time = "2026-09-24T13:15:37.476Z" },
+    { url = "https://files.pythonhosted.org/packages/44/96/f012de4b3c1d9a4773326621380d768b4d48c47e620dc012775c5e01c7d7/ty-0.0.84-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:61155cad0921e890d86d1d911a40b3a0e924ef4bdc3b4f3865a6c89c7e3012dc", size = 13471235, upload-time = "2026-09-24T13:15:40.64Z" },
+    { url = "https://files.pythonhosted.org/packages/05/32/dca630f5f5353fa7bf67eebccf1549df99b16656d21071d0df6677c826a5/ty-0.0.84-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:417c3bf14947ed16b0b92976ab333c27915590354e96d4f581709068d3811355", size = 13680704, upload-time = "2026-09-24T13:15:43.817Z" },
+    { url = "https://files.pythonhosted.org/packages/44/8d/33702c8f62f05ad45b33644fb914d483de6a0a7bc8e51884e9b8773e6d69/ty-0.0.84-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:e06ef117759f654f5379efe9ae79bda8a186016c016f1023d05c34f8e15c1546", size = 14518923, upload-time = "2026-09-24T13:15:46.802Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/a1/da3246e6ef2ae0e842bca4058b25c54bee55ab058ffff4ee54e72517ec01/ty-0.0.84-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:a05d1d53db8b64410ab38c6e32c5898510584869d1d5dd9c0605db81c9aef7df", size = 15027731, upload-time = "2026-09-24T13:15:49.755Z" },
+    { url = "https://files.pythonhosted.org/packages/20/17/b0099098a560aeb4f9fde6c912f9a81622c3e44e6555e1fbe322b368ec31/ty-0.0.84-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b92400494ab855cfb1204ac1101e3f53b2d09a8e21d171758b2cf9acdab1809e", size = 14748260, upload-time = "2026-09-24T13:15:52.713Z" },
+    { url = "https://files.pythonhosted.org/packages/60/d5/32cd67aedb271f006e716ad093806c96c5d7e2af86be8255469dbd3d76c8/ty-0.0.84-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:af17eb391ae3027fed9be1780bea555c2b8a25ba68e184c627b4981b2c9eaab7", size = 14205858, upload-time = "2026-09-24T13:15:55.677Z" },
+    { url = "https://files.pythonhosted.org/packages/43/c4/638ac62ca2e8eca1b92e3e16273085744fada728b993500819b5c258ca15/ty-0.0.84-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:44cf06af0e7ec78ea6d8ff33a3450fc19627756a4fba681f7410d4e3ef63047a", size = 14573196, upload-time = "2026-09-24T13:15:59.165Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/f6/9ee81c5d8921e5fd5f10889ae563c95cd3272b31df2ada528919ca1cef6b/ty-0.0.84-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:c6e56b443ff9ba462e34bfbc1e582004c2719ed35f8f93a433744b0ba0afb2d9", size = 13480760, upload-time = "2026-09-24T13:16:02.313Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/83/fbe5d1177667ae16d84c3242846b143809c9cc09568b333e5a9b4d5908f6/ty-0.0.84-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:8b6562fcc48820c1030e2a4509ef2c14ef93043ca4860280074314ac3a825b95", size = 13696346, upload-time = "2026-09-24T13:16:05.391Z" },
+    { url = "https://files.pythonhosted.org/packages/86/9a/1b4ac9ddc34cc0ab4624bc219825d66af52f1ad87f4778ad08ad03fa06d5/ty-0.0.84-py3-none-musllinux_1_2_i686.whl", hash = "sha256:dee7421451efcbd70f03e95a8f2c8d9e5ec3d35edcd27b4095ee00ee062abfc4", size = 13959410, upload-time = "2026-09-24T13:16:08.661Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/04/70e289437a67dfd686056ab4fd91880261a8233033a6a95d29393741fb97/ty-0.0.84-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:31e96307cf621babe969307dd657783d672e2d8bdbd06493710da635bf63fa07", size = 14350294, upload-time = "2026-09-24T13:16:11.865Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/f4/ae7dbd118425c850981d23efb850f0d9d7f6b8d2b852bde2767434f668b4/ty-0.0.84-py3-none-win32.whl", hash = "sha256:4bdc85f91cbaae35825f2b17bb4ac5de0563367875cb0f42b2bf07a1bf7ff2ba", size = 13176439, upload-time = "2026-09-24T13:16:15.049Z" },
+    { url = "https://files.pythonhosted.org/packages/29/ec/994d87252f065dda5a500bc8afc726d18f6582d81d6f4ff1feb8a267c800/ty-0.0.84-py3-none-win_amd64.whl", hash = "sha256:71cc9aa7a7c89d4e12c6a814e9c0c3310ad5bee44efedbd6f5a42d91e9ac0f0d", size = 13962879, upload-time = "2026-09-24T13:16:18.191Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/1c/e6e91852b72566b1ab9aca504712857dfb89324c12092a5bd61d42d34427/ty-0.0.84-py3-none-win_arm64.whl", hash = "sha256:6c9d3718c4a0d318bc9c92af9b2aa85c3294e7dff54cf1d69ad79568f56516da", size = 13656453, upload-time = "2026-09-24T13:16:21.51Z" },
 ]
 
 [[package]]
@@ -2770,67 +2887,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867, upload-time = "2024-12-07T15:28:28.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083, upload-time = "2024-12-07T15:28:26.465Z" },
-]
-
-[[package]]
-name = "wp-bulk-editor"
-version = "1.7.1"
-source = { editable = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "html-to-gutenberg" },
-    { name = "httpx" },
-    { name = "keyring" },
-    { name = "llmkit" },
-    { name = "loguru" },
-    { name = "markdown" },
-    { name = "openpyxl" },
-    { name = "pandas" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-    { name = "python-slugify" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "html-to-gutenberg", git = "https://github.com/bolandeu/html-to-gutenberg" },
-    { name = "httpx", specifier = ">=0.26.0" },
-    { name = "keyring", specifier = ">=25.0.0" },
-    { name = "llmkit", git = "https://github.com/bolandeu/llmkit" },
-    { name = "loguru", specifier = ">=0.7.0" },
-    { name = "markdown", specifier = ">=3.5.0" },
-    { name = "openpyxl", specifier = ">=3.1.0" },
-    { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pillow", specifier = ">=10.0.0" },
-    { name = "pydantic", specifier = ">=2.5.0" },
-    { name = "pydantic-settings", specifier = ">=2.1.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "python-slugify", specifier = ">=8.0.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.7.0" },
-    { name = "typer", specifier = ">=0.9.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=9.0.3" },
-    { name = "pytest-asyncio", specifier = ">=1.3.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "ruff", specifier = ">=0.16.8" },
 ]
 
 [[package]]

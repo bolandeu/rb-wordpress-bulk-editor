@@ -8,8 +8,9 @@
 from importlib import metadata
 from typing import Optional
 
-# Имя пакета и команды — для importlib.metadata и подсказки об обновлении.
-PACKAGE_NAME = "wp-bulk-editor"
+# Имя дистрибутива (`[project] name`, стандарт §10: `rb-<tool>`) — для
+# importlib.metadata и подсказки `uv tool upgrade`. Команда остаётся `wp-bulk`.
+PACKAGE_NAME = "rb-wordpress-bulk-editor"
 
 
 def installed_version() -> Optional[str]:

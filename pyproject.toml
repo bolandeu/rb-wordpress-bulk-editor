@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
 
 [project]
-name = "wp-bulk-editor"
-version = "1.7.1"
+name = "rb-wordpress-bulk-editor"
+# Версия — из git-тега vX.Y.Z (uv-dynamic-versioning); строку `version =` не добавлять.
+dynamic = ["version"]
 description = "WordPress Bulk Editor - Excel <-> WordPress sync"
 requires-python = ">=3.11"
 dependencies = [
@@ -23,21 +24,29 @@ dependencies = [
     "python-slugify>=8.0.0",
     "markdown>=3.5.0",
     "beautifulsoup4>=4.12.0",
-    "llmkit",
-    "html_to_gutenberg",
+    "rb-llmkit>=0.4,<0.5",
+    "rb-html-to-gutenberg>=0.4,<0.5",
 ]
 
 [project.scripts]
 wp-bulk = "src.cli:main"
 
-[tool.setuptools.packages.find]
-include = ["src*"]
+[project.urls]
+Repository = "https://github.com/bolandeu/worppress-bulk-editor"
 
-# Бандленный SKILL.md должен уехать в wheel: его читают `wp-bulk --ai`
-# и агент, у которого есть только установленный пакет.
-[tool.setuptools.package-data]
-"src" = ["py.typed"]
-"src.data" = ["*.md"]
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+fallback-version = "0.0.0"
+
+# Импортный пакет исторически называется `src`. hatchling кладёт в wheel все
+# файлы пакета, включая бандленный SKILL.md (его читают `wp-bulk --ai` и агент,
+# у которого есть только установленный пакет) и py.typed.
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -70,9 +79,13 @@ warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 
+[tool.uv]
+# Пересобирать editable-установку при новом коммите/теге, чтобы --version шёл за тегом.
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
+
 [tool.uv.sources]
-llmkit = { git = "https://github.com/bolandeu/llmkit" }
-html_to_gutenberg = { git = "https://github.com/bolandeu/html-to-gutenberg" }
+rb-llmkit = { git = "https://github.com/bolandeu/llmkit", tag = "v0.4.0" }
+rb-html-to-gutenberg = { git = "https://github.com/bolandeu/html-to-gutenberg", tag = "v0.4.0" }
 
 [dependency-groups]
 dev = [
@@ -80,4 +93,51 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.8",
+    "syrupy>=4.8",
+    "towncrier>=24.8",
+    "ty>=0.0.80",
 ]
+
+# Changelog из фрагментов: каждое изменение — файл changelog.d/+<slug>.<type>.md
+# (`uv run towncrier create +<slug>.<type>.md -c "..."`); собирает scripts/release.py.
+[tool.towncrier]
+filename = "CHANGELOG.md"
+directory = "changelog.d"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## [{version}] - {project_date}"
+issue_format = "#{issue}"
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[tool.cli-generator]
+# Где scripts/check_command_docstrings.py (git pre-commit + хуки Claude Code)
+# ищет команды: здесь они в src/cli/*_commands.py, а не в commands/*.py шаблона.
+commands = ["src/cli/*_commands.py"]

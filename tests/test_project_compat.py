@@ -99,7 +99,7 @@ class TestCliEnforcement:
         assert compat["details"] == {
             "installed": "1.0.0",
             "required": "2.0.0",
-            "package": "wp-bulk-editor",
+            "package": "rb-wordpress-bulk-editor",
         }
 
     def test_new_enough_cli_passes_the_gate(self, project_env, monkeypatch):

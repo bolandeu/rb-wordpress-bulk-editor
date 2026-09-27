@@ -6,8 +6,12 @@ Python CLI-инструмент для синхронизации данных �
 
 ```bash
 uv tool install "git+https://github.com/bolandeu/worppress-bulk-editor.git"
-uv tool upgrade wp-bulk-editor
+uv tool upgrade rb-wordpress-bulk-editor
 ```
+
+Дистрибутив называется `rb-wordpress-bulk-editor` (раньше — `wp-bulk-editor`),
+команда — `wp-bulk`. Со старым именем сначала удалить его, иначе два
+инструмента спорят за одну команду: `uv tool uninstall wp-bulk-editor`.
 
 Репозиторий приватный — авторизация как у `git clone` (`gh auth login`, либо
 SSH-форма `git+ssh://git@github.com/bolandeu/worppress-bulk-editor.git`).

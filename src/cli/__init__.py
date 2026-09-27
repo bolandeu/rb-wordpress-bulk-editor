@@ -16,7 +16,7 @@ from typing import Optional
 
 import typer
 
-from .project import PACKAGE_NAME, check_cli_compat, installed_version, resolve_project
+from .project import check_cli_compat, installed_version, resolve_project
 from .. import output
 from ..data import read_skill_doc
 from ..exceptions import CliTooOld, ConfigurationError
@@ -44,11 +44,11 @@ def _print_skill_doc(value: bool) -> None:
 
 
 def _print_version(value: bool) -> None:
-    """--version: напечатать `<имя> <версия> — <описание>` и выйти."""
+    """--version: напечатать только номер версии (стандарт §3: его сверяет гейт) и выйти."""
     if not value:
         return
-    version = installed_version() or "0.0.0-src (запущено из исходников, не установлен как пакет)"
-    typer.echo(f"{PACKAGE_NAME} {version} — WordPress Bulk Editor: Excel <-> WordPress sync")
+    # Голый запуск из исходников (пакет не установлен) версии не имеет.
+    typer.echo(installed_version() or "0.0.0-dev")
     raise typer.Exit()
 
 
