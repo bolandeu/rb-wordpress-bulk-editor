@@ -5,6 +5,21 @@
 
 <!-- towncrier release notes start -->
 
+## [2.0.0] - 2026-09-27
+
+### Added
+
+- Группа `wp-bulk auth`: `auth status [--check] [--provider] --json` — отчёт о доступах в общей форме инструментов (стандарт §8): по записи `wp:<домен>` на каждый сайт из keychain и сайт активного проекта, ключи LLM — записями `llmkit:<провайдер>`; exit 3 при неисправном обязательном или неверном доступе. `auth login` / `auth logout` сохраняют и удаляют доступ сайта в OS keychain.
+
+### Changed
+
+- Дистрибутив переименован: `wp-bulk-editor` → `rb-wordpress-bulk-editor` (команда `wp-bulk` та же). На машинах со старым именем: `uv tool uninstall wp-bulk-editor`, затем `uv tool install "git+https://github.com/bolandeu/worppress-bulk-editor.git"`. Версия берётся из git-тега; `wp-bulk --version` печатает только номер (раньше — `wp-bulk-editor X.Y.Z — описание`); dev-сборка `0.0.0…` пропускает проверку `WP_BULK_MIN_VERSION`. Зависимости `rb-llmkit` и `rb-html-to-gutenberg` закреплены на тегах `v0.4.0`. Editable-установка под старым именем по-прежнему сообщает `cli_version` (запасное имя в `installed_version`).
+
+### Fixed
+
+- Поиск ACF-полей по первой записи типа/таксономии вызывал несуществующий параметр `get_all(per_page=1)` и всегда молча возвращал пустой список; теперь берётся первая страница через `list(per_page=1)`.
+
+
 ## [1.7.1] - 2026-09-26
 
 - Загрузка медиа уходит с одним `Content-Type` — MIME файла (раньше вторым шёл `application/json` клиента, WordPress отвечал 400)
