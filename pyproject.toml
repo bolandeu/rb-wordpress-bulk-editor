@@ -50,6 +50,12 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Покрытие — часть гейта (release.py запускает голый `pytest`): fail_under ниже.
+addopts = "--cov --cov-report=term-missing:skip-covered"
+# Снапшоты справки лежат в tests/snapshots/help/<команда>.txt (стандарт §7), а не
+# в раскладке syrupy `__snapshots__/<файл теста>/` — syrupy предупреждает, что
+# «не может связать» файл с тестом. Может — по имени.
+filterwarnings = ["ignore:(?s).*Can not relate snapshot:UserWarning"]
 
 [tool.ruff]
 line-length = 110
@@ -70,7 +76,7 @@ omit = ["src/__main__.py", "src/cli/__main__.py"]
 [tool.coverage.report]
 # Нижняя граница по факту текущего прогона, а не по пожеланиям:
 # ронять сборку она не должна, но и опускаться ниже нельзя.
-fail_under = 40
+fail_under = 64
 
 [tool.mypy]
 python_version = "3.11"

@@ -95,6 +95,8 @@ def validate(
     Exit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах,
     3 — сайт отверг доступы, 5 — сайт недоступен (повторите с --offline),
     1 — непредвиденная ошибка.
+
+    Example: {cli} validate --file site.json --sheets site.ru --json
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_data_file(ctx, file)
@@ -229,6 +231,8 @@ def options(
     Exit-коды: 0 — успех, 2 — аргументы/файл или отсутствующий --confirm,
     3 — нет credentials,
     5 — недоступен WordPress, 1 — непредвиденная ошибка.
+
+    Example: {cli} options --fetch --dry-run
     """
     env_file = resolve_env_file(ctx, env_file)
     # Если активен --project и --file не указан — берём xlsx из папки проекта.
@@ -473,6 +477,8 @@ def bulk_delete(
     Exit-коды: 0 — успех, 1 — отменено пользователем/непредвиденная ошибка,
     2 — аргументы или отсутствующий --confirm, 3 — нет credentials,
     5 — недоступен WordPress.
+
+    Example: {cli} bulk-delete --post-type posts --dry-run
     """
     env_file = resolve_env_file(ctx, env_file)
     opts = output.get_options(ctx)
@@ -722,6 +728,8 @@ def counter(
 
     Пример:
         wp-bulk counter --domain https://example.com --type posts --output stats.csv
+
+    Example: wp-bulk counter --type posts --output stats.csv
     """
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "counter_output.csv")
@@ -975,7 +983,7 @@ def llm(
     Массовая генерация контента через LLM.
 
     Обрабатывает строки где action=update и генерирует контент в указанную колонку.
-    Поддерживает подстановку значений из других колонок через [column_name].
+    Поддерживает подстановку значений из других колонок через \\[column_name].
 
     ТЕКСТ идёт через общую библиотеку llmkit: цепочки моделей с фолбэком, ретраи,
     кэш и учёт стоимости. Ключи провайдеров llmkit берёт из своего конфига
@@ -990,18 +998,20 @@ def llm(
 
     Примеры:
         # Генерация excerpt уровнем llmkit
-        llm --column excerpt --level cheap --prompt "Напиши короткий lead абзац к услуге [title]"
+        llm --column excerpt --level cheap --prompt "Напиши короткий lead абзац к услуге \\[title]"
 
         # Явная цепочка моделей с fallback (формат llmkit: провайдер/модель)
-        llm --column description --prompt "Опиши [title]" \
+        llm --column description --prompt "Опиши \\[title]" \
             --model "ollama/gpt-oss:120b,openrouter/openai/gpt-4o-mini"
 
         # С конвертацией Markdown в HTML, уровень llmkit по умолчанию
-        llm --column content --prompt "Напиши статью про [title]" --md-to-html
+        llm --column content --prompt "Напиши статью про \\[title]" --md-to-html
 
         # Картинка: нужен endpoint + token
         llm --column img_path --model "some-image-model" \
             --endpoint https://api.example/v1/chat/completions --token ...
+
+    Example: wp-bulk llm --column excerpt --level cheap --prompt "Кратко о \\[title]" --dry-run
     """
     file = require_excel_file(ctx, file)
     env_file = resolve_env_file(ctx, env_file)
@@ -1396,6 +1406,8 @@ def reshape(
         wp-bulk reshape --extra none
         wp-bulk reshape --extra "acf_price,acf_address"
         wp-bulk reshape --src custom.xlsx --tpl my_template.xlsx -o result.xlsx
+
+    Example: wp-bulk reshape --extra none
     """
     from openpyxl import Workbook
 
@@ -1544,6 +1556,8 @@ def taxonomies(
 
     Exit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,
     1 — непредвиденная ошибка.
+
+    Example: {cli} taxonomies --json
     """
     env_file = resolve_env_file(ctx, env_file)
     setup_command_logging(ctx, "taxonomies")

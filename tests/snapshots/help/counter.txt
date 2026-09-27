@@ -1,0 +1,27 @@
+
+ Usage: wp-bulk counter [OPTIONS]
+
+ Подсчет количества слов и символов в контенте записей WordPress.
+
+ Выводит результаты в CSV файл с полями:
+ id, slug, link, title, words, chars
+
+ Пример:
+     wp-bulk counter --domain https://example.com --type posts --output stats.csv
+
+ Example: wp-bulk counter --type posts --output stats.csv
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --domain               TEXT     WordPress domain (например, https://example.com)                 │
+│ --username             TEXT     WordPress username                                               │
+│ --password             TEXT     WordPress Application Password                                   │
+│ --env-file             FILE     Путь к .env файлу (по умолчанию .env)                            │
+│ --type         -t      TEXT     Тип контента (posts, pages, или custom post type)                │
+│                                 [default: posts]                                                 │
+│ --status       -s      TEXT     Статус записей (publish, draft, any) [default: publish]          │
+│ --output       -o      PATH     Путь к выходному CSV файлу [default: counter_output.csv]         │
+│ --limit        -l      INTEGER  Максимум записей для обработки                                   │
+│ --concurrency  -c      INTEGER  Количество параллельных запросов [default: 5]                    │
+│ --help                          Show this message and exit.                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

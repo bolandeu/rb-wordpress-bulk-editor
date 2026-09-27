@@ -181,6 +181,8 @@ def image_crop(
         wp-bulk image-crop -P ost -a 16:9 --gradient 0.5
 
         wp-bulk image-crop -P ost -a 16:9 --wt "© MySite" --wp center
+
+    Example: wp-bulk image-crop --input ./photos --aspect-ratio 16:9
     """
     if not aspect_ratio and not (width and height):
         console.print(
@@ -318,6 +320,8 @@ def image_compress(
         wp-bulk image-compress -P ost --quality 80
 
         wp-bulk image-compress --input ./photos -q 75 --max-width 1920
+
+    Example: wp-bulk image-compress --input ./photos --quality 80
     """
     resolved_input = _resolve_input_folder(ctx, input_folder)
     resolved_output = _resolve_output_folder(
@@ -436,6 +440,8 @@ def image_convert(
         wp-bulk image-convert -P ost --format webp
 
         wp-bulk image-convert --input ./photos -f webp -q 85
+
+    Example: wp-bulk image-convert --input ./photos --format webp
     """
     valid_formats = {"webp", "jpg", "jpeg", "png"}
     if target_format.lower() not in valid_formats:

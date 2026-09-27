@@ -85,6 +85,8 @@ def vlook(
       media   - {id}.<картинка> в media/ -> img_path
       both    - content + media одновременно
       custom  - --folder + --column, любые файлы
+
+    Example: wp-bulk vlook --mode media
     """
     if mode not in VALID_MODES:
         console.print(

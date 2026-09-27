@@ -1,0 +1,22 @@
+
+ Usage: wp-bulk export [OPTIONS]
+
+ Экспорт всего контента сайта в файлы.
+
+ Находит все типы контента и экспортирует их в отдельные HTML файлы.
+ Создает CSV индекс.
+
+ Example: wp-bulk export --output ./exported_content
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --domain         -d      TEXT     WordPress domain                                               │
+│ --username       -u      TEXT     WordPress username                                             │
+│ --password       -p      TEXT     WordPress Application Password                                 │
+│ --env-file               FILE     Путь к .env файлу                                              │
+│ --output         -o      PATH     Папка для экспорта контента [default: exported_content]        │
+│ --concurrency    -c      INTEGER  Количество параллельных загрузок [default: 10]                 │
+│ --include-media                   Включить экспорт метаданных медиа                              │
+│ --verbose        -v               Подробные логи                                                 │
+│ --help                            Show this message and exit.                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

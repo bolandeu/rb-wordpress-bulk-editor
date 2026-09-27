@@ -1,0 +1,62 @@
+
+ Usage: wp-bulk llm [OPTIONS]
+
+ Массовая генерация контента через LLM.
+
+ Обрабатывает строки где action=update и генерирует контент в указанную колонку.
+ Поддерживает подстановку значений из других колонок через [column_name].
+
+ ТЕКСТ идёт через общую библиотеку llmkit: цепочки моделей с фолбэком, ретраи,
+ кэш и учёт стоимости. Ключи провайдеров llmkit берёт из своего конфига
+ (~/Library/Application Support/llmkit/config.toml) или связки ключей ОС —
+ НЕ из .env проекта. Нужен свой OpenAI-совместимый сервер для текста — заведите
+ его там провайдером kind = "openai_compatible"; флаги --endpoint/--token
+ на текст больше не влияют.
+
+ КАРТИНКИ (--column img_path) llmkit не умеет — они по-прежнему идут своим
+ вызовом, и только для них нужны --endpoint/--token (LLM_ENDPOINT/LLM_TOKEN)
+ и модели LLM_IMG_MODELS.
+
+ Примеры:
+     # Генерация excerpt уровнем llmkit
+     llm --column excerpt --level cheap --prompt "Напиши короткий lead абзац к услуге [title]"
+
+     # Явная цепочка моделей с fallback (формат llmkit: провайдер/модель)
+     llm --column description --prompt "Опиши [title]"             --model
+ "ollama/gpt-oss:120b,openrouter/openai/gpt-4o-mini"
+
+     # С конвертацией Markdown в HTML, уровень llmkit по умолчанию
+     llm --column content --prompt "Напиши статью про [title]" --md-to-html
+
+     # Картинка: нужен endpoint + token
+     llm --column img_path --model "some-image-model"             --endpoint
+ https://api.example/v1/chat/completions --token ...
+
+ Example: wp-bulk llm --column excerpt --level cheap --prompt "Кратко о [title]" --dry-run
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ *  --column      -c      TEXT  Колонка для генерации контента [required]                         │
+│    --file        -f      PATH  Путь к Excel файлу (авто-определяется из --project)               │
+│    --sheets              TEXT  Список листов через запятую (posts,pages)                         │
+│    --model       -m      TEXT  Модели через запятую. Текст: цепочка llmkit ('провайдер/модель'), │
+│                                по умолчанию LLM_MODELS из .env. Картинки (--column img_path):    │
+│                                модели endpoint'а, по умолчанию LLM_IMG_MODELS/LLM_MODELS         │
+│    --level               TEXT  Уровень llmkit (cheap/judge/strong — что настроено в его          │
+│                                конфиге). Только для текста, по умолчанию LLM_LEVEL из .env. Если │
+│                                не задан ни --level, ни --model — llmkit берёт свой уровень по    │
+│                                умолчанию                                                         │
+│    --prompt      -p      TEXT  Промпт для генерации (используйте  для подстановки значений)      │
+│    --endpoint            TEXT  LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по    │
+│                                умолчанию .env: LLM_ENDPOINT                                      │
+│    --token               TEXT  LLM API token — ТОЛЬКО для картинок (--column img_path), по       │
+│                                умолчанию .env: LLM_TOKEN                                         │
+│    --overwrite                 Перезаписывать существующие значения в колонке                    │
+│    --dry-run     -d            Режим тестирования без записи в Excel                             │
+│    --strip-tags                Удалить HTML теги из результата                                   │
+│    --md-to-html                Конвертировать Markdown в HTML                                    │
+│    --html-to-md                Конвертировать HTML в Markdown                                    │
+│    --env-file            FILE  Путь к .env файлу (по умолчанию .env)                             │
+│    --verbose     -v            Подробные логи                                                    │
+│    --help                      Show this message and exit.                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

@@ -1,0 +1,31 @@
+
+ Usage: wp-bulk reshape [OPTIONS]
+
+ Перенос данных из fetch-файла в структуру шаблона.
+
+ Берёт Excel-источник (результат fetch), Excel-шаблон (из templates/),
+ и создаёт результирующий Excel, где данные из источника перенесены
+ в структуру шаблона (листы, колонки, порядок).
+
+ По умолчанию колонки из источника, которых нет в шаблоне, дописываются
+ в конец. --extra none отключает это, --extra "col1,col2" добавляет только указанные.
+
+ Примеры:
+     wp-bulk reshape
+     wp-bulk reshape --extra none
+     wp-bulk reshape --extra "acf_price,acf_address"
+     wp-bulk reshape --src custom.xlsx --tpl my_template.xlsx -o result.xlsx
+
+ Example: wp-bulk reshape --extra none
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --source,--src    -s      PATH  Excel-источник (по умолчанию fetch.xlsx)                         │
+│ --template,--tpl  -t      TEXT  Шаблон: имя в templates/ или полный путь (по умолчанию           │
+│                                 default.xlsx)                                                    │
+│ --output          -o      PATH  Результирующий файл (по умолчанию export.xlsx)                   │
+│ --extra           -e      TEXT  Доп. колонки из источника: список через запятую или 'none' чтобы │
+│                                 не добавлять                                                     │
+│ --verbose         -v            Подробные логи                                                   │
+│ --help                          Show this message and exit.                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

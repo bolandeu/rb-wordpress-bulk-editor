@@ -1,0 +1,27 @@
+
+ Usage: wp-bulk doctor [OPTIONS]
+
+ Диагностика окружения: проект, версия, конфиг, credentials.
+
+ Проверки: project, cli_compat, config, credentials, credential_store
+ (и connection — только с --check-connection).
+
+ Без --check-connection живой сайт не нужен: команда быстрая и офлайн.
+ Результат проверок — в payload (`status` каждой проверки и общий `status`),
+ сам запуск диагностики успешен.
+
+ Exit-коды: 0 — диагностика выполнена, 1 — непредвиденная ошибка.
+
+ Example: wp-bulk doctor --check-connection --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --domain                  TEXT  WordPress domain                                                 │
+│ --username                TEXT  WordPress username                                               │
+│ --password                TEXT  WordPress Application Password                                   │
+│ --env-file                FILE  Путь к .env файлу (по умолчанию .env проекта)                    │
+│ --check-connection              Дополнительно проверить, отвечает ли сайт (сетевой запрос).      │
+│ --json                          Машиночитаемый JSON-вывод.                                       │
+│ --quiet                         Только существенный вывод.                                       │
+│ --help                          Show this message and exit.                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

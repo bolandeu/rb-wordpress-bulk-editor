@@ -660,6 +660,8 @@ def sync(
     Exit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед
     отправкой, 3 — нет credentials, 5 — недоступен WordPress,
     1 — непредвиденная ошибка.
+
+    Example: {cli} sync --file site.json --sheets site.ru --dry-run
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
@@ -784,6 +786,8 @@ def async_sync(
     Exit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед
     отправкой, 3 — нет credentials, 5 — недоступен WordPress,
     1 — непредвиденная ошибка.
+
+    Example: {cli} async --file site.json --sheets site.ru --json
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)

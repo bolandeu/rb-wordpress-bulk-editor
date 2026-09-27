@@ -1,0 +1,14 @@
+
+ Usage: wp-bulk fetch-media [OPTIONS]
+
+ Загрузить список медиафайлов из WordPress в Excel (лист media)
+
+ Example: wp-bulk fetch-media --file media.xlsx
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --file      -f      PATH  Путь к Excel файлу (авто-определяется из --project)                    │
+│ --env-file          FILE  Путь к .env файлу (по умолчанию .env)                                  │
+│ --verbose   -v            Подробные логи                                                         │
+│ --help                    Show this message and exit.                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

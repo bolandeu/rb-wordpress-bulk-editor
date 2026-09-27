@@ -1,0 +1,34 @@
+
+ Usage: wp-bulk image-convert [OPTIONS]
+
+ Конвертация изображений в другой формат (по умолчанию WebP).
+
+ Примеры:
+
+     wp-bulk image-convert -P ost --format webp
+
+     wp-bulk image-convert --input ./photos -f webp -q 85
+
+ Example: wp-bulk image-convert --input ./photos --format webp
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --input           -i                     PATH                       Папка с изображениями        │
+│ --output          -o                     PATH                       Папка для результатов        │
+│ --format          -f                     TEXT                       Целевой формат: webp, jpg,   │
+│                                                                     png                          │
+│                                                                     [default: webp]              │
+│ --quality         -q                     INTEGER RANGE [1<=x<=100]  Качество для lossy форматов  │
+│                                                                     (1-100)                      │
+│                                                                     [default: 85]                │
+│ --strip-metadata      --keep-metadata                               Удалить EXIF метаданные      │
+│                                                                     [default: strip-metadata]    │
+│ --glob            -g                     TEXT                       Паттерн файлов               │
+│                                                                     [default:                    │
+│                                                                     *.{jpg,jpeg,png,gif,bmp,tif… │
+│ --recursive       -r                                                Искать в подпапках           │
+│ --overwrite                                                         Перезаписать существующие    │
+│ --dry-run         -d                                                Показать что будет сделано   │
+│ --verbose         -v                                                Подробный вывод              │
+│ --help                                                              Show this message and exit.  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

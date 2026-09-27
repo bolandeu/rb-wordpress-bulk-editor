@@ -239,6 +239,8 @@ def doctor(
     сам запуск диагностики успешен.
 
     Exit-коды: 0 — диагностика выполнена, 1 — непредвиденная ошибка.
+
+    Example: {cli} doctor --check-connection --json
     """
     env_file = resolve_env_file(ctx, env_file)
 

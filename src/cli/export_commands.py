@@ -36,6 +36,8 @@ def export(
 
     Находит все типы контента и экспортирует их в отдельные HTML файлы.
     Создает CSV индекс.
+
+    Example: wp-bulk export --output ./exported_content
     """
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "exported_content")
@@ -105,6 +107,8 @@ def export_media(
 ):
     """
     Экспортировать медиафайлы из WordPress в CSV (с файлами или без)
+
+    Example: wp-bulk export-media --download-files
     """
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "export_media")

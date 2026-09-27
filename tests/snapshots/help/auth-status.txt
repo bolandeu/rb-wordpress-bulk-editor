@@ -1,0 +1,30 @@
+
+ Usage: wp-bulk auth status [OPTIONS]
+
+ Отчёт о каждом доступе: откуда он берётся и работает ли. Значений не печатает.
+
+ Сайты WordPress — по записи `wp:<домен>` на каждую цель: сохранённые в
+ keychain (`auth login`), сайт активного проекта (та же цепочка, что у sync:
+ окружение → keychain → .env проекта) и цель из --provider. Ключи LLM —
+ записи `llmkit:<провайдер>` из отчёта llmkit, необязательные.
+
+ Без --check — только наличие (`unchecked` / `missing`). С --check у сайта
+ `GET /wp-json/wp/v2/users/me`: 401/403 — `invalid`, сеть/таймаут/5xx/429 —
+ `unreachable`. Exit 0 — все обязательные ok/unchecked; 3 — у обязательного
+ проблема или любой доступ invalid/expired (конверт ok:false +
+ CREDENTIALS_UNHEALTHY и весь отчёт); 2 — неизвестный --provider.
+ Форма --json — общий контракт: `tool`, `version`, `checked_at`,
+ `credentials[]` c `provider`, `required`, `fields`, `source`, `source_ref`,
+ `status`, `expires_at`, `quota`, `message`.
+
+ Example: wp-bulk auth status --check --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --check                 Проверить каждый доступ одним дешёвым read-only запросом (предел 10 с).  │
+│ --provider        TEXT  Только этот провайдер: wp, wp:<домен>, llmkit или llmkit:<провайдер> (по │
+│                         умолчанию — все).                                                        │
+│ --json                  Машиночитаемый JSON-вывод.                                               │
+│ --quiet                 Только существенный вывод.                                               │
+│ --help                  Show this message and exit.                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

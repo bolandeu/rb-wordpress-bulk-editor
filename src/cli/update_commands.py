@@ -81,6 +81,8 @@ def update_from_wp(
 
     Exit-коды: 0 — успех, 2 — аргументы/структура файла, 3 — нет credentials,
     5 — недоступен WordPress, 1 — непредвиденная ошибка.
+
+    Example: {cli} update --file site.json --sheets site.ru --columns slug,link --dry-run
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_data_file(ctx, file)

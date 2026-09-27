@@ -1,0 +1,34 @@
+
+ Usage: wp-bulk image-compress [OPTIONS]
+
+ Сжатие изображений для веба.
+
+ Примеры:
+
+     wp-bulk image-compress -P ost --quality 80
+
+     wp-bulk image-compress --input ./photos -q 75 --max-width 1920
+
+ Example: wp-bulk image-compress --input ./photos --quality 80
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --input           -i                     PATH                       Папка с изображениями        │
+│ --output          -o                     PATH                       Папка для результатов        │
+│ --quality         -q                     INTEGER RANGE [1<=x<=100]  Качество JPEG/WebP (1-100)   │
+│                                                                     [default: 80]                │
+│ --max-width                              INTEGER                    Максимальная ширина          │
+│                                                                     (пропорционально)            │
+│ --max-height                             INTEGER                    Максимальная высота          │
+│                                                                     (пропорционально)            │
+│ --strip-metadata      --keep-metadata                               Удалить EXIF метаданные      │
+│                                                                     [default: strip-metadata]    │
+│ --glob            -g                     TEXT                       Паттерн файлов               │
+│                                                                     [default:                    │
+│                                                                     *.{jpg,jpeg,png,webp}]       │
+│ --recursive       -r                                                Искать в подпапках           │
+│ --overwrite                                                         Перезаписать существующие    │
+│ --dry-run         -d                                                Показать что будет сделано   │
+│ --verbose         -v                                                Подробный вывод              │
+│ --help                                                              Show this message and exit.  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

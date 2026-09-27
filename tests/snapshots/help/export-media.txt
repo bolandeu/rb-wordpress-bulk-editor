@@ -1,0 +1,21 @@
+
+ Usage: wp-bulk export-media [OPTIONS]
+
+ Экспортировать медиафайлы из WordPress в CSV (с файлами или без)
+
+ Example: wp-bulk export-media --download-files
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --domain                                     TEXT     URL WordPress сайта                        │
+│ --username                                   TEXT     Имя пользователя WordPress                 │
+│ --password                                   TEXT     Application Password                       │
+│ --env-file                                   FILE     Путь к .env файлу                          │
+│ --output          -o                         PATH     Папка для экспорта [default: export_media] │
+│ --download-files      --no-download-files             Скачивать файлы или только метаданные      │
+│                                                       [default: download-files]                  │
+│ --concurrency                                INTEGER  Количество параллельных загрузок           │
+│                                                       [default: 10]                              │
+│ --verbose         -v                                  Подробные логи                             │
+│ --help                                                Show this message and exit.                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

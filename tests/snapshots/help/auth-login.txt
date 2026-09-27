@@ -1,0 +1,22 @@
+
+ Usage: wp-bulk auth login [OPTIONS]
+
+ Сохранить логин и пароль приложения сайта в OS keychain.
+
+ Пароль берётся из WP_<DOMAIN>_API_TOKEN / WP_API_TOKEN, иначе спрашивается
+ скрытым вводом; флага для пароля нет, чтобы он не попал в историю shell.
+ Без терминала (или с --non-interactive) недостающее поле — ошибка, exit 2.
+ Сохранённый сайт появляется в `auth status`.
+
+ Example: wp-bulk auth login --provider wp:example.com --username editor
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ *  --provider               TEXT  Сайт: wp:<домен>, например wp:example.com. [required]          │
+│    --username               TEXT  Логин WordPress (иначе WP_<DOMAIN>_API_USER / WP_API_USER или  │
+│                                   вопрос).                                                       │
+│    --non-interactive              Никогда не спрашивать; вместо вопроса — ошибка.                │
+│    --json                         Машиночитаемый JSON-вывод.                                     │
+│    --quiet                        Только существенный вывод.                                     │
+│    --help                         Show this message and exit.                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

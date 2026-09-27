@@ -1,0 +1,46 @@
+
+ Usage: wp-bulk bulk-delete [OPTIONS]
+
+ Массовое удаление всех записей указанного типа
+
+ ОПАСНО: удаление необратимо. Сначала --dry-run (ничего не удаляет),
+ затем — подтверждение: человеку задаётся вопрос, а под --non-interactive
+ (и в --json, и когда stdin не терминал) нужен явный --confirm.
+
+ Примеры:
+     # Посмотреть что будет удалено, ничего не трогая
+     wp-bulk bulk-delete --post-type posts --dry-run
+
+     # Удалить все черновики постов в корзину (спросит подтверждение)
+     wp-bulk bulk-delete --post-type posts --status draft
+
+     # Неинтерактивно: подтверждение обязательно флагом
+     wp-bulk bulk-delete --post-type service --force --delete-media             --non-interactive
+ --confirm
+
+ Exit-коды: 0 — успех, 1 — отменено пользователем/непредвиденная ошибка,
+ 2 — аргументы или отсутствующий --confirm, 3 — нет credentials,
+ 5 — недоступен WordPress.
+
+ Example: wp-bulk bulk-delete --post-type posts --dry-run
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│    --domain                   TEXT  WordPress domain (например, https://example.com)             │
+│    --username                 TEXT  WordPress username                                           │
+│    --password                 TEXT  WordPress Application Password                               │
+│    --env-file                 FILE  Путь к .env файлу (по умолчанию .env)                        │
+│ *  --post-type        -t      TEXT  Тип контента для удаления (posts, pages, service, и т.д.)    │
+│                                     [required]                                                   │
+│    --status                   TEXT  Статус записей для удаления (any, publish, draft, etc.)      │
+│                                     [default: any]                                               │
+│    --force                          Удалить полностью (минуя корзину)                            │
+│    --delete-media                   Удалять связанные featured media                             │
+│    --dry-run          -d            Показать что будет удалено, без удаления                     │
+│    --confirm                        Подтвердить опасную операцию без вопроса.                    │
+│    --non-interactive                Никогда не спрашивать; вместо вопроса — ошибка.              │
+│    --json                           Машиночитаемый JSON-вывод.                                   │
+│    --quiet                          Только существенный вывод.                                   │
+│    --verbose          -v            Подробные логи                                               │
+│    --help                           Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

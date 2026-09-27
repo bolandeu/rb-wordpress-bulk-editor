@@ -1,0 +1,69 @@
+
+ Usage: wp-bulk async [OPTIONS]
+
+ Асинхронная синхронизация файла данных -> WordPress
+
+ Источник (.xlsx или .json), --sheets, --filter и проверка перед
+ отправкой (--skip-checks) — как у sync. Результат — тот же конверт,
+ что у sync (--json: статистика по наборам, log_file, cli_version).
+
+ Отличия от sync:
+ - Параллельная обработка строк (Semaphore)
+ - Retry с exponential backoff
+ - Circuit breaker для устойчивости
+ - Настраиваемые таймауты
+
+ Exit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед
+ отправкой, 3 — нет credentials, 5 — недоступен WordPress,
+ 1 — непредвиденная ошибка.
+
+ Example: wp-bulk async --file site.json --sheets site.ru --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --file                 -f                          PATH     Путь к файлу данных .xlsx или .json  │
+│                                                             (авто-определяется из --project)     │
+│ --domain                                           TEXT     WordPress domain (например,          │
+│                                                             https://example.com)                 │
+│ --username                                         TEXT     WordPress username                   │
+│ --password                                         TEXT     WordPress Application Password       │
+│ --sheets                                           TEXT     Листы Excel / табы JSON через        │
+│                                                             запятую (posts,pages). Для JSON      │
+│                                                             обязателен                           │
+│ --filter                                           TEXT     Фильтр записей field=value           │
+│                                                             (повторяемый, условия по И):         │
+│                                                             --filter type=rb_services            │
+│ --env-file                                         FILE     Путь к .env файлу (по умолчанию      │
+│                                                             .env)                                │
+│ --dry-run              -d                                   Режим dry-run (без изменений)        │
+│ --verbose              -v                                   Подробные логи                       │
+│ --concurrency                                      INTEGER  Количество параллельных запросов     │
+│                                                             (default: 5)                         │
+│ --api-timeout                                      INTEGER  API timeout в секундах (default: 30) │
+│ --max-retries                                      INTEGER  Максимум повторных попыток (default: │
+│                                                             3)                                   │
+│ --circuit-breaker          --no-circuit-breaker             Включить circuit breaker             │
+│                                                             [default: circuit-breaker]           │
+│ --skip-media                                                Пропустить загрузку медиа            │
+│ --skip-tax                                                  Пропустить обновление таксономий     │
+│                                                             (категории, теги)                    │
+│ --no-update-excel                                           Не записывать ID обратно в файл      │
+│                                                             данных (Excel или JSON)              │
+│ --delete-media                                              Удалять featured media при удалении  │
+│                                                             записей (action=delete)              │
+│ --skip-existing-media                                       Не прикреплять существующие          │
+│                                                             featured_media при update            │
+│ --test-mode                                                 Тестовый режим: обрабатывает только  │
+│                                                             первые 3 строки                      │
+│ --columns                                          TEXT     Колонки для обновления через запятую │
+│                                                             (excerpt,seo_title)                  │
+│ --skip-checks                                               Не проверять данные перед отправкой  │
+│                                                             (имена полей, таксономий, значения)  │
+│ --confirm                                                   Подтвердить опасную операцию без     │
+│                                                             вопроса.                             │
+│ --non-interactive                                           Никогда не спрашивать; вместо        │
+│                                                             вопроса — ошибка.                    │
+│ --json                                                      Машиночитаемый JSON-вывод.           │
+│ --quiet                                                     Только существенный вывод.           │
+│ --help                                                      Show this message and exit.          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

@@ -1,0 +1,27 @@
+
+ Usage: wp-bulk taxonomies [OPTIONS]
+
+ Вывести список таксономий сайта (справка).
+
+ sync/async/validate берут таксономии с сайта сами — вписывать их в
+ WP_TAXONOMIES не нужно. env_line — для ручного исключения или для
+ проверки без сайта (validate --offline).
+
+ Пример:
+     wp-bulk --project mysite taxonomies
+     → WP_TAXONOMIES=product_cat,brand,regions
+
+ Exit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,
+ 1 — непредвиденная ошибка.
+
+ Example: wp-bulk taxonomies --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --env-file              FILE  Путь к .env (по умолчанию projects/<name>/.env)                    │
+│ --include-system              Включать служебные таксономии (nav_menu, post_format,              │
+│                               wp_pattern_category и т.п.)                                        │
+│ --json                        Машиночитаемый JSON-вывод.                                         │
+│ --quiet                       Только существенный вывод.                                         │
+│ --help                        Show this message and exit.                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

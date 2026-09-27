@@ -238,6 +238,8 @@ def media_upload(
 
     Exit-коды: 0 — загружен хотя бы один файл, 2 — аргументы/манифест или
     ни одного файла нет на диске, 3 — нет credentials, 5 — недоступен WordPress.
+
+    Example: {cli} media-upload media/1.jpg media/2.jpg --alt "Фото" --json
     """
     items = _build_items(paths, manifest, alt, title, caption)
 

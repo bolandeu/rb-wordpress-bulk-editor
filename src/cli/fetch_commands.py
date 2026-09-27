@@ -147,6 +147,8 @@ def fetch(
 
     Exit-коды: 0 — успех, 1 — отказ в подтверждении, 2 — аргументы/файл,
     3 — нет credentials, 5 — недоступен WordPress.
+
+    Example: {cli} fetch --to-json --tab site.ru --json
     """
     proj = get_project(ctx)
     env_file = resolve_env_file(ctx, env_file)
@@ -577,6 +579,8 @@ def fetch_media(
 ):
     """
     Загрузить список медиафайлов из WordPress в Excel (лист media)
+
+    Example: wp-bulk fetch-media --file media.xlsx
     """
     env_file = resolve_env_file(ctx, env_file)
     file = require_excel_file(ctx, file)
