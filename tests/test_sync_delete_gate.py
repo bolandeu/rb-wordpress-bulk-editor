@@ -32,10 +32,12 @@ class FakeReader:
 
 
 def make_reader(media_actions=(), content_actions=()) -> FakeReader:
-    return FakeReader({
-        "media": pd.DataFrame({"action": list(media_actions), "id": range(len(media_actions))}),
-        "posts": pd.DataFrame({"action": list(content_actions), "id": range(len(content_actions))}),
-    })
+    return FakeReader(
+        {
+            "media": pd.DataFrame({"action": list(media_actions), "id": range(len(media_actions))}),
+            "posts": pd.DataFrame({"action": list(content_actions), "id": range(len(content_actions))}),
+        }
+    )
 
 
 def make_config(**kwargs) -> SimpleNamespace:
@@ -87,14 +89,10 @@ class TestConfirmIrreversible:
         reader = make_reader(content_actions=["delete"])
 
         with pytest.raises(ValidationError) as exc:
-            _confirm_irreversible(
-                make_ctx(), reader, SHEETS, make_config(delete_featured_media=True), confirm=False
-            )
+            _confirm_irreversible(make_ctx(), reader, SHEETS, make_config(delete_featured_media=True), confirm=False)
 
         assert "--delete-media" in exc.value.message
 
     def test_confirm_flag_lets_it_through(self):
         reader = make_reader(media_actions=["delete"])
-        _confirm_irreversible(
-            make_ctx(), reader, SHEETS, make_config(delete_featured_media=True), confirm=True
-        )
+        _confirm_irreversible(make_ctx(), reader, SHEETS, make_config(delete_featured_media=True), confirm=True)

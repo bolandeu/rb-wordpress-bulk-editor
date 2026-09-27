@@ -27,11 +27,7 @@ class TaxonomySyncAsync(TaxonomySyncBase):
     - Результаты собираются через asyncio.gather()
     """
 
-    def __init__(
-        self,
-        wp_client: WordPressClient,
-        config: AppConfig
-    ):
+    def __init__(self, wp_client: WordPressClient, config: AppConfig):
         super().__init__(wp_client, config)
         self.batch_processor = AsyncBatchProcessor(config.sync.concurrency)
 
@@ -82,28 +78,18 @@ class TaxonomySyncAsync(TaxonomySyncBase):
 
                 # Функция обработки (partial для передачи в process_row)
                 if action == "delete":
-                    process_func = partial(
-                        self._delete_term,
-                        taxonomy_endpoint,
-                        row
-                    )
+                    process_func = partial(self._delete_term, taxonomy_endpoint, row)
                 elif action == "update":
-                    process_func = partial(
-                        self._update_term,
-                        taxonomy_endpoint,
-                        row
-                    )
+                    process_func = partial(self._update_term, taxonomy_endpoint, row)
                 else:  # add
-                    process_func = partial(
-                        self._add_term,
-                        taxonomy_endpoint,
-                        row
-                    )
+                    process_func = partial(self._add_term, taxonomy_endpoint, row)
 
                 # Создаем задачу через AsyncBatchProcessor
                 task = self._tracked(
                     self.batch_processor.process_row(action, idx, row, process_func),
-                    record, action, progress,
+                    record,
+                    action,
+                    progress,
                 )
                 tasks.append(task)
 
@@ -134,20 +120,18 @@ class TaxonomySyncAsync(TaxonomySyncBase):
 
                         # Записываем в источник через ASYNC метод
                         if writer and result.api_response and self.config.sync.update_excel:
-                            await writer.update_from_result_async(
-                                result.row_index,
-                                result.api_response,
-                                action
-                            )
+                            await writer.update_from_result_async(result.row_index, result.api_response, action)
                     else:
                         stats["errors"] += 1
-                        error_results.append(SyncResult(
-                            row_index=result.row_index,
-                            action=result.action,
-                            post_id=None,
-                            success=False,
-                            error=str(result.error) if result.error else "Неизвестная ошибка",
-                        ))
+                        error_results.append(
+                            SyncResult(
+                                row_index=result.row_index,
+                                action=result.action,
+                                post_id=None,
+                                success=False,
+                                error=str(result.error) if result.error else "Неизвестная ошибка",
+                            )
+                        )
 
         # Подсчитываем пропущенные
         stats["skipped"] = self._count_skipped(records)

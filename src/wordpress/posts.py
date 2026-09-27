@@ -37,9 +37,7 @@ class PostsEndpoint:
         """
         logger.debug(f"Creating {self.post_type}: {data.get('title', 'No title')}")
         result = await self.client.post(self.endpoint, data)
-        logger.info(
-            f"Created {self.post_type} ID={result['id']}: {result.get('title', {}).get('rendered', 'N/A')}"
-        )
+        logger.info(f"Created {self.post_type} ID={result['id']}: {result.get('title', {}).get('rendered', 'N/A')}")
         return result
 
     async def update(self, post_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,7 +94,7 @@ class PostsEndpoint:
         page: int = 1,
         status: Optional[str] = None,
         suppress_non_retryable_log: bool = False,
-        **params
+        **params,
     ) -> List[Dict[str, Any]]:
         """
         Получить список записей.
@@ -110,11 +108,7 @@ class PostsEndpoint:
         Returns:
             Список записей
         """
-        query_params = {
-            "per_page": min(per_page, 100),
-            "page": page,
-            **params
-        }
+        query_params = {"per_page": min(per_page, 100), "page": page, **params}
 
         # WordPress REST API не везде принимает status=any, хотя это привычное
         # значение из WP_Query. Для одиночного списка просто используем дефолт API.
@@ -181,10 +175,7 @@ class PostsEndpoint:
                         posts_by_id[post_id] = post
 
             all_posts = list(posts_by_id.values())
-            logger.info(
-                f"Fetched {len(all_posts)} {self.post_type} "
-                f"(all statuses: {', '.join(FETCH_ALL_STATUSES)})"
-            )
+            logger.info(f"Fetched {len(all_posts)} {self.post_type} (all statuses: {', '.join(FETCH_ALL_STATUSES)})")
             return all_posts
 
         return await self._get_all_for_status(status)
@@ -212,9 +203,7 @@ class PostsEndpoint:
                 )
             except WordPressError as e:
                 if context is None and "status" in str(e).lower():
-                    logger.debug(
-                        f"Retrying {self.post_type} status='{status}' with context=edit"
-                    )
+                    logger.debug(f"Retrying {self.post_type} status='{status}' with context=edit")
                     return await self._get_all_for_status(
                         status,
                         context="edit",

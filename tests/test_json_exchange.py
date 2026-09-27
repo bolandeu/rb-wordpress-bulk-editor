@@ -22,28 +22,55 @@ SITE_TAB = "mwlogistics.ru"
 
 # ── Фейковый WordPress ───────────────────────────────────────────────
 
+
 class FakeSite:
     """Данные сайта: {rest-путь: [объекты]} + типы/таксономии для discovery."""
 
     def __init__(self):
         self.items = {
             "rb_services": [
-                {"id": 10, "type": "rb_services", "slug": "portery", "status": "publish",
-                 "title": {"rendered": "Портьеры (WP)"}, "content": {"rendered": "<p>x</p>"},
-                 "excerpt": {"rendered": ""}, "link": "https://s/portery", "parent": 0,
-                 "rb_services_cat": [5],
-                 "acf": {"f1": "портьеры", "group": {"inner": "в"}, "phones": [{"n": "1"}]},
-                 "seo": {"title": "SEO WP", "robots": {"index": True},
-                         "schema": {"graph": {"@graph": [{"@type": "WebPage"}]}}}},
+                {
+                    "id": 10,
+                    "type": "rb_services",
+                    "slug": "portery",
+                    "status": "publish",
+                    "title": {"rendered": "Портьеры (WP)"},
+                    "content": {"rendered": "<p>x</p>"},
+                    "excerpt": {"rendered": ""},
+                    "link": "https://s/portery",
+                    "parent": 0,
+                    "rb_services_cat": [5],
+                    "acf": {"f1": "портьеры", "group": {"inner": "в"}, "phones": [{"n": "1"}]},
+                    "seo": {
+                        "title": "SEO WP",
+                        "robots": {"index": True},
+                        "schema": {"graph": {"@graph": [{"@type": "WebPage"}]}},
+                    },
+                },
             ],
             "posts": [
-                {"id": 20, "type": "post", "slug": "news", "status": "draft",
-                 "title": {"rendered": "Новость"}, "content": {"rendered": ""},
-                 "excerpt": {"rendered": ""}, "categories": [], "tags": []},
+                {
+                    "id": 20,
+                    "type": "post",
+                    "slug": "news",
+                    "status": "draft",
+                    "title": {"rendered": "Новость"},
+                    "content": {"rendered": ""},
+                    "excerpt": {"rendered": ""},
+                    "categories": [],
+                    "tags": [],
+                },
             ],
             "rb_services_cat": [
-                {"id": 5, "name": "Импорт из Китая", "slug": "import", "description": "Текст",
-                 "parent": 0, "taxonomy": "rb_services_cat", "acf": {"icon": "box"}},
+                {
+                    "id": 5,
+                    "name": "Импорт из Китая",
+                    "slug": "import",
+                    "description": "Текст",
+                    "parent": 0,
+                    "taxonomy": "rb_services_cat",
+                    "acf": {"icon": "box"},
+                },
             ],
         }
         self.types = {"post": {"name": "Posts"}, "rb_services": {"name": "Услуги"}}
@@ -63,6 +90,7 @@ class FakeSite:
                 if item["id"] == int(item_id):
                     return item
             from src.exceptions import NotFoundError
+
             raise NotFoundError(f"{endpoint} не найден")
         return list(self.items.get(path, []))
 
@@ -134,24 +162,50 @@ def payload(result):
 @pytest.fixture
 def project_json(tmp_path):
     """Реестр в духе antagor: служебный таб + смешанный таб сайта."""
-    return write_doc(tmp_path / "data.json", {
-        "options": [{"_row_num": 2, "key": "phone", "value": "+7"}],
-        SITE_TAB: [
-            {"_row_num": 2, "action": "skip", "id": "10", "type": "rb_services", "taxonomy": "",
-             "title": "Портьеры", "seo.title": "", "acf.f1": ""},
-            {"_row_num": 3, "action": "skip", "id": 5, "type": "", "taxonomy": "rb_services_cat",
-             "name": "Старое имя", "description": ""},
-            {"_row_num": 4, "action": "add", "type": "rb_services", "title": "Без id"},
-        ],
-    })
+    return write_doc(
+        tmp_path / "data.json",
+        {
+            "options": [{"_row_num": 2, "key": "phone", "value": "+7"}],
+            SITE_TAB: [
+                {
+                    "_row_num": 2,
+                    "action": "skip",
+                    "id": "10",
+                    "type": "rb_services",
+                    "taxonomy": "",
+                    "title": "Портьеры",
+                    "seo.title": "",
+                    "acf.f1": "",
+                },
+                {
+                    "_row_num": 3,
+                    "action": "skip",
+                    "id": 5,
+                    "type": "",
+                    "taxonomy": "rb_services_cat",
+                    "name": "Старое имя",
+                    "description": "",
+                },
+                {"_row_num": 4, "action": "add", "type": "rb_services", "title": "Без id"},
+            ],
+        },
+    )
 
 
 # ── update ───────────────────────────────────────────────────────────
 
+
 class TestUpdateJson:
     def test_pulls_fields_for_content_and_terms(self, fake_wp, project_json):
-        result = run("update", "--file", str(project_json), "--sheets", SITE_TAB,
-                     "--columns", "title,seo.title,acf.f1,name,seo.robots.index")
+        result = run(
+            "update",
+            "--file",
+            str(project_json),
+            "--sheets",
+            SITE_TAB,
+            "--columns",
+            "title,seo.title,acf.f1,name,seo.robots.index",
+        )
 
         assert result.exit_code == 0, result.stdout
         content, term, no_id = read_tab(project_json)
@@ -165,8 +219,7 @@ class TestUpdateJson:
         assert payload(result)["updated"] == 2
 
     def test_id_filter(self, fake_wp, project_json):
-        result = run("update", "--file", str(project_json), "--sheets", SITE_TAB,
-                     "--columns", "name", "--id", "5")
+        result = run("update", "--file", str(project_json), "--sheets", SITE_TAB, "--columns", "name", "--id", "5")
 
         assert result.exit_code == 0, result.stdout
         assert payload(result)["found"] == 1
@@ -175,8 +228,9 @@ class TestUpdateJson:
     def test_dry_run_does_not_touch_the_file(self, fake_wp, project_json):
         before = project_json.read_bytes()
 
-        result = run("update", "--file", str(project_json), "--sheets", SITE_TAB,
-                     "--columns", "title,name", "--dry-run")
+        result = run(
+            "update", "--file", str(project_json), "--sheets", SITE_TAB, "--columns", "title,name", "--dry-run"
+        )
 
         assert result.exit_code == 0, result.stdout
         assert payload(result)["updated"] == 2
@@ -218,6 +272,7 @@ class TestUpdateExcel:
 
 
 # ── fetch ────────────────────────────────────────────────────────────
+
 
 class TestFetchJson:
     def test_one_tab_per_site_terms_first(self, fake_wp, tmp_path):
@@ -310,14 +365,20 @@ class TestFetchJson:
 
 # ── validate ─────────────────────────────────────────────────────────
 
+
 class TestValidateJson:
     def test_all_problems_reported_without_credentials(self, fake_wp, tmp_path):
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "type": "posts", "taxonomy": "category"},
-            {"_row_num": 2, "type": "posts"},
-            {"_row_num": 3},
-            {"_row_num": 4, "action": "u", "id": 1, "type": "posts", "acf.more": "content/404.html"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "type": "posts", "taxonomy": "category"},
+                    {"_row_num": 2, "type": "posts"},
+                    {"_row_num": 3},
+                    {"_row_num": 4, "action": "u", "id": 1, "type": "posts", "acf.more": "content/404.html"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
 
@@ -330,11 +391,16 @@ class TestValidateJson:
     def test_broken_file_on_skip_record_is_a_warning(self, fake_wp, tmp_path):
         (tmp_path / "content").mkdir()
         (tmp_path / "content" / "1.html").write_text("<p>ok</p>", encoding="utf-8")
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "action": "add", "type": "posts", "title": "a", "acf.more": "content/1.html"},
-            {"_row_num": 3, "action": "skip", "id": 2, "type": "posts", "acf.more": "content/2.html"},
-            {"_row_num": 4, "action": "publish", "id": 3, "type": "posts"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "action": "add", "type": "posts", "title": "a", "acf.more": "content/1.html"},
+                    {"_row_num": 3, "action": "skip", "id": 2, "type": "posts", "acf.more": "content/2.html"},
+                    {"_row_num": 4, "action": "publish", "id": 3, "type": "posts"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
 
@@ -348,7 +414,6 @@ class TestValidateJson:
 
         assert result.exit_code == 2
         assert "--sheets" in payload(result)["error"]["message"]
-
 
 
 class TestValidateWithSite:
@@ -373,9 +438,14 @@ class TestValidateWithSite:
         return state
 
     def test_site_taxonomy_is_accepted(self, online, tmp_path):
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
 
@@ -383,9 +453,14 @@ class TestValidateWithSite:
         assert payload(result)["site_checked"] is True
 
     def test_unknown_type_found(self, online, tmp_path):
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
 
@@ -393,9 +468,14 @@ class TestValidateWithSite:
         assert "rb_services" in payload(result)["error"]["message"]
 
     def test_offline_flag_does_not_touch_the_site(self, online, tmp_path):
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "action": "add", "type": "rb_servces", "title": "A"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB, "--offline")
 
@@ -410,9 +490,14 @@ class TestValidateWithSite:
             raise NetworkError("сайт не ответил")
 
         monkeypatch.setattr(tool_commands, "_load_site_schema", down)
-        path = write_doc(tmp_path / "data.json", {SITE_TAB: [
-            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A"},
-        ]})
+        path = write_doc(
+            tmp_path / "data.json",
+            {
+                SITE_TAB: [
+                    {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A"},
+                ]
+            },
+        )
 
         result = run("validate", "--file", str(path), "--sheets", SITE_TAB)
 
@@ -420,6 +505,7 @@ class TestValidateWithSite:
 
 
 # ── Термин: fetch → правка → sync ────────────────────────────────────
+
 
 class TestTermPayloadRoundTrip:
     """Термин из общего JSON-таба должен уходить на сайт вложенными acf/seo."""
@@ -438,8 +524,15 @@ class TestTermPayloadRoundTrip:
         from src.records.json_source import SOURCE_META_FIELDS
 
         record = term_to_record(
-            {"id": 5, "name": "Импорт", "slug": "import", "description": "", "parent": 0,
-             "acf": {"icon": "box"}, "seo": {"title": "SEO", "robots": {"index": False}}},
+            {
+                "id": 5,
+                "name": "Импорт",
+                "slug": "import",
+                "description": "",
+                "parent": 0,
+                "acf": {"icon": "box"},
+                "seo": {"title": "SEO", "robots": {"index": False}},
+            },
             "rb_services_cat",
         )
         record["acf.icon"] = "ship"
@@ -452,10 +545,19 @@ class TestTermPayloadRoundTrip:
         assert not any("." in key for key in payload)
 
     def test_blank_columns_of_mixed_tab_are_not_sent(self, tmp_path):
-        payload = self.build({
-            "name": "Термин", "slug": "t", "acf.f1": "", "seo.title": "",
-            "seo.robots.index": "", "date": "", "link": "", "title": "",
-        }, tmp_path)
+        payload = self.build(
+            {
+                "name": "Термин",
+                "slug": "t",
+                "acf.f1": "",
+                "seo.title": "",
+                "seo.robots.index": "",
+                "date": "",
+                "link": "",
+                "title": "",
+            },
+            tmp_path,
+        )
 
         assert "acf" not in payload
         assert payload["seo"] == {"robots": {"index": True}}  # bool по умолчанию true

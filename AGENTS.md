@@ -542,6 +542,8 @@ docstring'ов. Добавили команду — написали хорош�
    `confirm: bool = output.ConfirmOption` и `non_interactive: bool = output.NonInteractiveOption`,
    вопрос задавать только через `output.require_confirmation`.
 7. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
+8. Docstring с `Example: {cli} <команда> …`, `help=` у каждого параметра, группа — через
+   `output.group("…")`; `uv run pytest --snapshot-update` и фрагмент `changelog.d/` (`added`).
 
 ---
 
@@ -591,11 +593,35 @@ WPBulkEditorError                       UNEXPECTED (1)
 ## Тесты и качество
 
 ```bash
-uv sync
-uv run python -m pytest -q                     # (uv run pytest не резолвится в PATH)
-uv run python -m pytest -q --cov=src --cov-report=term-missing   # fail_under в pyproject
-uv run ruff check .
+uv sync --all-groups
+uv run scripts/release.py --check    # весь гейт — перед каждым коммитом
+uv run pytest -q                     # покрытие включено (fail_under в pyproject)
+uv run pytest --snapshot-update      # после правки справки команды
 ```
+
+**Гейт — `scripts/release.py` (стандарт `tools/docs/standard-release.md` §3)**, копия
+из cli-generator дословно, руками не править: `uv lock --check`, ruff check + format,
+ty, pytest (покрытие, контракт справки, форма `auth status`), фрагмент changelog,
+сборка wheel и `wp-bulk --version`/`--help` в чистом venv, osv-scanner по `uv.lock`.
+ty в `tests/` для утиных дублёров только предупреждает (`[tool.ty.overrides]`),
+`src/` — на полной строгости.
+
+**Релиз:** `uv run scripts/release.py patch|minor|major` на чистом `main` —
+гейт, `towncrier build`, коммит `Release vX.Y.Z` и annotated-тег; пушит пользователь
+(`git push --follow-tags`). Строки `version =` нет, `CHANGELOG.md` руками не правится:
+каждое изменение — фрагмент `changelog.d/+<slug>.<type>.md`.
+
+**Справка команды = её docstring.** Поменял поведение команды — поправь docstring в том
+же коммите (хуки `.claude/settings.json` и `.githooks/pre-commit` это проверяют,
+`scripts/install_hooks.sh` — один раз на клон), строка `Example: {cli} <команда> …`
+обязательна (`{cli}` подставляет `output.guard`; у команд без guard — буквально `wp-bulk`),
+у каждого параметра `help=`; `tests/snapshots/help/` обновляет `--snapshot-update`.
+Квадратные скобки в docstring экранировать `\\[…]` — иначе rich съест их как разметку.
+
+**`auth status` (§8)** — `src/credentials/health.py`, форма зафиксирована
+`tests/test_auth_status.py` (её смена — ломающее изменение). Цели `wp:<домен>`:
+индекс сохранённых доменов в keychain (`credentials.manager.stored_names`, keyring
+не умеет перечислять) + сайт активного проекта + `--provider`. LLM — отчёт llmkit.
 
 Конвенции тестов: плоские `tests/test_<module>.py`, группировка в `class Test<Thing>:`,
 `asyncio_mode = "auto"`. HTTP мокается через `httpx.MockTransport` + хелпер

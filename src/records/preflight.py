@@ -46,24 +46,57 @@ if TYPE_CHECKING:
 # Поля WordPress (контент и термины), которые понимает маппинг
 KNOWN_FIELDS = frozenset(SYSTEM_COLUMNS) | {
     # контент
-    "title", "content", "excerpt", "slug", "status", "parent", "menu_order",
-    "author", "template", "comment_status", "ping_status", "sticky", "format",
-    "password", "date_gmt", "modified_gmt", "custom_permalink",
+    "title",
+    "content",
+    "excerpt",
+    "slug",
+    "status",
+    "parent",
+    "menu_order",
+    "author",
+    "template",
+    "comment_status",
+    "ping_status",
+    "sticky",
+    "format",
+    "password",
+    "date_gmt",
+    "modified_gmt",
+    "custom_permalink",
     # термины
-    "name", "description", "count",
+    "name",
+    "description",
+    "count",
     # медиа
-    "alt_text", "caption",
+    "alt_text",
+    "caption",
     # legacy SEO (Yoast-стиль, без точки)
-    "seo_title", "seo_description", "seo_meta_keywords", "seo_focus_keyword",
-    "seo_noindex", "seo_nofollow",
+    "seo_title",
+    "seo_description",
+    "seo_meta_keywords",
+    "seo_focus_keyword",
+    "seo_noindex",
+    "seo_nofollow",
 }
 
 # SEO-поля по умолчанию; WP_SEO_FIELDS проекта добавляется к ним
-DEFAULT_SEO_FIELDS = frozenset({
-    "seo.title", "seo.description", "seo.keywords", "seo.h1", "seo.intent",
-    "seo.breadcrumb", "seo.canonical",
-    "seo.og.title", "seo.og.description", "seo.og.image",
-}) | BOOL_FIELDS_DEFAULT_TRUE
+DEFAULT_SEO_FIELDS = (
+    frozenset(
+        {
+            "seo.title",
+            "seo.description",
+            "seo.keywords",
+            "seo.h1",
+            "seo.intent",
+            "seo.breadcrumb",
+            "seo.canonical",
+            "seo.og.title",
+            "seo.og.description",
+            "seo.og.image",
+        }
+    )
+    | BOOL_FIELDS_DEFAULT_TRUE
+)
 
 # Поля, которые проверкой имён не трогаются: их набор задаёт сайт
 FREE_PREFIXES = ("acf.", ACF_PREFIX, "meta.")
@@ -98,6 +131,7 @@ class FieldRules:
             и по самому файлу (записи-термины с `taxonomy`).
         declared: Таксономии, объявленные в файле записями-терминами.
     """
+
     known_taxonomies: Optional[List[str]] = None
     seo_fields: Iterable[str] = ()
     extra_fields: Iterable[str] = ()
@@ -109,6 +143,7 @@ class FieldRules:
         """Правила из .env проекта: WP_TAXONOMIES, WP_SEO_FIELDS, WP_EXTRA_FIELDS."""
         if settings is None:
             from ..config import Settings
+
             settings = Settings()
         return cls(
             known_taxonomies=settings.get_taxonomies(),
@@ -134,6 +169,7 @@ class FieldRules:
 @dataclass
 class TabCheck:
     """Итог проверки одного набора данных (лист Excel / таб JSON)."""
+
     tab: str
     records: int = 0
     errors: List[str] = field(default_factory=list)
@@ -221,9 +257,7 @@ def check_records(
                 if sending:
                     result.errors.append(f"{place}: {problem}")
                 else:
-                    result.warnings.append(
-                        f"{place}: {problem} (action={action or 'пусто'} — на сайт не уйдёт)"
-                    )
+                    result.warnings.append(f"{place}: {problem} (action={action or 'пусто'} — на сайт не уйдёт)")
 
     for (discriminator, _, slug), places in slugs.items():
         if len(places) > 1:
@@ -265,33 +299,40 @@ def _site_problems(
 
     if record.is_taxonomy:
         if not site.taxonomy(discriminator):
-            problems.append((
-                f"таксономии '{discriminator}' на сайте нет{_hint(site.closest_taxonomy(discriminator))}",
-                acting,
-            ))
+            problems.append(
+                (
+                    f"таксономии '{discriminator}' на сайте нет{_hint(site.closest_taxonomy(discriminator))}",
+                    acting,
+                )
+            )
         return problems
 
     type_known = site.has_type(discriminator)
     if not type_known:
-        problems.append((
-            f"типа записи '{discriminator}' на сайте нет{_hint(site.closest_type(discriminator))}",
-            acting,
-        ))
+        problems.append(
+            (
+                f"типа записи '{discriminator}' на сайте нет{_hint(site.closest_type(discriminator))}",
+                acting,
+            )
+        )
 
     for name, value in record.data.items():
         if name.startswith(FREE_PREFIXES) or not is_taxonomy_column(name, taxonomies):
             continue
         if not site.taxonomy(name):
-            problems.append((
-                f"колонка '{name}': таксономии '{name}' на сайте нет"
-                f"{_hint(site.closest_taxonomy(name))}",
-                sending,
-            ))
+            problems.append(
+                (
+                    f"колонка '{name}': таксономии '{name}' на сайте нет{_hint(site.closest_taxonomy(name))}",
+                    sending,
+                )
+            )
         elif type_known and not is_blank(value) and not site.is_attached(discriminator, name):
-            problems.append((
-                f"таксономия '{name}' не привязана к типу '{discriminator}' — WordPress проигнорирует поле",
-                sending,
-            ))
+            problems.append(
+                (
+                    f"таксономия '{name}' не привязана к типу '{discriminator}' — WordPress проигнорирует поле",
+                    sending,
+                )
+            )
     return problems
 
 
@@ -340,9 +381,7 @@ def _value_problems(record: Record, action: str, rules: FieldRules) -> List[str]
     if not record.is_taxonomy:
         status = data.get("status")
         if not is_blank(status) and str(status).strip() not in VALID_STATUSES:
-            problems.append(
-                f"status {status!r} не из допустимых: {', '.join(sorted(VALID_STATUSES))}"
-            )
+            problems.append(f"status {status!r} не из допустимых: {', '.join(sorted(VALID_STATUSES))}")
 
     for name, value in data.items():
         if is_blank(value):
@@ -356,8 +395,7 @@ def _value_problems(record: Record, action: str, rules: FieldRules) -> List[str]
             and _BAD_TERM_DELIMITER.search(value)
         ):
             problems.append(
-                f"'{name}' = {value!r}: термины разделяются '{TAXONOMY_DELIMITER}' "
-                "(точка с запятой и пробел)"
+                f"'{name}' = {value!r}: термины разделяются '{TAXONOMY_DELIMITER}' (точка с запятой и пробел)"
             )
 
     return problems
@@ -408,9 +446,7 @@ def check_sources(
     # Таксономии, объявленные файлом (записи-термины, листы таксономий Excel),
     # действуют на все наборы: лист `rb_topic` делает таксономией колонку
     # `rb_topic` на листе `rb_services`.
-    rules = rules.with_declared(
-        r.discriminator for _, records in read for r in records if r.is_taxonomy
-    )
+    rules = rules.with_declared(r.discriminator for _, records in read for r in records if r.is_taxonomy)
     checks = []
     for source, records in read:
         name = getattr(source, "sheet_name", None) or getattr(source, "tab_name")

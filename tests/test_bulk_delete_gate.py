@@ -94,9 +94,7 @@ class TestBulkDeleteGate:
         }
 
     def test_json_stdout_is_envelope_only_on_dry_run(self, fake_wp):
-        result = runner.invoke(
-            app, ["--json", "bulk-delete", "--post-type", "posts", "--dry-run"]
-        )
+        result = runner.invoke(app, ["--json", "bulk-delete", "--post-type", "posts", "--dry-run"])
 
         assert result.exit_code == 0
         payload = json.loads(result.stdout.strip())

@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 import csv
 import asyncio
 from loguru import logger
@@ -16,11 +16,7 @@ class MediaExporter:
     """Экспорт медиафайлов из WordPress с метаданными."""
 
     def __init__(
-        self,
-        media_endpoint: MediaEndpoint,
-        export_folder: Path,
-        download_files: bool = True,
-        concurrency: int = 10
+        self, media_endpoint: MediaEndpoint, export_folder: Path, download_files: bool = True, concurrency: int = 10
     ):
         """
         Args:
@@ -93,15 +89,10 @@ class MediaExporter:
         """
         async with self._semaphore:
             try:
-                media_id = media["id"]
-
                 # Скачиваем файл если нужно
                 file_path = None
                 if self.download_files:
-                    file_path = await self.media_endpoint.download_media(
-                        media,
-                        self.export_folder
-                    )
+                    file_path = await self.media_endpoint.download_media(media, self.export_folder)
 
                 # Добавляем в CSV
                 self._add_to_csv(media, file_path)
@@ -112,11 +103,7 @@ class MediaExporter:
                 logger.error(f"Failed to export media {media.get('id')}: {e}")
                 return False
 
-    def _add_to_csv(
-        self,
-        media: Dict[str, Any],
-        file_path: Optional[Path]
-    ):
+    def _add_to_csv(self, media: Dict[str, Any], file_path: Optional[Path]):
         """
         Добавить медиафайл в CSV индекс.
 
@@ -130,25 +117,27 @@ class MediaExporter:
             file_relative = file_path.relative_to(self.export_folder).as_posix()
 
         # Формируем запись
-        self.csv_data.append({
-            "id": media.get("id", ""),
-            "date": media.get("date", ""),
-            "modified": media.get("modified", ""),
-            "title": wp_rendered(media.get("title", {})),
-            "type": media.get("type", ""),
-            "slug": media.get("slug", ""),
-            "link": media.get("link", ""),
-            "status": media.get("status", ""),
-            "guid": wp_rendered(media.get("guid", {})),
-            "caption": wp_rendered(media.get("caption", {})),
-            "alt_text": media.get("alt_text", ""),
-            "media_type": media.get("media_type", ""),
-            "mime_type": media.get("mime_type", ""),
-            "post": media.get("post", ""),
-            "source_url": media.get("source_url", ""),
-            "description": wp_rendered(media.get("description", {})),
-            "file_path": file_relative,
-        })
+        self.csv_data.append(
+            {
+                "id": media.get("id", ""),
+                "date": media.get("date", ""),
+                "modified": media.get("modified", ""),
+                "title": wp_rendered(media.get("title", {})),
+                "type": media.get("type", ""),
+                "slug": media.get("slug", ""),
+                "link": media.get("link", ""),
+                "status": media.get("status", ""),
+                "guid": wp_rendered(media.get("guid", {})),
+                "caption": wp_rendered(media.get("caption", {})),
+                "alt_text": media.get("alt_text", ""),
+                "media_type": media.get("media_type", ""),
+                "mime_type": media.get("mime_type", ""),
+                "post": media.get("post", ""),
+                "source_url": media.get("source_url", ""),
+                "description": wp_rendered(media.get("description", {})),
+                "file_path": file_relative,
+            }
+        )
 
     def save_csv_index(self):
         """Сохранить CSV индекс всех медиафайлов."""
@@ -158,9 +147,22 @@ class MediaExporter:
 
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
             fieldnames = [
-                "id", "date", "modified", "title", "type", "slug", "link",
-                "status", "guid", "caption", "alt_text", "media_type",
-                "mime_type", "post", "source_url", "file_path"
+                "id",
+                "date",
+                "modified",
+                "title",
+                "type",
+                "slug",
+                "link",
+                "status",
+                "guid",
+                "caption",
+                "alt_text",
+                "media_type",
+                "mime_type",
+                "post",
+                "source_url",
+                "file_path",
             ]
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
 

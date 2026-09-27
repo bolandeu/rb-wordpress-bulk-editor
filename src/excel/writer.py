@@ -10,7 +10,8 @@ from openpyxl import load_workbook
 from loguru import logger
 
 from ..exceptions import ExcelError
-from ..mappers.writeback_mapper import build_update_data_from_api, normalize_api_value
+from ..mappers.writeback_mapper import build_update_data_from_api
+from ..mappers.writeback_mapper import normalize_api_value  # noqa: F401 — ре-экспорт: sync/field_pull, тесты
 
 
 EXCEL_CELL_CHAR_LIMIT = 32767
@@ -43,9 +44,7 @@ def _find_oversized_cells(
             for index, value in series.items():
                 if isinstance(value, str) and len(value) > limit:
                     excel_row = int(index) + 2  # +1 header, +1 zero-based index
-                    problems.append(
-                        f"{sheet_name}!{column}{excel_row}: {len(value)} chars"
-                    )
+                    problems.append(f"{sheet_name}!{column}{excel_row}: {len(value)} chars")
 
     return problems
 
@@ -58,11 +57,7 @@ class ExcelWriter:
     Thread-safe для async операций через asyncio.Lock.
     """
 
-    def __init__(
-        self,
-        excel_file: Path,
-        taxonomy_cache: Optional[Any] = None
-    ):
+    def __init__(self, excel_file: Path, taxonomy_cache: Optional[Any] = None):
         """
         Args:
             excel_file: Путь к Excel файлу
@@ -85,20 +80,11 @@ class ExcelWriter:
         # Загружаем все листы в DataFrame
         with pd.ExcelFile(self.excel_file) as xls:
             for sheet_name in xls.sheet_names:
-                self._dataframes[sheet_name] = pd.read_excel(
-                    xls,
-                    sheet_name=sheet_name,
-                    dtype=str
-                )
+                self._dataframes[sheet_name] = pd.read_excel(xls, sheet_name=sheet_name, dtype=str)
                 # NEW: Создаем lock для каждого листа
                 self._locks[sheet_name] = asyncio.Lock()
 
-    def update_row(
-        self,
-        sheet_name: str,
-        row_index: int,
-        data: Dict[str, Any]
-    ):
+    def update_row(self, sheet_name: str, row_index: int, data: Dict[str, Any]):
         """
         Обновить строку в листе.
 
@@ -128,11 +114,7 @@ class ExcelWriter:
 
         logger.debug(f"Updated row {row_index} in sheet {sheet_name}: {list(data.keys())}")
 
-    def append_rows(
-        self,
-        sheet_name: str,
-        rows: list[Dict[str, Any]]
-    ):
+    def append_rows(self, sheet_name: str, rows: list[Dict[str, Any]]):
         """
         Добавить новые строки в конец листа.
 
@@ -159,25 +141,16 @@ class ExcelWriter:
 
         # Сохраняем старый порядок и добавляем новые колонки из fetch/мапперов.
         # Это важно для content_path: старые Excel-файлы могли быть без этой колонки.
-        ordered_columns = list(df.columns) + [
-            col for col in new_df.columns if col not in df.columns
-        ]
+        ordered_columns = list(df.columns) + [col for col in new_df.columns if col not in df.columns]
         new_df = new_df[ordered_columns]
 
         # Добавляем новые строки
-        self._dataframes[sheet_name] = pd.concat(
-            [df, new_df],
-            ignore_index=True
-        )
+        self._dataframes[sheet_name] = pd.concat([df, new_df], ignore_index=True)
         self._dirty = True
 
         logger.info(f"Appended {len(rows)} rows to sheet {sheet_name}")
 
-    def replace_rows(
-        self,
-        sheet_name: str,
-        rows: list[Dict[str, Any]]
-    ):
+    def replace_rows(self, sheet_name: str, rows: list[Dict[str, Any]]):
         """
         Заменить все строки в листе новыми данными (кроме заголовков).
 
@@ -205,9 +178,7 @@ class ExcelWriter:
 
         # Сохраняем старый порядок и добавляем новые колонки из fetch/мапперов.
         # Это важно для content_path: старые Excel-файлы могли быть без этой колонки.
-        ordered_columns = list(df.columns) + [
-            col for col in new_df.columns if col not in df.columns
-        ]
+        ordered_columns = list(df.columns) + [col for col in new_df.columns if col not in df.columns]
         new_df = new_df[ordered_columns]
 
         # Заменяем все строки новыми данными
@@ -217,11 +188,7 @@ class ExcelWriter:
         logger.info(f"Replaced all rows in sheet {sheet_name} with {len(rows)} new rows")
 
     def _build_update_data_from_api(
-        self,
-        sheet_name: str,
-        api_response: Dict[str, Any],
-        action: str,
-        columns_filter: Optional[List[str]] = None
+        self, sheet_name: str, api_response: Dict[str, Any], action: str, columns_filter: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Построить словарь данных для обновления строки из ответа WordPress API.
@@ -255,7 +222,7 @@ class ExcelWriter:
         row_index: int,
         api_response: Dict[str, Any],
         action: str,
-        columns_filter: Optional[List[str]] = None
+        columns_filter: Optional[List[str]] = None,
     ):
         """
         Обновить строку данными из ответа WordPress API.
@@ -267,9 +234,7 @@ class ExcelWriter:
             action: Тип операции (add, update, delete)
             columns_filter: Если задан — ограничить writeback (только action, modified, id)
         """
-        update_data = self._build_update_data_from_api(
-            sheet_name, api_response, action, columns_filter=columns_filter
-        )
+        update_data = self._build_update_data_from_api(sheet_name, api_response, action, columns_filter=columns_filter)
         if update_data:
             self.update_row(sheet_name, row_index, update_data)
 
@@ -277,12 +242,7 @@ class ExcelWriter:
     # Async methods with Lock (NEW)
     # ========================================
 
-    async def update_row_async(
-        self,
-        sheet_name: str,
-        row_index: int,
-        data: Dict[str, Any]
-    ):
+    async def update_row_async(self, sheet_name: str, row_index: int, data: Dict[str, Any]):
         """
         Async версия update_row с thread-safety через Lock.
 
@@ -306,7 +266,7 @@ class ExcelWriter:
         row_index: int,
         api_response: Dict[str, Any],
         action: str,
-        columns_filter: Optional[List[str]] = None
+        columns_filter: Optional[List[str]] = None,
     ):
         """
         Async версия update_from_api_response с thread-safety.
@@ -319,9 +279,7 @@ class ExcelWriter:
             columns_filter: Если задан — ограничить writeback (только action, modified, id)
         """
         # Формируем update_data (вне блокировки для минимизации времени lock)
-        update_data = self._build_update_data_from_api(
-            sheet_name, api_response, action, columns_filter=columns_filter
-        )
+        update_data = self._build_update_data_from_api(sheet_name, api_response, action, columns_filter=columns_filter)
 
         # Блокируем только момент записи
         if update_data:
@@ -353,19 +311,11 @@ class ExcelWriter:
                 )
 
             # Используем ExcelWriter из pandas для записи всех листов
-            with pd.ExcelWriter(
-                self.excel_file,
-                engine="openpyxl",
-                mode="w"
-            ) as writer:
+            with pd.ExcelWriter(self.excel_file, engine="openpyxl", mode="w") as writer:
                 for sheet_name, df in self._dataframes.items():
-                    df.to_excel(
-                        writer,
-                        sheet_name=sheet_name,
-                        index=False
-                    )
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-            logger.info(f"Successfully saved Excel file")
+            logger.info("Successfully saved Excel file")
             self._dirty = False
 
         except Exception as e:

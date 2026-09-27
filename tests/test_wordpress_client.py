@@ -3,16 +3,16 @@ Tests for src/wordpress/client.py
 """
 
 import base64
-import json
 import pytest
 import httpx
 
 from src.wordpress.client import WordPressClient
 from src.config import WordPressConfig
-from src.exceptions import AuthenticationError, NotFoundError, ServerError, NetworkError
+from src.exceptions import AuthenticationError, NotFoundError, ServerError
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def make_config(url="https://example.com", username="admin", password="secret") -> WordPressConfig:
     return WordPressConfig(url=url, username=username, password=password)
@@ -23,6 +23,7 @@ def mock_transport(responses: dict):
     Простой MockTransport: responses = {method_url_key: httpx.Response}.
     Ключ: "METHOD URL", например "GET https://example.com/wp-json/wp/v2/posts".
     """
+
     def handler(request: httpx.Request) -> httpx.Response:
         key = f"{request.method} {request.url}"
         if key in responses:
@@ -33,6 +34,7 @@ def mock_transport(responses: dict):
 
 
 # ── Auth headers ──────────────────────────────────────────────────────
+
 
 class TestAuthHeaders:
     async def test_basic_auth_header_set(self):
@@ -61,14 +63,17 @@ class TestAuthHeaders:
 
 # ── GET requests ──────────────────────────────────────────────────────
 
+
 class TestGet:
     async def test_get_returns_parsed_json(self):
         config = make_config()
-        transport = mock_transport({
-            "GET https://example.com/wp-json/wp/v2/posts": httpx.Response(
-                200, json=[{"id": 1, "title": {"rendered": "Hello"}}]
-            )
-        })
+        transport = mock_transport(
+            {
+                "GET https://example.com/wp-json/wp/v2/posts": httpx.Response(
+                    200, json=[{"id": 1, "title": {"rendered": "Hello"}}]
+                )
+            }
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -82,9 +87,13 @@ class TestGet:
 
     async def test_get_raises_not_found(self):
         config = make_config()
-        transport = mock_transport({
-            "GET https://example.com/wp-json/wp/v2/posts/999": httpx.Response(404, json={"code": "rest_post_invalid_id"})
-        })
+        transport = mock_transport(
+            {
+                "GET https://example.com/wp-json/wp/v2/posts/999": httpx.Response(
+                    404, json={"code": "rest_post_invalid_id"}
+                )
+            }
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -96,9 +105,9 @@ class TestGet:
 
     async def test_get_raises_auth_error(self):
         config = make_config()
-        transport = mock_transport({
-            "GET https://example.com/wp-json/wp/v2/posts": httpx.Response(401, json={"code": "rest_forbidden"})
-        })
+        transport = mock_transport(
+            {"GET https://example.com/wp-json/wp/v2/posts": httpx.Response(401, json={"code": "rest_forbidden"})}
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -110,9 +119,9 @@ class TestGet:
 
     async def test_authenticated_connection_checks_current_user(self):
         config = make_config()
-        transport = mock_transport({
-            "GET https://example.com/wp-json/wp/v2/users/me": httpx.Response(200, json={"id": 1})
-        })
+        transport = mock_transport(
+            {"GET https://example.com/wp-json/wp/v2/users/me": httpx.Response(200, json={"id": 1})}
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -123,9 +132,9 @@ class TestGet:
 
     async def test_get_raises_server_error(self):
         config = make_config()
-        transport = mock_transport({
-            "GET https://example.com/wp-json/wp/v2/posts": httpx.Response(500, text="Internal Server Error")
-        })
+        transport = mock_transport(
+            {"GET https://example.com/wp-json/wp/v2/posts": httpx.Response(500, text="Internal Server Error")}
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -138,14 +147,13 @@ class TestGet:
 
 # ── POST requests ─────────────────────────────────────────────────────
 
+
 class TestPost:
     async def test_post_returns_created_resource(self):
         config = make_config()
-        transport = mock_transport({
-            "POST https://example.com/wp-json/wp/v2/posts": httpx.Response(
-                201, json={"id": 42, "status": "publish"}
-            )
-        })
+        transport = mock_transport(
+            {"POST https://example.com/wp-json/wp/v2/posts": httpx.Response(201, json={"id": 42, "status": "publish"})}
+        )
         async with WordPressClient(config) as client:
             client._client = httpx.AsyncClient(
                 base_url="https://example.com",
@@ -158,6 +166,7 @@ class TestPost:
 
 
 # ── Config validation ─────────────────────────────────────────────────
+
 
 class TestConfigValidation:
     def test_url_without_scheme_gets_https(self):
@@ -178,6 +187,7 @@ class TestConfigValidation:
 
 
 # ── Загрузка медиа ────────────────────────────────────────────────────
+
 
 class TestMediaUploadHeaders:
     async def test_single_content_type_is_the_file_mime(self):

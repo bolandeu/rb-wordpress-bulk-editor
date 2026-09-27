@@ -91,14 +91,10 @@ class FileValueResolver:
             return path.resolve()
 
         if self.base_dir is None:
-            raise ValidationError(
-                f"Поле '{field}': относительный путь '{raw}' — неизвестна папка файла данных"
-            )
+            raise ValidationError(f"Поле '{field}': относительный путь '{raw}' — неизвестна папка файла данных")
         resolved = (self.base_dir / path).resolve()
         try:
             resolved.relative_to(self.base_dir)
         except ValueError:
-            raise ValidationError(
-                f"Поле '{field}': путь '{raw}' выходит за папку файла данных"
-            ) from None
+            raise ValidationError(f"Поле '{field}': путь '{raw}' выходит за папку файла данных") from None
         return resolved

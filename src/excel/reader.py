@@ -3,11 +3,11 @@
 """
 
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 import pandas as pd
 from loguru import logger
 
-from ..constants import SYSTEM_SHEETS, VALID_ACTIONS, is_taxonomy_column, normalize_action
+from ..constants import VALID_ACTIONS, is_taxonomy_column, normalize_action
 from ..exceptions import ExcelError, ExcelStructureError
 
 
@@ -80,13 +80,7 @@ class ExcelReader:
             Dict с ключами типов и списками названий листов
         """
         sheets = self.get_sheet_names()
-        result: Dict[SheetType, List[str]] = {
-            "profile": [],
-            "options": [],
-            "content": [],
-            "taxonomy": [],
-            "media": []
-        }
+        result: Dict[SheetType, List[str]] = {"profile": [], "options": [], "content": [], "taxonomy": [], "media": []}
 
         for sheet_name in sheets:
             sheet_type = self.classify_sheet(sheet_name)
@@ -94,12 +88,7 @@ class ExcelReader:
 
         return result
 
-    def read_sheet(
-        self,
-        sheet_name: str,
-        dtype: Dict[str, type] = None,
-        fillna: bool = True
-    ) -> pd.DataFrame:
+    def read_sheet(self, sheet_name: str, dtype: Optional[Dict[str, Any]] = None, fillna: bool = True) -> pd.DataFrame:
         """
         Читает конкретный лист Excel.
 
@@ -118,19 +107,18 @@ class ExcelReader:
         if sheet_name in self._sheets_cache:
             return self._sheets_cache[sheet_name].copy()
 
+        # По умолчанию все как строки. Any: стабы pandas не принимают Dict[str, ...]
+        # как DtypeArg (ключ Mapping инвариантен), хотя в рантайме это штатный вызов.
+        dtype_arg: Any = dtype or str
         try:
             if self._excel_file_obj is not None:
                 df = pd.read_excel(
                     self._excel_file_obj,
                     sheet_name=sheet_name,
-                    dtype=dtype or str  # По умолчанию все как строки
+                    dtype=dtype_arg,
                 )
             else:
-                df = pd.read_excel(
-                    self.excel_file,
-                    sheet_name=sheet_name,
-                    dtype=dtype or str
-                )
+                df = pd.read_excel(self.excel_file, sheet_name=sheet_name, dtype=dtype_arg)
 
             # Игнорируем колонки без заголовка (pandas: "Unnamed: N") и служебные `__*`
             df = self._drop_ignored_columns(df, sheet_name)
@@ -173,9 +161,7 @@ class ExcelReader:
         ignored = [c for c in df.columns if self._is_ignored_column(c)]
         if not ignored:
             return df
-        logger.debug(
-            f"Лист '{sheet_name}': игнорируются колонки без заголовка/служебные: {ignored}"
-        )
+        logger.debug(f"Лист '{sheet_name}': игнорируются колонки без заголовка/служебные: {ignored}")
         return df.drop(columns=ignored)
 
     @staticmethod
@@ -225,11 +211,7 @@ class ExcelReader:
         )
         return df[~drop_mask]
 
-    def validate_sheet_structure(
-        self,
-        sheet_name: str,
-        required_columns: List[str]
-    ) -> bool:
+    def validate_sheet_structure(self, sheet_name: str, required_columns: List[str]) -> bool:
         """
         Валидация структуры листа.
 
@@ -248,17 +230,12 @@ class ExcelReader:
         missing_columns = set(required_columns) - set(df.columns)
         if missing_columns:
             raise ExcelStructureError(
-                f"В листе '{sheet_name}' отсутствуют обязательные колонки: "
-                f"{', '.join(missing_columns)}"
+                f"В листе '{sheet_name}' отсутствуют обязательные колонки: {', '.join(missing_columns)}"
             )
 
         return True
 
-    def filter_by_action(
-        self,
-        df: pd.DataFrame,
-        action: str
-    ) -> pd.DataFrame:
+    def filter_by_action(self, df: pd.DataFrame, action: str) -> pd.DataFrame:
         """
         Фильтрует строки по значению action.
 

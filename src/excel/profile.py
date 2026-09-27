@@ -33,27 +33,21 @@ class ProfileReader:
             df = pd.read_excel(
                 self.excel_file,
                 sheet_name="profile",
-                dtype=str  # Все как строки
+                dtype=str,  # Все как строки
             )
         except ValueError as e:
             if "Worksheet named 'profile' not found" in str(e):
-                raise ProfileSheetMissingError(
-                    f"Лист 'profile' не найден в файле {self.excel_file}"
-                )
+                raise ProfileSheetMissingError(f"Лист 'profile' не найден в файле {self.excel_file}")
             raise
 
         # Проверяем наличие обязательных колонок
         missing_columns = set(self.REQUIRED_COLUMNS) - set(df.columns)
         if missing_columns:
-            raise ExcelStructureError(
-                f"В листе 'profile' отсутствуют колонки: {', '.join(missing_columns)}"
-            )
+            raise ExcelStructureError(f"В листе 'profile' отсутствуют колонки: {', '.join(missing_columns)}")
 
         # Проверяем что есть хотя бы одна строка
         if len(df) == 0:
-            raise ExcelStructureError(
-                "Лист 'profile' пустой. Добавьте строку с credentials."
-            )
+            raise ExcelStructureError("Лист 'profile' пустой. Добавьте строку с credentials.")
 
         # Берем первую строку
         first_row = df.iloc[0]
@@ -69,7 +63,7 @@ class ProfileReader:
         if not username or username == "nan":
             raise ExcelStructureError("API_USER не может быть пустым")
 
-        if not password or password == "nan":
+        if not password or password == "nan":  # noqa: S105 — пустая ячейка pandas, не пароль
             raise ExcelStructureError("API_TOKEN не может быть пустым")
 
         return domain, username, password

@@ -91,9 +91,7 @@ class WordPressClient:
         suppress_non_retryable_log: bool = False,
     ) -> Dict[str, Any]:
         """GET запрос с retry и circuit breaker."""
-        return await self.provider.get(
-            endpoint, params, suppress_non_retryable_log=suppress_non_retryable_log
-        )
+        return await self.provider.get(endpoint, params, suppress_non_retryable_log=suppress_non_retryable_log)
 
     async def post(
         self,

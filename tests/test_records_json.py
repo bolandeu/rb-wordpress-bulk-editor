@@ -72,6 +72,7 @@ def json_file(tmp_path) -> Path:
 
 # ── JsonRecordSource ──────────────────────────────────────────────────
 
+
 class TestJsonRecordSource:
     def test_content_record(self, json_file):
         records = list(JsonRecordSource(json_file, TAB).read())
@@ -185,6 +186,7 @@ class TestJsonRecordSource:
 
 
 # ── JsonRecordWriter ──────────────────────────────────────────────────
+
 
 class TestJsonRecordWriter:
     def test_round_trip_touches_only_target_record(self, json_file):

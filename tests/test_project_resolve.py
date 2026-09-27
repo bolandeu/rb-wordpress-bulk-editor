@@ -14,9 +14,7 @@ class TestResolveExplicitPath:
         """Явный путь к произвольной директории на диске резолвится как есть."""
         project_dir = tmp_path / "external-project"
         project_dir.mkdir()
-        (project_dir / ".env").write_text(
-            "WP_DOMAIN=https://x.com\nWP_BULK_MIN_VERSION=1.5.0\n", encoding="utf-8"
-        )
+        (project_dir / ".env").write_text("WP_DOMAIN=https://x.com\nWP_BULK_MIN_VERSION=1.5.0\n", encoding="utf-8")
 
         ctx = resolve_project(str(project_dir))
 
@@ -70,9 +68,7 @@ class TestResolveCwdWalk:
     def test_finds_env_in_parent_directory(self, tmp_path, monkeypatch):
         project_root = tmp_path / "myproj"
         project_root.mkdir()
-        (project_root / ".env").write_text(
-            "WP_DOMAIN=https://x.com\nWP_BULK_MIN_VERSION=2.3.0\n", encoding="utf-8"
-        )
+        (project_root / ".env").write_text("WP_DOMAIN=https://x.com\nWP_BULK_MIN_VERSION=2.3.0\n", encoding="utf-8")
         nested = project_root / "sub" / "sub2"
         nested.mkdir(parents=True)
         monkeypatch.chdir(nested)

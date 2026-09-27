@@ -25,9 +25,21 @@ def check(*records, rules=None, base_dir=None):
 
 def test_clean_records_pass():
     result = check(
-        post(2, action="add", title="A", slug="a", status="publish", content="<p>x</p>",
-             **{"seo.title": "T", "seo.robots.index": "да", "rb_services_cat": "Перевозки",
-                "acf.anything_goes": "1", "custom_permalink": "a/"}),
+        post(
+            2,
+            action="add",
+            title="A",
+            slug="a",
+            status="publish",
+            content="<p>x</p>",
+            **{
+                "seo.title": "T",
+                "seo.robots.index": "да",
+                "rb_services_cat": "Перевозки",
+                "acf.anything_goes": "1",
+                "custom_permalink": "a/",
+            },
+        ),
         term(3, action="add", name="Перевозки", slug="perevozki", description=""),
     )
 
@@ -37,6 +49,7 @@ def test_clean_records_pass():
 
 
 # ── Имена полей ──────────────────────────────────────────────────────
+
 
 class TestFieldNames:
     def test_typo_in_seo_field_is_error_with_suggestion(self):
@@ -90,10 +103,20 @@ class TestFieldNames:
 
 # ── Имена таксономий ─────────────────────────────────────────────────
 
+
 class TestTaxonomyNames:
-    @pytest.mark.parametrize("name", [
-        "categories", "tags", "rb_services_cat", "genre-tax", "region_term", "cat_services", "post_tag",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "categories",
+            "tags",
+            "rb_services_cat",
+            "genre-tax",
+            "region_term",
+            "cat_services",
+            "post_tag",
+        ],
+    )
     def test_standard_names_pass(self, name):
         assert check(post(action="add", **{name: "X"})).errors == []
 
@@ -120,6 +143,7 @@ class TestTaxonomyNames:
 
 
 # ── Значения ─────────────────────────────────────────────────────────
+
 
 class TestValues:
     @pytest.mark.parametrize("action", ["update", "delete"])
@@ -188,6 +212,7 @@ class TestValues:
 
 # ── Значения-пути к файлам ───────────────────────────────────────────
 
+
 class TestFileValues:
     def test_missing_file_on_sending_record_is_error(self, tmp_path):
         result = check(post(action="add", title="A", **{"acf.more": "content/1.html"}), base_dir=tmp_path)
@@ -206,7 +231,9 @@ class TestFileValues:
 
 def test_location_uses_custom_label():
     result = check_records(
-        "posts", [post(0, action="update", title="A")], FieldRules(),
+        "posts",
+        [post(0, action="update", title="A")],
+        FieldRules(),
         where=lambda record: f"строка {record.write_key + 2}",
     )
 
@@ -222,7 +249,9 @@ SITE = SiteSchema.from_rest(
         "category": {"slug": "category", "rest_base": "categories", "types": ["post"]},
         "rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]},
         "rb_services_cat": {
-            "slug": "rb_services_cat", "rest_base": "rb_services_cat", "types": ["rb_services"],
+            "slug": "rb_services_cat",
+            "rest_base": "rb_services_cat",
+            "types": ["rb_services"],
         },
     },
     {

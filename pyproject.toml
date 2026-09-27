@@ -58,7 +58,7 @@ addopts = "--cov --cov-report=term-missing:skip-covered"
 filterwarnings = ["ignore:(?s).*Can not relate snapshot:UserWarning"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -66,8 +66,10 @@ target-version = "py311"
 select = ["E", "F", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-# В тестах assert — это и есть инструмент (S101).
-"tests/*" = ["S101"]
+# В тестах assert — это и есть инструмент (S101), пароли — фиктивные (S105–S107).
+"tests/*" = ["S101", "S105", "S106", "S107"]
+# Скрипты гейта (из шаблона, дословно): subprocess с фиксированным argv (git, uv), без shell.
+"scripts/*" = ["S603", "S607"]
 
 [tool.coverage.run]
 source = ["src"]
@@ -77,6 +79,24 @@ omit = ["src/__main__.py", "src/cli/__main__.py"]
 # Нижняя граница по факту текущего прогона, а не по пожеланиям:
 # ронять сборку она не должна, но и опускаться ниже нельзя.
 fail_under = 64
+
+# ty (гейт release.py): src/ — на полной строгости. Легаси-тесты подсовывают
+# утиные дублёры (FakeReader вместо ExcelReader, Series вместо Mapping) и
+# проверяют Optional-результаты без сужения — эти правила в tests/ только
+# предупреждают. Новые тесты пишутся так, чтобы предупреждений не добавлять.
+[tool.ty.terminal]
+# Предупреждения (только правила tests/ ниже) не валят гейт; ошибки — валят.
+error-on-warning = false
+
+[[tool.ty.overrides]]
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "warn"
+unresolved-attribute = "warn"
+unsupported-operator = "warn"
+not-iterable = "warn"
+invalid-assignment = "warn"
 
 [tool.mypy]
 python_version = "3.11"

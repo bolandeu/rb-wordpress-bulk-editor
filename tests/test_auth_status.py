@@ -19,7 +19,15 @@ from src.providers.wordpress import check_credentials
 from tests.test_credentials import FakeKeyring
 
 ENTRY_KEYS = {
-    "provider", "required", "fields", "source", "source_ref", "status", "expires_at", "quota", "message",
+    "provider",
+    "required",
+    "fields",
+    "source",
+    "source_ref",
+    "status",
+    "expires_at",
+    "quota",
+    "message",
 }
 REPORT_KEYS = {"ok", "tool", "version", "checked_at", "credentials", "cli_version"}
 
@@ -176,7 +184,8 @@ class TestWordPressCheck:
         return WordPressConfig(url="https://example.com", username="u", password="p")
 
     @pytest.mark.parametrize(
-        ("status_code", "expected"), [(200, "ok"), (401, "invalid"), (403, "invalid"), (429, "unreachable"), (502, "unreachable")]
+        ("status_code", "expected"),
+        [(200, "ok"), (401, "invalid"), (403, "invalid"), (429, "unreachable"), (502, "unreachable")],
     )
     def test_status_mapping(self, status_code, expected):
         def handler(request):

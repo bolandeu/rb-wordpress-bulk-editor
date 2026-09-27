@@ -90,10 +90,7 @@ class ContentProcessor:
             if file_path.suffix.lower() in [".md", ".markdown"]:
                 # Конвертируем markdown в HTML
                 logger.debug(f"Converting markdown to HTML: {filename}")
-                html_content = markdown.markdown(
-                    content,
-                    extensions=['extra', 'nl2br', 'sane_lists']
-                )
+                html_content = markdown.markdown(content, extensions=["extra", "nl2br", "sane_lists"])
             elif file_path.suffix.lower() in [".html", ".htm"]:
                 # Уже HTML
                 logger.debug(f"Processing HTML file: {filename}")

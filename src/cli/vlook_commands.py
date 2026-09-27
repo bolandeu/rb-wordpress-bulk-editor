@@ -3,21 +3,29 @@
 """
 
 from pathlib import Path
-from typing import Optional, Set, Dict, List, Tuple
+from typing import Optional, Set, Dict, List, Tuple, cast
 
 import typer
 from loguru import logger
 
 from . import app, console
-from .helpers import get_project, resolve_logs_folder, require_excel_file
+from .helpers import get_project, require_excel_file
 from .common import handle_command_errors, setup_command_logging
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
 
 # Расширения изображений
 IMAGE_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".gif", ".webp",
-    ".svg", ".bmp", ".tiff", ".tif", ".ico",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".bmp",
+    ".tiff",
+    ".tif",
+    ".ico",
 }
 
 VALID_MODES = {"content", "media", "both", "custom"}
@@ -28,9 +36,7 @@ def _resolve_vlook_excel(ctx: typer.Context, explicit: Optional[Path]) -> Path:
     return require_excel_file(ctx, explicit)
 
 
-def _build_file_index(
-    folder: Path, extensions: Optional[Set[str]] = None
-) -> Dict[str, str]:
+def _build_file_index(folder: Path, extensions: Optional[Set[str]] = None) -> Dict[str, str]:
     """Индекс {stem: filename} для файлов в папке."""
     index: Dict[str, str] = {}
     if not folder.exists():
@@ -49,28 +55,38 @@ def _build_file_index(
 def vlook(
     ctx: typer.Context,
     mode: str = typer.Option(
-        "content", "--mode", "-m",
+        "content",
+        "--mode",
+        "-m",
         help="Режим: content, media, both, custom",
     ),
     file: Optional[Path] = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Excel файл (по умолчанию export.xlsx)",
     ),
     sheet: Optional[str] = typer.Option(
-        None, "--sheet", "-s",
+        None,
+        "--sheet",
+        "-s",
         help="Конкретный лист (по умолчанию все контентные)",
     ),
     folder: Optional[Path] = typer.Option(
-        None, "--folder",
+        None,
+        "--folder",
         help="Папка для поиска (режим custom)",
         resolve_path=True,
     ),
     column: Optional[str] = typer.Option(
-        None, "--column",
+        None,
+        "--column",
         help="Колонка для записи (режим custom)",
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v",
+        False,
+        "--verbose",
+        "-v",
         help="Подробные логи",
     ),
 ):
@@ -89,10 +105,7 @@ def vlook(
     Example: wp-bulk vlook --mode media
     """
     if mode not in VALID_MODES:
-        console.print(
-            f"[red]ERROR: Неизвестный режим '{mode}'. "
-            f"Допустимые: {', '.join(sorted(VALID_MODES))}[/red]"
-        )
+        console.print(f"[red]ERROR: Неизвестный режим '{mode}'. Допустимые: {', '.join(sorted(VALID_MODES))}[/red]")
         raise typer.Exit(code=1)
 
     excel_file = _resolve_vlook_excel(ctx, file)
@@ -101,7 +114,7 @@ def vlook(
     with handle_command_errors(ctx):
         setup_command_logging(ctx, "vlook", verbose)
 
-        console.print(f"\n[bold cyan]VLOOK[/bold cyan] — привязка файлов по ID")
+        console.print("\n[bold cyan]VLOOK[/bold cyan] — привязка файлов по ID")
         console.print(f"Файл: [white]{excel_file.name}[/white]")
         console.print(f"Режим: [white]{mode}[/white]\n")
 
@@ -124,7 +137,7 @@ def vlook(
             tasks.append((proj.media_folder, "img_path", IMAGE_EXTENSIONS))
 
         if mode == "custom":
-            tasks.append((folder, column, None))
+            tasks.append((cast(Path, folder), cast(str, column), None))
 
         # Проверка папок
         for task_folder, task_col, _ in tasks:
@@ -138,13 +151,8 @@ def vlook(
             if key not in file_indexes:
                 idx = _build_file_index(task_folder, task_ext)
                 file_indexes[key] = idx
-                logger.info(
-                    f"Индекс '{task_folder}': {len(idx)} файлов"
-                )
-                console.print(
-                    f"Папка [white]{task_folder}[/white]: "
-                    f"[cyan]{len(idx)}[/cyan] файлов"
-                )
+                logger.info(f"Индекс '{task_folder}': {len(idx)} файлов")
+                console.print(f"Папка [white]{task_folder}[/white]: [cyan]{len(idx)}[/cyan] файлов")
 
         # --- Фаза 1: чтение Excel, поиск совпадений ---
         updates: Dict[str, List[Tuple[int, str, str]]] = {}
@@ -168,19 +176,14 @@ def vlook(
                 df = reader.read_sheet(sheet_name)
 
                 if "id" not in df.columns:
-                    console.print(
-                        f"  [yellow]{sheet_name}[/yellow]: нет колонки 'id', пропуск"
-                    )
+                    console.print(f"  [yellow]{sheet_name}[/yellow]: нет колонки 'id', пропуск")
                     continue
 
                 sheet_updates: List[Tuple[int, str, str]] = []
 
                 for task_folder, task_column, task_ext in tasks:
                     if task_column not in df.columns:
-                        console.print(
-                            f"  [yellow]{sheet_name}[/yellow]: "
-                            f"нет колонки '{task_column}', пропуск"
-                        )
+                        console.print(f"  [yellow]{sheet_name}[/yellow]: нет колонки '{task_column}', пропуск")
                         continue
 
                     index = file_indexes.get(str(task_folder), {})
@@ -200,10 +203,7 @@ def vlook(
                         if filename:
                             sheet_updates.append((row_idx, task_column, filename))
                             sheet_found += 1
-                            logger.debug(
-                                f"[{sheet_name}] id={row_id} → "
-                                f"{task_column}={filename}"
-                            )
+                            logger.debug(f"[{sheet_name}] id={row_id} → {task_column}={filename}")
 
                     total_rows += sheet_total
                     total_found += sheet_found
@@ -214,8 +214,7 @@ def vlook(
                         f"(файлов в папке: {len(index)})"
                     )
                     console.print(
-                        f"  [green]{sheet_name}[/green] -> {task_column}: "
-                        f"[cyan]{sheet_found}[/cyan]/{sheet_total}"
+                        f"  [green]{sheet_name}[/green] -> {task_column}: [cyan]{sheet_found}[/cyan]/{sheet_total}"
                     )
 
                 if sheet_updates:
@@ -229,11 +228,7 @@ def vlook(
                         writer.update_row(sheet_name, row_idx, {col: val})
 
             console.print(
-                f"\n[bold green]Готово![/bold green] "
-                f"Обновлено: [cyan]{total_found}[/cyan] из {total_rows} строк"
+                f"\n[bold green]Готово![/bold green] Обновлено: [cyan]{total_found}[/cyan] из {total_rows} строк"
             )
         else:
-            console.print(
-                f"\n[yellow]Совпадений не найдено[/yellow] "
-                f"(проверено {total_rows} строк)"
-            )
+            console.print(f"\n[yellow]Совпадений не найдено[/yellow] (проверено {total_rows} строк)")

@@ -29,6 +29,7 @@ class SiteSchema:
         types: Любое имя типа записи (slug / REST-имя) → slug.
         attached: slug типа → slug'и привязанных к нему таксономий.
     """
+
     taxonomies: Dict[str, str] = field(default_factory=dict)
     types: Dict[str, str] = field(default_factory=dict)
     attached: Dict[str, Set[str]] = field(default_factory=dict)

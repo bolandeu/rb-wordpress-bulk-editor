@@ -2,7 +2,7 @@
 Маппинг записей источника (Excel/JSON) в WordPress API payload
 """
 
-from typing import Callable, Dict, Any, List, Mapping, Set, Optional, Tuple
+from typing import Callable, Dict, Any, List, Mapping, Set, Optional
 from loguru import logger
 
 from ..records.base import is_blank, is_missing
@@ -12,7 +12,6 @@ from ..utils.file_values import FileValueResolver
 from ..constants import (
     ACF_PREFIX,
     BOOL_FIELDS_DEFAULT_TRUE,
-    SYSTEM_COLUMNS,
     build_nested_payload,
     read_nested_value,
 )
@@ -50,11 +49,7 @@ class ContentMapper:
             return value
         return self.file_resolver.resolve(field, value)
 
-    def map_row(
-        self,
-        row: Mapping[str, Any],
-        taxonomy_ids: Dict[str, List[int]] = None
-    ) -> Dict[str, Any]:
+    def map_row(self, row: Mapping[str, Any], taxonomy_ids: Optional[Dict[str, List[int]]] = None) -> Dict[str, Any]:
         """
         Преобразовать запись источника в WordPress API payload.
 
@@ -66,14 +61,14 @@ class ContentMapper:
             Dict готовый для отправки в WordPress API
         """
         payload = {}
-        
+
         # Логируем информацию о строке для отладки
         row_id = row.get("id", "N/A")
         row_title = row.get("title", "N/A")
         logger.debug(f"Mapping row id={row_id}, title='{row_title}'")
-        
+
         # Полная структура строки для диагностики
-        logger.debug(f"Row structure (all fields):")
+        logger.debug("Row structure (all fields):")
         for field_name in row.keys():
             value = row[field_name]
             logger.debug(f"  {field_name}: {repr(value)} (type={type(value).__name__}, isna={is_blank(value)})")
@@ -83,25 +78,32 @@ class ContentMapper:
         for field in self.analysis["content"]:
             if field in row:
                 value = self._file_value(field, row[field])
-                
+
                 # Поля, которые нужно отправлять всегда (включая пустые значения для обнуления)
                 send_empty_fields = {
                     # Основные текстовые поля
-                    'title', 'slug', 'content', 'excerpt',
+                    "title",
+                    "slug",
+                    "content",
+                    "excerpt",
                     # SEO поля
-                    'seo_title', 'seo_description', 'seo_meta_keywords',
-                    'seo_noindex', 'seo_nofollow', 'custom_permalink',
+                    "seo_title",
+                    "seo_description",
+                    "seo_meta_keywords",
+                    "seo_noindex",
+                    "seo_nofollow",
+                    "custom_permalink",
                     # Другие текстовые поля
-                    'description', 'caption', 'alt_text'
+                    "description",
+                    "caption",
+                    "alt_text",
                 }
 
                 # Определяем должно ли поле отправляться всегда
                 should_send_empty = (
-                    field in send_empty_fields or
-                    field.startswith('seo_') or
-                    field.startswith('custom_')
+                    field in send_empty_fields or field.startswith("seo_") or field.startswith("custom_")
                 )
-                
+
                 # Детальное логирование для SEO полей
                 if field.startswith("seo_"):
                     logger.debug(
@@ -115,7 +117,7 @@ class ContentMapper:
                 if not is_blank(value):
                     converted = self._convert_value(value)
                     payload[field] = converted
-                    
+
                     # Детальное логирование для SEO полей
                     if field.startswith("seo_"):
                         logger.debug(
@@ -149,8 +151,9 @@ class ContentMapper:
         acf_data = self._extract_acf_from_row(row, self._file_value)
         if acf_data:
             # Если dot-нотация уже положила что-то в payload["acf"], мержим
-            if isinstance(payload.get("acf"), dict):
-                payload["acf"].update(acf_data)
+            existing_acf = payload.get("acf")
+            if isinstance(existing_acf, dict):
+                existing_acf.update(acf_data)
             else:
                 payload["acf"] = acf_data
             logger.debug(f"ACF fields (legacy prefix): {list(acf_data.keys())}")
@@ -183,7 +186,7 @@ class ContentMapper:
                     continue
                 # Legacy ACF prefix
                 if col.startswith(ACF_PREFIX):
-                    acf_key = col[len(ACF_PREFIX):]
+                    acf_key = col[len(ACF_PREFIX) :]
                     acf_src = payload.get("acf")
                     if isinstance(acf_src, dict) and acf_key in acf_src:
                         filtered.setdefault("acf", {})[acf_key] = acf_src[acf_key]
@@ -245,7 +248,7 @@ class ContentMapper:
         acf_data = {}
         for col in row.keys():
             if col.startswith(ACF_PREFIX):
-                field_name = col[len(ACF_PREFIX):]
+                field_name = col[len(ACF_PREFIX) :]
                 value = row[col]
                 if not is_blank(value):
                     if file_value is not None:

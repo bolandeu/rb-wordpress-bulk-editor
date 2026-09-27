@@ -26,9 +26,12 @@ VALID_ACTIONS = {"add", "update", "delete", "skip"}
 # Регистр не важен. Всё, чего здесь нет и что не входит в VALID_ACTIONS,
 # остаётся как есть и дальше считается недопустимым (запись пропускается).
 ACTION_ALIASES = {
-    "u": "update", "e": "update", "edit": "update",
+    "u": "update",
+    "e": "update",
+    "edit": "update",
     "a": "add",
-    "s": "skip", "0": "skip",
+    "s": "skip",
+    "0": "skip",
     "d": "delete",
 }
 
@@ -46,6 +49,7 @@ def normalize_action(value: Any) -> str:
     text = str(value).strip().lower()
     return ACTION_ALIASES.get(text, text)
 
+
 # Названия служебных листов
 SYSTEM_SHEETS = {"options", "media"}
 
@@ -59,8 +63,12 @@ DEFAULT_SKIP_POST_TYPE_PATTERNS = ["wp_", "attachment", "nav_menu", "spectra", "
 # форматы записей и внутренние таксономии блочного редактора (категории
 # шаблонов блоков, привязка шаблонов к теме, области частей шаблона)
 DEFAULT_SKIP_TAXONOMY_PATTERNS = [
-    "nav_menu", "link_category", "post_format",
-    "wp_pattern_category", "wp_theme", "wp_template_part_area",
+    "nav_menu",
+    "link_category",
+    "post_format",
+    "wp_pattern_category",
+    "wp_theme",
+    "wp_template_part_area",
 ]
 
 # Разделитель таксономий в Excel
@@ -81,11 +89,13 @@ _TAXONOMY_NAME_SEPARATORS = re.compile(r"[-_]")
 # Поля, которые всегда отправляются как bool.
 # Если колонка присутствует в Excel — значение парсится (пустое = True),
 # отсутствие колонки = не отправляем (WP сохраняет текущее значение).
-BOOL_FIELDS_DEFAULT_TRUE = frozenset({
-    "seo.robots.index",
-    "seo.robots.follow",
-    "seo.sitemap.include",
-})
+BOOL_FIELDS_DEFAULT_TRUE = frozenset(
+    {
+        "seo.robots.index",
+        "seo.robots.follow",
+        "seo.sitemap.include",
+    }
+)
 
 # WordPress REST API базовый path
 WP_API_BASE = "/wp-json/wp/v2"
@@ -170,6 +180,7 @@ def read_nested_value(dot_path: str, source: Dict[str, Any]) -> Any:
             return None
         cursor = cursor[key]
     return cursor
+
 
 # Максимум параллельных запросов
 DEFAULT_CONCURRENCY = 5

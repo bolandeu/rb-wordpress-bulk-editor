@@ -12,7 +12,7 @@
 import functools
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, NoReturn, Optional
 
 import typer
 from loguru import logger
@@ -48,12 +48,8 @@ __all__ = [
 JsonOption = typer.Option(False, "--json", help="Машиночитаемый JSON-вывод.")
 QuietOption = typer.Option(False, "--quiet", help="Только существенный вывод.")
 VerboseOption = typer.Option(False, "--verbose", "-v", help="Подробная диагностика.")
-NonInteractiveOption = typer.Option(
-    False, "--non-interactive", help="Никогда не спрашивать; вместо вопроса — ошибка."
-)
-ConfirmOption = typer.Option(
-    False, "--confirm", help="Подтвердить опасную операцию без вопроса."
-)
+NonInteractiveOption = typer.Option(False, "--non-interactive", help="Никогда не спрашивать; вместо вопроса — ошибка.")
+ConfirmOption = typer.Option(False, "--confirm", help="Подтвердить опасную операцию без вопроса.")
 
 _META_KEY = "wp_bulk.output"
 
@@ -72,6 +68,7 @@ _LOCAL_FLAGS = {
 @dataclass
 class OutputOptions:
     """Режим вывода текущего запуска."""
+
     json: bool = False
     quiet: bool = False
     verbose: bool = False
@@ -172,7 +169,7 @@ def emit_report(
     raise typer.Exit(code=problem.exit_code)
 
 
-def emit_error(ctx: Optional[typer.Context], error: WPBulkEditorError) -> None:
+def emit_error(ctx: Optional[typer.Context], error: WPBulkEditorError) -> NoReturn:
     """Ошибка: JSON-конверт или строка в stderr. Всегда завершает команду."""
     if get_options(ctx).json:
         json_output.emit_error(error)
@@ -213,8 +210,7 @@ def require_confirmation(
     if not is_interactive(ctx):
         raise ValidationError(
             f"Операция необратима и требует подтверждения: {description}",
-            action="Повторите с --confirm (или уберите --non-interactive), "
-                   "либо посмотрите план с --dry-run.",
+            action="Повторите с --confirm (или уберите --non-interactive), либо посмотрите план с --dry-run.",
         )
 
     if not typer.confirm(description):

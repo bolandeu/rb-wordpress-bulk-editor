@@ -2,13 +2,12 @@
 Tests for src/mappers/field_detector.py
 """
 
-import pytest
-
 from src.mappers.field_detector import FieldDetector
 from src.mappers.value_converter import convert_acf_value
 
 
 # ── FieldDetector.analyze() ─────────────────────────────────────────
+
 
 class TestFieldDetectorAnalyze:
     def test_system_columns(self):
@@ -60,6 +59,7 @@ class TestFieldDetectorAnalyze:
 
 # ── Dot-notation (вложенные поля) ────────────────────────────────────
 
+
 class TestDotNotationDetection:
     def test_single_dot_to_nested(self):
         fd = FieldDetector(["seo.title", "seo.description"])
@@ -88,6 +88,7 @@ class TestDotNotationDetection:
 
 
 # ── known_taxonomies override ────────────────────────────────────────
+
 
 class TestTaxonomyOverride:
     def test_custom_taxonomy_recognized_without_suffix(self):
@@ -120,6 +121,7 @@ class TestTaxonomyOverride:
 
 # ── convert_acf_value() ─────────────────────────────────────────────
 # (перенесено из FieldDetector в src/mappers/value_converter.py)
+
 
 class TestConvertAcfValue:
     def test_int_passthrough(self):
@@ -173,6 +175,7 @@ class TestConvertAcfValue:
 
     def test_none_value(self):
         import pandas as pd
+
         assert convert_acf_value(pd.NA) is None
 
     def test_whitespace_stripped(self):

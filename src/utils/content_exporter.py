@@ -9,7 +9,6 @@ import asyncio
 from loguru import logger
 from bs4 import BeautifulSoup
 import httpx
-import mimetypes
 
 from ..wordpress.client import WordPressClient
 from ..constants import DEFAULT_SKIP_POST_TYPE_PATTERNS
@@ -19,8 +18,14 @@ from .wp_helpers import wp_rendered
 class ContentExporter:
     """Экспорт контента из WordPress в файлы с организацией по типам."""
 
-    def __init__(self, wp_client: WordPressClient, export_folder: Path, concurrency: int = 10,
-                 skip_post_type_patterns: list = None, download_timeout: float = 30.0):
+    def __init__(
+        self,
+        wp_client: WordPressClient,
+        export_folder: Path,
+        concurrency: int = 10,
+        skip_post_type_patterns: Optional[list] = None,
+        download_timeout: float = 30.0,
+    ):
         """
         Args:
             wp_client: WordPress клиент
@@ -98,7 +103,7 @@ class ContentExporter:
         # Загружаем пачками по 100 через include параметр
         media_id_list = list(media_ids)
         for i in range(0, len(media_id_list), 100):
-            batch = media_id_list[i:i + 100]
+            batch = media_id_list[i : i + 100]
             try:
                 params = {
                     "include": ",".join(str(mid) for mid in batch),
@@ -236,7 +241,7 @@ class ContentExporter:
                 params = {
                     "per_page": per_page,
                     "page": page,
-                    "status": "any"  # Получаем все статусы
+                    "status": "any",  # Получаем все статусы
                 }
 
                 posts = await self.wp_client.get(endpoint, params)
@@ -287,7 +292,7 @@ class ContentExporter:
         post: Dict[str, Any],
         type_folder: Path,
         post_id: int,
-        safe_id: str = None,
+        safe_id: Optional[str] = None,
         media_cache: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> Optional[Path]:
         """
@@ -362,6 +367,7 @@ class ContentExporter:
         """
         # Пытаемся извлечь расширение из URL
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         path = parsed.path
 
@@ -369,19 +375,13 @@ class ContentExporter:
         extension = Path(path).suffix.lower()
 
         # Если расширения нет или оно странное, используем .jpg по умолчанию
-        valid_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'}
+        valid_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"}
         if extension not in valid_extensions:
-            extension = '.jpg'
+            extension = ".jpg"
 
         return extension
 
-    def _add_to_csv(
-        self,
-        post_type: str,
-        post: Dict[str, Any],
-        html_path: Optional[Path],
-        image_path: Optional[Path]
-    ):
+    def _add_to_csv(self, post_type: str, post: Dict[str, Any], html_path: Optional[Path], image_path: Optional[Path]):
         """
         Добавить запись в CSV индекс.
 
@@ -405,29 +405,32 @@ class ContentExporter:
             image_relative = image_path.relative_to(self.export_folder).as_posix()
 
         # SEO title (может быть в разных полях в зависимости от плагина)
-        seo_title = post.get("seo_title") or \
-                    post.get("yoast_head_json", {}).get("title") or \
-                    post.get("rank_math_title") or \
-                   ""
-        
-        seo_description = post.get("seo_description") or \
-                    post.get("yoast_head_json", {}).get("description") or \
-                    post.get("rank_math_description") or \
-                    ""
+        seo_title = (
+            post.get("seo_title") or post.get("yoast_head_json", {}).get("title") or post.get("rank_math_title") or ""
+        )
 
-        self.csv_data.append({
-            "post_type": post_type,
-            "id": post.get("id", ""),
-            "title": title_text,
-            "slug": post.get("slug", ""),
-            "link": post.get("link", ""),
-            "html_path": html_relative,
-            "image_path": image_relative,
-            "seo_title": seo_title,
-            "seo_description": seo_description,
-            "status": post.get("status", ""),
-            "date": post.get("date", "")
-        })
+        seo_description = (
+            post.get("seo_description")
+            or post.get("yoast_head_json", {}).get("description")
+            or post.get("rank_math_description")
+            or ""
+        )
+
+        self.csv_data.append(
+            {
+                "post_type": post_type,
+                "id": post.get("id", ""),
+                "title": title_text,
+                "slug": post.get("slug", ""),
+                "link": post.get("link", ""),
+                "html_path": html_relative,
+                "image_path": image_relative,
+                "seo_title": seo_title,
+                "seo_description": seo_description,
+                "status": post.get("status", ""),
+                "date": post.get("date", ""),
+            }
+        )
 
     def save_csv_index(self):
         """Сохранить CSV индекс всех экспортированных записей."""
@@ -437,8 +440,17 @@ class ContentExporter:
 
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
             fieldnames = [
-                "post_type", "id", "title", "slug", "link",
-                "html_path", "image_path", "seo_title", "seo_description", "status", "date"
+                "post_type",
+                "id",
+                "title",
+                "slug",
+                "link",
+                "html_path",
+                "image_path",
+                "seo_title",
+                "seo_description",
+                "status",
+                "date",
             ]
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
 
@@ -475,31 +487,45 @@ class ContentExporter:
 
         with open(media_csv_path, "w", encoding="utf-8-sig", newline="") as f:
             fieldnames = [
-                "id", "date", "modified", "title", "type", "slug", "link",
-                "status", "guid", "caption", "alt_text", "media_type",
-                "mime_type", "post", "source_url"
+                "id",
+                "date",
+                "modified",
+                "title",
+                "type",
+                "slug",
+                "link",
+                "status",
+                "guid",
+                "caption",
+                "alt_text",
+                "media_type",
+                "mime_type",
+                "post",
+                "source_url",
             ]
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
             writer.writeheader()
 
             for media in all_media:
-                writer.writerow({
-                    "id": media.get("id", ""),
-                    "date": media.get("date", ""),
-                    "modified": media.get("modified", ""),
-                    "title": wp_rendered(media.get("title", {})),
-                    "type": media.get("type", ""),
-                    "slug": media.get("slug", ""),
-                    "link": media.get("link", ""),
-                    "status": media.get("status", ""),
-                    "guid": wp_rendered(media.get("guid", {})),
-                    "caption": wp_rendered(media.get("caption", {})),
-                    "alt_text": media.get("alt_text", ""),
-                    "media_type": media.get("media_type", ""),
-                    "mime_type": media.get("mime_type", ""),
-                    "post": media.get("post", ""),
-                    "source_url": media.get("source_url", ""),
-                })
+                writer.writerow(
+                    {
+                        "id": media.get("id", ""),
+                        "date": media.get("date", ""),
+                        "modified": media.get("modified", ""),
+                        "title": wp_rendered(media.get("title", {})),
+                        "type": media.get("type", ""),
+                        "slug": media.get("slug", ""),
+                        "link": media.get("link", ""),
+                        "status": media.get("status", ""),
+                        "guid": wp_rendered(media.get("guid", {})),
+                        "caption": wp_rendered(media.get("caption", {})),
+                        "alt_text": media.get("alt_text", ""),
+                        "media_type": media.get("media_type", ""),
+                        "mime_type": media.get("mime_type", ""),
+                        "post": media.get("post", ""),
+                        "source_url": media.get("source_url", ""),
+                    }
+                )
 
         logger.info(f"Saved {len(all_media)} media records to CSV")
         return len(all_media)

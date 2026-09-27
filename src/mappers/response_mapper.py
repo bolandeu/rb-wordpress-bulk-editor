@@ -112,12 +112,33 @@ class ResponseMapper:
         # SEO и другие кастомные поля
         # Добавляем все остальные поля которые не обработали
         skip_fields = {
-            "id", "date", "modified", "slug", "status", "type", "link",
-            "title", "content", "excerpt", "featured_media", "parent",
-            "image_url", "categories", "tags", "acf",
+            "id",
+            "date",
+            "modified",
+            "slug",
+            "status",
+            "type",
+            "link",
+            "title",
+            "content",
+            "excerpt",
+            "featured_media",
+            "parent",
+            "image_url",
+            "categories",
+            "tags",
+            "acf",
             # Служебные поля API
-            "_links", "guid", "author", "comment_status", "ping_status",
-            "sticky", "template", "format", "meta", "menu_order"
+            "_links",
+            "guid",
+            "author",
+            "comment_status",
+            "ping_status",
+            "sticky",
+            "template",
+            "format",
+            "meta",
+            "menu_order",
         }
 
         for key, value in post.items():
@@ -128,7 +149,9 @@ class ResponseMapper:
                     # Проверяем есть ли в кэше
                     if key in self.taxonomy_cache:
                         row[key] = convert_taxonomy_ids_to_names(
-                            value, self.taxonomy_cache.get(key, {}), key,
+                            value,
+                            self.taxonomy_cache.get(key, {}),
+                            key,
                         )
                         logger.debug(f"Converted custom taxonomy '{key}' IDs to names")
                     else:
@@ -170,10 +193,7 @@ class ResponseMapper:
         content_file.write_text(content, encoding="utf-8")
         row["content"] = ""
         row["content_path"] = filename
-        logger.info(
-            f"Content for post ID={post_id} saved to {content_file} "
-            f"({len(content)} chars)"
-        )
+        logger.info(f"Content for post ID={post_id} saved to {content_file} ({len(content)} chars)")
 
     @staticmethod
     def map_term_to_excel(term: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,10 +228,7 @@ class ResponseMapper:
         # (nested_paths не применяются к terms — они per-instance, решит вызывающий код если нужно)
 
         # Пропускаем уже обработанные и системные поля API
-        skip_fields = {
-            "id", "name", "slug", "description", "link", "acf",
-            "_links", "taxonomy", "count", "parent"
-        }
+        skip_fields = {"id", "name", "slug", "description", "link", "acf", "_links", "taxonomy", "count", "parent"}
 
         for key, value in term.items():
             if key not in skip_fields and key not in row:

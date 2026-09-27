@@ -9,7 +9,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import typer
 from loguru import logger
@@ -132,8 +132,7 @@ def _all_failed_error(failed: List[Dict[str, Any]], errors: List[Exception]) -> 
     cause = site_errors[0] if site_errors else errors[0]
     first = failed[0]
     error = WPBulkEditorError(
-        f"Ни один файл не загружен ({len(failed)}). "
-        f"Первая ошибка: {Path(first['path']).name}: {first['error']}",
+        f"Ни один файл не загружен ({len(failed)}). Первая ошибка: {Path(first['path']).name}: {first['error']}",
         action=getattr(cause, "action", None),
     )
     if isinstance(cause, WPBulkEditorError):
@@ -170,21 +169,25 @@ async def _upload_all(
                 try:
                     await media.update(result["id"], **meta)
                 except Exception as e:
-                    logger.warning(f"{Path(path).name}: вложение id={result['id']} создано, "
-                                   f"но alt/title/caption не проставлены: {e}")
+                    logger.warning(
+                        f"{Path(path).name}: вложение id={result['id']} создано, "
+                        f"но alt/title/caption не проставлены: {e}"
+                    )
                     entry["meta_error"] = str(e)
             progress.report(path, f"id={result['id']}")
             return entry
 
-        tasks = [
-            processor.process_row("upload", n, item, upload_one, item)
-            for n, item in enumerate(items)
-        ]
+        tasks = [processor.process_row("upload", n, item, upload_one, item) for n, item in enumerate(items)]
         results = await asyncio.gather(*tasks)
 
     return [
-        {"ok": True, "entry": r.api_response} if r.success
-        else {"ok": False, "entry": _failure(items[r.row_index]["path"], r.error), "error": r.error}
+        {"ok": True, "entry": r.api_response}
+        if r.success
+        else {
+            "ok": False,
+            "entry": _failure(items[cast(int, r.row_index)]["path"], cast(Exception, r.error)),
+            "error": r.error,
+        }
         for r in results
     ]
 
@@ -209,15 +212,21 @@ def media_upload(
     caption: Optional[str] = typer.Option(None, "--caption", help="Подпись для всех путей-аргументов"),
     concurrency: int = typer.Option(5, "--concurrency", min=1, help="Количество параллельных загрузок"),
     dry_run: bool = typer.Option(
-        False, "--dry-run",
+        False,
+        "--dry-run",
         help="Проверить манифест и наличие файлов, к сайту не обращаться (id: null)",
     ),
     domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain"),
     username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
     password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     env_file: Optional[Path] = typer.Option(
-        None, "--env-file", help="Путь к .env файлу",
-        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        None,
+        "--env-file",
+        help="Путь к .env файлу",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
@@ -266,17 +275,21 @@ def media_upload(
     elif to_upload:
         domain, username, password = load_and_print_credentials(
             env_file=resolve_env_file(ctx, env_file),
-            domain=domain, username=username, password=password, ctx=ctx,
+            domain=domain,
+            username=username,
+            password=password,
+            ctx=ctx,
         )
         wp_config = WordPressConfig.from_credentials(domain, username, password)
         uploaded = asyncio.run(_upload_all(wp_config, [items[n] for n in to_upload], concurrency, progress))
         for n, outcome in zip(to_upload, uploaded):
             outcomes[n] = outcome
 
-    uploaded_entries = [o["entry"] for o in outcomes if o["ok"]]
-    failed_entries = [o["entry"] for o in outcomes if not o["ok"]]
+    # К этому месту заполнены все outcomes (ни одного None) — отсюда ty: ignore.
+    uploaded_entries = [o["entry"] for o in outcomes if o["ok"]]  # ty: ignore[not-subscriptable]
+    failed_entries = [o["entry"] for o in outcomes if not o["ok"]]  # ty: ignore[not-subscriptable]
     if not uploaded_entries:
-        raise _all_failed_error(failed_entries, [o["error"] for o in outcomes if not o["ok"]])
+        raise _all_failed_error(failed_entries, [o["error"] for o in outcomes if not o["ok"]])  # ty: ignore[not-subscriptable]
 
     payload = {
         "uploaded": uploaded_entries,
@@ -291,8 +304,11 @@ def media_upload(
         verb = "Проверено (dry-run)" if dry_run else "Загружено"
         console.print(f"\n[bold green]{verb}: {data['uploaded_count']}[/bold green]")
         for entry in data["uploaded"]:
-            note = f"  [yellow](alt/title не проставлены: {entry['meta_error']})[/yellow]" \
-                if entry.get("meta_error") else ""
+            note = (
+                f"  [yellow](alt/title не проставлены: {entry['meta_error']})[/yellow]"
+                if entry.get("meta_error")
+                else ""
+            )
             ident = f"id={entry['id']}" if entry["id"] is not None else "файл на месте"
             console.print(f"  {entry['path']} -> {ident}{note}")
         if data["failed"]:

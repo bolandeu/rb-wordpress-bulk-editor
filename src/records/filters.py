@@ -41,8 +41,7 @@ def parse_filters(values: Optional[Iterable[str]]) -> List[RecordFilter]:
         field = field.strip()
         if not sep or not field:
             raise ValidationError(
-                f"Неверный формат --filter: '{raw}'. Ожидается field=value, "
-                "например --filter type=rb_services"
+                f"Неверный формат --filter: '{raw}'. Ожидается field=value, например --filter type=rb_services"
             )
         filters.append((field, value.strip()))
 

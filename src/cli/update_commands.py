@@ -44,19 +44,25 @@ def _parse_ids(ids: Optional[str]) -> Optional[Set[int]]:
 def update_from_wp(
     ctx: typer.Context,
     ids: Optional[str] = typer.Option(
-        None, "--id",
+        None,
+        "--id",
         help="ID записей через запятую: 123,456,789. Без --id — все записи с id.",
     ),
     columns: str = typer.Option(
-        ..., "--columns", "-c",
+        ...,
+        "--columns",
+        "-c",
         help="Поля для обновления из WordPress: title,excerpt,seo.title,acf.f1",
     ),
     file: Optional[Path] = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Файл данных .xlsx или .json (авто-определяется из --project)",
     ),
     sheets: Optional[str] = typer.Option(
-        None, "--sheets",
+        None,
+        "--sheets",
         help="Листы Excel / табы JSON через запятую. Для JSON обязателен",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать изменения без записи в файл"),
@@ -104,17 +110,22 @@ def update_from_wp(
     domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
     wp_config = WordPressConfig.from_credentials(domain, username, password)
 
-    report = asyncio.run(_run_update(
-        wp_config, file, names, column_list, id_filter, dry_run=dry_run, test_mode=test_mode,
-    ))
+    report = asyncio.run(
+        _run_update(
+            wp_config,
+            file,
+            names,
+            column_list,
+            id_filter,
+            dry_run=dry_run,
+            test_mode=test_mode,
+        )
+    )
 
     def _render(payload: dict):
         prefix = "DRY-RUN " if payload["dry_run"] else ""
         for item in payload["items"]:
-            console.print(
-                f"[green]✓[/green] {prefix}{item['dataset']} id={item['id']}: "
-                f"{', '.join(item['fields'])}"
-            )
+            console.print(f"[green]✓[/green] {prefix}{item['dataset']} id={item['id']}: {', '.join(item['fields'])}")
         for warning in payload["warnings"]:
             console.print(f"[yellow]WARN[/yellow] {warning}")
         verb = "Будет обновлено" if payload["dry_run"] else "Обновлено"
@@ -156,8 +167,12 @@ async def _update_json(client, file, tabs, columns, id_filter, dry_run, test_mod
             writer.load()
         try:
             await pull_fields(
-                client, [PullTarget(tab, records, writer)], columns,
-                id_filter=id_filter, test_mode=test_mode, report=report,
+                client,
+                [PullTarget(tab, records, writer)],
+                columns,
+                id_filter=id_filter,
+                test_mode=test_mode,
+                report=report,
             )
         finally:
             # Сохраняем и на пути ошибки: подтянутое до сбоя не должно пропасть.
@@ -187,7 +202,8 @@ async def _update_excel(client, file, sheets, columns, id_filter, dry_run, test_
     try:
         targets = [
             PullTarget(
-                name, records,
+                name,
+                records,
                 ExcelRecordWriter(excel_writer, name) if excel_writer else None,
                 known_fields=fields,
             )

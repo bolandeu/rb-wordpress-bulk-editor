@@ -46,6 +46,7 @@ class ContentSync(ContentSyncBase):
 
         # Создаем mapper и content processor
         from ..config import known_taxonomies
+
         mapper = ContentMapper(
             collect_fields(records),
             allowed_columns=self.config.sync.columns_filter,
@@ -79,26 +80,11 @@ class ContentSync(ContentSyncBase):
 
                     # Обработка в зависимости от action
                     if action == "delete":
-                        result = await self._delete_item(
-                            posts_endpoint,
-                            row
-                        )
+                        result = await self._delete_item(posts_endpoint, row)
                     elif action == "update":
-                        result = await self._update_item(
-                            posts_endpoint,
-                            media_endpoint,
-                            mapper,
-                            content_processor,
-                            row
-                        )
+                        result = await self._update_item(posts_endpoint, media_endpoint, mapper, content_processor, row)
                     else:  # add
-                        result = await self._add_item(
-                            posts_endpoint,
-                            media_endpoint,
-                            mapper,
-                            content_processor,
-                            row
-                        )
+                        result = await self._add_item(posts_endpoint, media_endpoint, mapper, content_processor, row)
 
                     # Обновляем статистику
                     if action == "add":
@@ -110,12 +96,7 @@ class ContentSync(ContentSyncBase):
 
                     # Записываем обратно в источник
                     if writer and result and self.config.sync.update_excel:
-                        writer.update_from_result(
-                            idx,
-                            result,
-                            action,
-                            columns_filter=self.config.sync.columns_filter
-                        )
+                        writer.update_from_result(idx, result, action, columns_filter=self.config.sync.columns_filter)
 
                     if progress:
                         progress.record_done(record, action, result)
@@ -125,13 +106,15 @@ class ContentSync(ContentSyncBase):
                     stats["errors"] += 1
                     if progress:
                         progress.record_done(record, action, error=True)
-                    error_results.append(SyncResult(
-                        row_index=idx,
-                        action=action,
-                        post_id=None,
-                        success=False,
-                        error=str(e),
-                    ))
+                    error_results.append(
+                        SyncResult(
+                            row_index=idx,
+                            action=action,
+                            post_id=None,
+                            success=False,
+                            error=str(e),
+                        )
+                    )
 
         # Подсчитываем пропущенные
         stats["skipped"] = self._count_skipped(records)

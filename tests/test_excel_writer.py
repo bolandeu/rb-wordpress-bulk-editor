@@ -13,14 +13,28 @@ from src.exceptions import ExcelError
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def excel_file_with_posts(tmp_path) -> Path:
     """Excel файл с листом posts."""
     wb = Workbook()
     ws = wb.active
     ws.title = "posts"
-    ws.append(["id", "action", "title", "slug", "link", "modified", "date",
-               "content_path", "img_path", "featured_media", "image_url"])
+    ws.append(
+        [
+            "id",
+            "action",
+            "title",
+            "slug",
+            "link",
+            "modified",
+            "date",
+            "content_path",
+            "img_path",
+            "featured_media",
+            "image_url",
+        ]
+    )
     ws.append(["", "add", "Hello World", "", "", "", "", "", "", "", ""])
     ws.append(["10", "update", "Old Title", "old-slug", "", "", "", "", "", "", ""])
     path = tmp_path / "data.xlsx"
@@ -29,6 +43,7 @@ def excel_file_with_posts(tmp_path) -> Path:
 
 
 # ── normalize_api_value() ─────────────────────────────────────────────
+
 
 class TestNormalizeApiValue:
     def test_string_passthrough(self):
@@ -52,6 +67,7 @@ class TestNormalizeApiValue:
 
 
 # ── ExcelWriter.update_row() ──────────────────────────────────────────
+
 
 class TestUpdateRow:
     def test_update_id_column(self, excel_file_with_posts):
@@ -103,18 +119,24 @@ class TestReplaceRows:
         writer = ExcelWriter(excel_file_with_posts)
         writer.load()
 
-        writer.replace_rows("posts", [{
-            "id": "1",
-            "action": "skip",
-            "title": "Hello",
-            "new_field": "kept",
-        }])
+        writer.replace_rows(
+            "posts",
+            [
+                {
+                    "id": "1",
+                    "action": "skip",
+                    "title": "Hello",
+                    "new_field": "kept",
+                }
+            ],
+        )
 
         assert "new_field" in writer._dataframes["posts"].columns
         assert writer._dataframes["posts"].at[0, "new_field"] == "kept"
 
 
 # ── ExcelWriter dirty-флаг ─────────────────────────────────────────────
+
 
 class TestDirtyFlag:
     def test_save_is_noop_without_changes(self, excel_file_with_posts):
@@ -135,6 +157,7 @@ class TestDirtyFlag:
 
         # Перечитываем — изменения должны быть на диске
         import pandas as pd
+
         df = pd.read_excel(excel_file_with_posts, sheet_name="posts", dtype=str)
         assert df.at[0, "id"] == "777"
 
@@ -146,6 +169,7 @@ class TestDirtyFlag:
 
 
 # ── ExcelWriter.update_from_api_response() ───────────────────────────
+
 
 class TestUpdateFromApiResponse:
     def test_add_action_writes_id_and_link(self, excel_file_with_posts):
@@ -193,6 +217,7 @@ class TestUpdateFromApiResponse:
 
 # ── ExcelWriter.update_row_async() ────────────────────────────────────
 
+
 class TestUpdateRowAsync:
     async def test_async_update_is_thread_safe(self, excel_file_with_posts):
         """Concurrent async updates не должны перезатирать данные."""
@@ -210,4 +235,4 @@ class TestUpdateRowAsync:
         df = writer._dataframes["posts"]
         # Оба обновления должны были применяться без гонок
         assert df.at[0, "title"] in ("Title A", "Hello World")  # row 0 обновлён
-        assert df.at[1, "title"] in ("Title B", "Old Title")    # row 1 обновлён
+        assert df.at[1, "title"] in ("Title B", "Old Title")  # row 1 обновлён

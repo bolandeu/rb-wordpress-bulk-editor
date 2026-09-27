@@ -167,9 +167,7 @@ def store_credential(provider: str, fields: Dict[str, str]) -> None:
     try:
         keyring.set_password(_service_name(provider), provider, json.dumps(fields))
     except keyring.errors.KeyringError as e:
-        raise CredentialStoreUnavailable(
-            f"Не удалось записать credentials для '{provider}' в OS keychain: {e}"
-        )
+        raise CredentialStoreUnavailable(f"Не удалось записать credentials для '{provider}' в OS keychain: {e}")
     _update_index(provider, present=True)
     logger.debug(f"Credentials сохранены в keychain для {provider}: {sorted(fields)}")
 
@@ -181,7 +179,5 @@ def delete_credential(provider: str) -> None:
     except keyring.errors.PasswordDeleteError:
         pass
     except keyring.errors.KeyringError as e:
-        raise CredentialStoreUnavailable(
-            f"Не удалось удалить credentials для '{provider}' из OS keychain: {e}"
-        )
+        raise CredentialStoreUnavailable(f"Не удалось удалить credentials для '{provider}' из OS keychain: {e}")
     _update_index(provider, present=False)

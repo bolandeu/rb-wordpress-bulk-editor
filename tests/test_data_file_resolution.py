@@ -29,9 +29,7 @@ def write_data_json(path, tabs=None):
 
 def write_foreign_json(path):
     """Посторонний json: валидный, но не файл данных (service-account Google)."""
-    path.write_text(
-        json.dumps({"type": "service_account", "private_key": "…"}), encoding="utf-8"
-    )
+    path.write_text(json.dumps({"type": "service_account", "private_key": "…"}), encoding="utf-8")
     return path
 
 

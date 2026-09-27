@@ -3,7 +3,6 @@ Tests for src/utils/retry.py
 """
 
 import asyncio
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -26,6 +25,7 @@ from src.utils.retry import (
 
 
 # ── is_retryable_error ──────────────────────────────────────────────
+
 
 class TestIsRetryableError:
     def test_network_error_retryable(self):
@@ -52,6 +52,7 @@ class TestIsRetryableError:
 
 
 # ── @async_retry ────────────────────────────────────────────────────
+
 
 class TestAsyncRetry:
     @pytest.mark.asyncio
@@ -114,6 +115,7 @@ class TestAsyncRetry:
 
 
 # ── CircuitBreaker ──────────────────────────────────────────────────
+
 
 class TestCircuitBreaker:
     @pytest.mark.asyncio

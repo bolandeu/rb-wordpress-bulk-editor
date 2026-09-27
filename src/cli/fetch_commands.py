@@ -71,27 +71,13 @@ def fetch(
         exists=False,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    domain: Optional[str] = typer.Option(
-        None,
-        "--domain",
-        help="WordPress domain (например, https://example.com)"
-    ),
-    username: Optional[str] = typer.Option(
-        None,
-        "--username",
-        help="WordPress username"
-    ),
-    password: Optional[str] = typer.Option(
-        None,
-        "--password",
-        help="WordPress Application Password"
-    ),
+    domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain (например, https://example.com)"),
+    username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
+    password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     sheets: Optional[str] = typer.Option(
-        None,
-        "--sheets",
-        help="Типы записей и таксономии через запятую (posts,pages,category)"
+        None, "--sheets", help="Типы записей и таксономии через запятую (posts,pages,category)"
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -100,22 +86,14 @@ def fetch(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    status: str = typer.Option(
-        "any",
-        "--status",
-        help="Фильтр по статусу (publish, draft, any)"
-    ),
+    status: str = typer.Option("any", "--status", help="Фильтр по статусу (publish, draft, any)"),
     limit: Optional[int] = typer.Option(
-        None,
-        "--limit",
-        help="Максимум записей на лист (в JSON — на тип записи/таксономию)"
+        None, "--limit", help="Максимум записей на лист (в JSON — на тип записи/таксономию)"
     ),
     exclude: Optional[str] = typer.Option(
-        None,
-        "--exclude",
-        help="Список типов для исключения через запятую (posts,category)"
+        None, "--exclude", help="Список типов для исключения через запятую (posts,category)"
     ),
     to_json: bool = typer.Option(
         False,
@@ -157,8 +135,19 @@ def fetch(
 
     if to_json or (file is not None and is_json_source(file)):
         _fetch_to_json(
-            ctx, proj, file, env_file, domain, username, password,
-            sheets, status, limit, exclude, tab, confirm,
+            ctx,
+            proj,
+            file,
+            env_file,
+            domain,
+            username,
+            password,
+            sheets,
+            status,
+            limit,
+            exclude,
+            tab,
+            confirm,
         )
         return
     if tab:
@@ -175,9 +164,7 @@ def fetch(
         say(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
 
         if file.exists():
-            output.require_confirmation(
-                ctx, f"Файл {file} уже существует. Перезаписать?", confirm
-            )
+            output.require_confirmation(ctx, f"Файл {file} уже существует. Перезаписать?", confirm)
     else:
         auto_mode = False
         say(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
@@ -201,9 +188,7 @@ def fetch(
     else:
         with ExcelReader(file, known_taxonomies=Settings().get_taxonomies()) as reader:
             sheets_by_type = reader.get_sheets_by_type()
-            sheets_to_fetch = parse_comma_list(sheets) or (
-                sheets_by_type["content"] + sheets_by_type["taxonomy"]
-            )
+            sheets_to_fetch = parse_comma_list(sheets) or (sheets_by_type["content"] + sheets_by_type["taxonomy"])
         say(f"[green]OK[/green] Листы для обработки: {', '.join(sheets_to_fetch)}\n")
 
     if exclude:
@@ -212,16 +197,18 @@ def fetch(
 
     wp_config = WordPressConfig.from_credentials(domain, username, password)
 
-    asyncio.run(fetch_and_append(
-        wp_config=wp_config,
-        excel_file=file,
-        sheets=sheets_to_fetch,
-        status=status,
-        limit=limit,
-        auto_mode=auto_mode,
-        exclude=exclude,
-        content_output_dir=proj.content_folder if proj.active else Path("data/content"),
-    ))
+    asyncio.run(
+        fetch_and_append(
+            wp_config=wp_config,
+            excel_file=file,
+            sheets=sheets_to_fetch,
+            status=status,
+            limit=limit,
+            auto_mode=auto_mode,
+            exclude=exclude,
+            content_output_dir=proj.content_folder if proj.active else Path("data/content"),
+        )
+    )
 
     def _render(payload: dict):
         console.print("\n[bold green]SUCCESS! Данные добавлены в Excel![/bold green]\n")
@@ -230,15 +217,30 @@ def fetch(
 
 
 def _fetch_to_json(
-    ctx, proj, file, env_file, domain, username, password,
-    sheets, status, limit, exclude, tab, confirm,
+    ctx,
+    proj,
+    file,
+    env_file,
+    domain,
+    username,
+    password,
+    sheets,
+    status,
+    limit,
+    exclude,
+    tab,
+    confirm,
 ) -> None:
     """fetch в JSON: один таб на сайт, таб пересобирается целиком."""
     if file is not None:
         _refuse_project_registry(proj, file)
 
     domain, username, password = load_and_print_credentials(
-        env_file=env_file, domain=domain, username=username, password=password, ctx=ctx,
+        env_file=env_file,
+        domain=domain,
+        username=username,
+        password=password,
+        ctx=ctx,
     )
     host = _site_host(domain)
     if file is None:
@@ -252,33 +254,48 @@ def _fetch_to_json(
     if existing:
         output.require_confirmation(
             ctx,
-            f"Таб '{tab_name}' в {file} уже содержит {len(existing)} записей и будет "
-            "пересобран с нуля. Продолжить?",
+            f"Таб '{tab_name}' в {file} уже содержит {len(existing)} записей и будет пересобран с нуля. Продолжить?",
             confirm,
         )
 
     log_file = setup_command_logging(ctx, "fetch")
     wp_config = WordPressConfig.from_credentials(domain, username, password)
-    records = asyncio.run(_fetch_json_tab(
-        wp_config, parse_comma_list(sheets) or [], status, limit, exclude,
-    ))
+    records = asyncio.run(
+        _fetch_json_tab(
+            wp_config,
+            parse_comma_list(sheets) or [],
+            status,
+            limit,
+            exclude,
+        )
+    )
     write_tab(file, tab_name, records, project=proj.name if proj.active else None)
 
-    by_type: Dict[str, int] = {}
+    by_type: Dict[Optional[str], int] = {}
     for record in records:
         key = record.get("taxonomy") or record.get("type")
         by_type[key] = by_type.get(key, 0) + 1
 
     def _render(payload: dict):
-        console.print(f"\n[bold green]SUCCESS![/bold green] {payload['records']} записей → "
-                      f"{payload['file']} (таб '{payload['tab']}')")
+        console.print(
+            f"\n[bold green]SUCCESS![/bold green] {payload['records']} записей → "
+            f"{payload['file']} (таб '{payload['tab']}')"
+        )
         for name, count in payload["by_type"].items():
             console.print(f"  {name}: {count}")
 
-    output.emit_success(ctx, {
-        "file": str(file), "format": "json", "tab": tab_name,
-        "records": len(records), "by_type": by_type, "log_file": str(log_file),
-    }, _render)
+    output.emit_success(
+        ctx,
+        {
+            "file": str(file),
+            "format": "json",
+            "tab": tab_name,
+            "records": len(records),
+            "by_type": by_type,
+            "log_file": str(log_file),
+        },
+        _render,
+    )
 
 
 async def _fetch_json_tab(
@@ -361,8 +378,10 @@ async def _fetch_site_data(
                 return post_type, {"data": posts, "fields": fields, "type": "content"}
             logger.warning(f"'{post_type}': нет данных, лист не будет создан")
         except NotFoundError:
-            logger.warning(f"'{post_type}': REST API недоступен (404), пропускаем. "
-                           f"Добавьте '{post_type}' в WP_SKIP_POST_TYPE_PATTERNS в .env")
+            logger.warning(
+                f"'{post_type}': REST API недоступен (404), пропускаем. "
+                f"Добавьте '{post_type}' в WP_SKIP_POST_TYPE_PATTERNS в .env"
+            )
         return None, None
 
     async def _fetch_taxonomy(taxonomy: str):
@@ -376,8 +395,10 @@ async def _fetch_site_data(
                 return taxonomy, {"data": terms, "fields": fields, "type": "taxonomy"}
             logger.warning(f"'{taxonomy}': нет данных, лист не будет создан")
         except NotFoundError:
-            logger.warning(f"'{taxonomy}': REST API недоступен (404), пропускаем. "
-                           f"Добавьте '{taxonomy}' в WP_SKIP_TAXONOMY_PATTERNS в .env")
+            logger.warning(
+                f"'{taxonomy}': REST API недоступен (404), пропускаем. "
+                f"Добавьте '{taxonomy}' в WP_SKIP_TAXONOMY_PATTERNS в .env"
+            )
         return None, None
 
     tasks = [_fetch_post_type(pt) for pt in all_post_types]
@@ -489,9 +510,7 @@ async def fetch_and_append(
                 normalized_taxonomy = normalize_taxonomy_name(taxonomy)
                 tax_endpoint = TaxonomiesEndpoint(client, normalized_taxonomy)
                 terms = await tax_endpoint.get_all()
-                taxonomy_cache_data[taxonomy] = {
-                    term["id"]: term["name"] for term in terms
-                }
+                taxonomy_cache_data[taxonomy] = {term["id"]: term["name"] for term in terms}
                 logger.info(f"Загружено {len(terms)} терминов для '{taxonomy}'")
             except Exception as e:
                 logger.warning(f"Не удалось загрузить таксономию '{taxonomy}': {e}")
@@ -507,9 +526,9 @@ async def fetch_and_append(
         excel_writer.load()
 
         for sheet_name in sheets:
-            logger.info(f"\n{'='*50}")
+            logger.info(f"\n{'=' * 50}")
             logger.info(f"Получение данных для листа: {sheet_name}")
-            logger.info(f"{'='*50}")
+            logger.info(f"{'=' * 50}")
 
             if is_taxonomy_column(sheet_name):
                 taxonomy_name = normalize_taxonomy_name(sheet_name)
@@ -568,14 +587,9 @@ def fetch_media(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Подробные логи"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
 ):
     """
     Загрузить список медиафайлов из WordPress в Excel (лист media)
@@ -585,7 +599,7 @@ def fetch_media(
     env_file = resolve_env_file(ctx, env_file)
     file = require_excel_file(ctx, file)
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
+    console.print("\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
     console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
 
     with handle_command_errors(ctx):
@@ -608,7 +622,7 @@ def fetch_media(
 
         asyncio.run(run_fetch_media(wp_config, file))
 
-        console.print(f"\n[bold green]SUCCESS! Медиафайлы загружены в лист 'media'![/bold green]")
+        console.print("\n[bold green]SUCCESS! Медиафайлы загружены в лист 'media'![/bold green]")
         console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
 
 
@@ -631,26 +645,28 @@ async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
 
         media_rows = []
         for media in all_media:
-            media_rows.append({
-                "action": "skip",
-                "img_path": "",
-                "id": media.get("id", ""),
-                "date": media.get("date", ""),
-                "modified": media.get("modified", ""),
-                "title": wp_rendered(media.get("title", {})),
-                "type": media.get("type", ""),
-                "slug": media.get("slug", ""),
-                "link": media.get("link", ""),
-                "status": media.get("status", ""),
-                "guid": wp_rendered(media.get("guid", {})),
-                "caption": wp_rendered(media.get("caption", {})),
-                "alt_text": media.get("alt_text", ""),
-                "media_type": media.get("media_type", ""),
-                "mime_type": media.get("mime_type", ""),
-                "post": media.get("post", ""),
-                "source_url": media.get("source_url", ""),
-                "description": wp_rendered(media.get("description", {})),
-            })
+            media_rows.append(
+                {
+                    "action": "skip",
+                    "img_path": "",
+                    "id": media.get("id", ""),
+                    "date": media.get("date", ""),
+                    "modified": media.get("modified", ""),
+                    "title": wp_rendered(media.get("title", {})),
+                    "type": media.get("type", ""),
+                    "slug": media.get("slug", ""),
+                    "link": media.get("link", ""),
+                    "status": media.get("status", ""),
+                    "guid": wp_rendered(media.get("guid", {})),
+                    "caption": wp_rendered(media.get("caption", {})),
+                    "alt_text": media.get("alt_text", ""),
+                    "media_type": media.get("media_type", ""),
+                    "mime_type": media.get("mime_type", ""),
+                    "post": media.get("post", ""),
+                    "source_url": media.get("source_url", ""),
+                    "description": wp_rendered(media.get("description", {})),
+                }
+            )
 
         df = pd.DataFrame(media_rows)
 

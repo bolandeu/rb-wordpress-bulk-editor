@@ -29,11 +29,11 @@ def normalize_api_value(value: Any) -> Any:
     """
     if isinstance(value, dict):
         # Если есть 'raw' - берём его (это исходное значение без HTML обёртки)
-        if 'raw' in value:
-            return value['raw']
+        if "raw" in value:
+            return value["raw"]
         # Если есть 'rendered' но нет 'raw' - берём rendered
-        if 'rendered' in value:
-            return value['rendered']
+        if "rendered" in value:
+            return value["rendered"]
     return value
 
 
@@ -129,7 +129,9 @@ def build_update_data_from_api(
                     mapping = taxonomy_cache.get_id_to_name_mapping()
                     id_to_name = mapping.get(tax_field, {})
                 update_data[tax_field] = convert_taxonomy_ids_to_names(
-                    tax_ids, id_to_name, tax_field,
+                    tax_ids,
+                    id_to_name,
+                    tax_field,
                 )
 
     # ACF поля из ответа API (обновляем только те, что есть в записи)
@@ -142,8 +144,19 @@ def build_update_data_from_api(
 
     # Другие кастомные поля (обновляем только те, что есть в записи)
     skip_fields = {
-        "id", "date", "modified", "link", "slug", "featured_media", "image_url", "acf",
-        "title", "content", "excerpt", "name", "description"
+        "id",
+        "date",
+        "modified",
+        "link",
+        "slug",
+        "featured_media",
+        "image_url",
+        "acf",
+        "title",
+        "content",
+        "excerpt",
+        "name",
+        "description",
     }
     # Добавляем таксономии в skip_fields
     skip_fields.update(taxonomy_fields)

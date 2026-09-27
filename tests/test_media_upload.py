@@ -41,11 +41,13 @@ def site(monkeypatch):
         return httpx.Response(200, json={"id": media_id})
 
     monkeypatch.setattr(
-        media_commands, "load_and_print_credentials",
+        media_commands,
+        "load_and_print_credentials",
         lambda **kwargs: ("https://example.com", "admin", "secret"),
     )
     monkeypatch.setattr(
-        media_commands, "WordPressClient",
+        media_commands,
+        "WordPressClient",
         lambda config: WordPressClient(config, transport=httpx.MockTransport(handler)),
     )
     return state
@@ -110,11 +112,14 @@ class TestManifestMode:
         missing = str(files / "3499.jpg")
         relative = "3426.jpg"  # от CWD, дословно
         monkeypatch.chdir(files)
-        manifest = write_manifest(files, [
-            {"path": str(files / "3425.jpg"), "alt": "a"},
-            {"path": relative, "title": "t"},
-            {"path": missing},
-        ])
+        manifest = write_manifest(
+            files,
+            [
+                {"path": str(files / "3425.jpg"), "alt": "a"},
+                {"path": relative, "title": "t"},
+                {"path": missing},
+            ],
+        )
 
         result, payload = run("--manifest", manifest)
 
@@ -173,14 +178,17 @@ class TestManifestMode:
         assert result.exit_code == 3
         assert payload["error"]["code"] == "AUTH_REQUIRED"
 
-    @pytest.mark.parametrize("content", [
-        "not json",
-        "{}",
-        "[]",
-        '[{"alt": "без пути"}]',
-        '[{"path": "a.jpg", "atl": "опечатка"}]',
-        '[{"path": "a.jpg", "alt": 5}]',
-    ])
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "not json",
+            "{}",
+            "[]",
+            '[{"alt": "без пути"}]',
+            '[{"path": "a.jpg", "atl": "опечатка"}]',
+            '[{"path": "a.jpg", "alt": 5}]',
+        ],
+    )
     def test_bad_manifest(self, site, tmp_path, content):
         manifest = tmp_path / "m.json"
         manifest.write_text(content, encoding="utf-8")

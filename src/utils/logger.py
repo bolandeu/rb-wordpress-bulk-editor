@@ -13,10 +13,7 @@ from ..constants import LOG_DATE_FORMAT
 
 
 def setup_logger(
-    logs_folder: Path,
-    config: LoggingConfig,
-    command_name: str = "sync",
-    console_stream: Optional[TextIO] = None
+    logs_folder: Path, config: LoggingConfig, command_name: str = "sync", console_stream: Optional[TextIO] = None
 ) -> Path:
     """
     Настроить loguru logger.
@@ -46,7 +43,7 @@ def setup_logger(
         console_stream or sys.stdout,
         format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
         level=config.level,
-        colorize=True
+        colorize=True,
     )
 
     # Файловый вывод (детальный)
@@ -56,7 +53,7 @@ def setup_logger(
         level="DEBUG",  # В файл пишем всё
         rotation=config.rotation,
         retention=config.retention,
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     logger.info(f"Лог-файл: {log_file}")
@@ -110,7 +107,7 @@ def log_summary(stats: dict, log_file: Path):
         logger.info(f"  Successful operations: {overall.get('successful', 0)}")
         logger.info(f"  Errors: {overall.get('errors', 0)}")
 
-        success_rate = overall.get('success_rate', 0)
+        success_rate = overall.get("success_rate", 0)
         logger.info(f"  Success rate: {success_rate:.2f}%")
 
     logger.info("=" * 50)

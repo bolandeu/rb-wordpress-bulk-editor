@@ -2,12 +2,10 @@
 Синхронизация медиафайлов
 """
 
-from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 from loguru import logger
 
 from ..wordpress.media import MediaEndpoint
-from ..config import AppConfig
 from ..records.base import Record, RecordWriter, is_blank, is_missing
 from ..models import SyncReport, SyncResult
 from .progress import Progress
@@ -86,11 +84,7 @@ class MediaSync(BaseSync):
 
                     # Записываем обратно в источник
                     if writer and result and self.config.sync.update_excel:
-                        writer.update_from_result(
-                            idx,
-                            result,
-                            action
-                        )
+                        writer.update_from_result(idx, result, action)
 
                     if progress:
                         progress.record_done(record, action, result)
@@ -100,13 +94,15 @@ class MediaSync(BaseSync):
                     stats["errors"] += 1
                     if progress:
                         progress.record_done(record, action, error=True)
-                    error_results.append(SyncResult(
-                        row_index=idx,
-                        action=action,
-                        post_id=None,
-                        success=False,
-                        error=str(e),
-                    ))
+                    error_results.append(
+                        SyncResult(
+                            row_index=idx,
+                            action=action,
+                            post_id=None,
+                            success=False,
+                            error=str(e),
+                        )
+                    )
 
         # Подсчитываем пропущенные
         stats["skipped"] = self._count_skipped(records)
@@ -145,11 +141,7 @@ class MediaSync(BaseSync):
 
         return True, None
 
-    async def _add_media(
-        self,
-        media_endpoint: MediaEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _add_media(self, media_endpoint: MediaEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Загрузить новый медиафайл."""
         media_path = str(row["img_path"]).strip()
 
@@ -162,35 +154,23 @@ class MediaSync(BaseSync):
         if media_path.startswith("http://") or media_path.startswith("https://"):
             # Загрузка по URL
             logger.debug(f"Uploading media from URL: {media_path}")
-            result = await media_endpoint.upload_from_url(
-                media_path,
-                title=title,
-                alt_text=alt_text
-            )
+            result = await media_endpoint.upload_from_url(media_path, title=title, alt_text=alt_text)
         else:
             # Локальный файл
             from ..utils.path_utils import resolve_media_file
+
             file_path = resolve_media_file(media_path, self.config.paths.media_folder)
 
             if not file_path.exists():
                 raise FileNotFoundError(f"Media file not found: {media_path}")
 
             logger.debug(f"Uploading media file: {file_path}")
-            result = await media_endpoint.upload_file(
-                file_path,
-                title=title,
-                alt_text=alt_text,
-                caption=caption
-            )
+            result = await media_endpoint.upload_file(file_path, title=title, alt_text=alt_text, caption=caption)
 
         logger.info(f"Uploaded media: {media_path} -> ID={result['id']}")
         return result
 
-    async def _update_media(
-        self,
-        media_endpoint: MediaEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _update_media(self, media_endpoint: MediaEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Обновить метаданные медиафайла."""
         media_id = int(row["id"])
 
@@ -198,25 +178,19 @@ class MediaSync(BaseSync):
         title = row.get("title") if "title" in row and not is_missing(row.get("title")) else None
         alt_text = row.get("alt_text") if "alt_text" in row and not is_missing(row.get("alt_text")) else None
         caption = row.get("caption") if "caption" in row and not is_missing(row.get("caption")) else None
-        description = row.get("description") if "description" in row and not is_missing(row.get("description")) else None
+        description = (
+            row.get("description") if "description" in row and not is_missing(row.get("description")) else None
+        )
 
         logger.debug(f"Updating media ID={media_id}")
         result = await media_endpoint.update(
-            media_id,
-            title=title,
-            alt_text=alt_text,
-            caption=caption,
-            description=description
+            media_id, title=title, alt_text=alt_text, caption=caption, description=description
         )
 
         logger.info(f"Updated media ID={media_id}")
         return result
 
-    async def _delete_media(
-        self,
-        media_endpoint: MediaEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _delete_media(self, media_endpoint: MediaEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Удалить медиафайл (полностью с всеми размерами)."""
         media_id = int(row["id"])
 

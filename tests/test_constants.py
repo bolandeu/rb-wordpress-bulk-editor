@@ -19,6 +19,7 @@ from src.utils.path_utils import resolve_media_file
 
 # ── is_taxonomy_column ──────────────────────────────────────────────
 
+
 class TestIsTaxonomyColumn:
     @pytest.mark.parametrize("col", ["categories", "tags", "category", "tag"])
     def test_standard_taxonomies(self, col):
@@ -32,11 +33,17 @@ class TestIsTaxonomyColumn:
     def test_suffix_cat(self, col):
         assert is_taxonomy_column(col) is True
 
-    @pytest.mark.parametrize("col", [
-        "rb_services_cat", "genre-cat",       # cat
-        "post_tag", "genre-tag",              # tag
-        "custom_tax", "genre-tax",            # tax
-    ])
+    @pytest.mark.parametrize(
+        "col",
+        [
+            "rb_services_cat",
+            "genre-cat",  # cat
+            "post_tag",
+            "genre-tag",  # tag
+            "custom_tax",
+            "genre-tax",  # tax
+        ],
+    )
     def test_suffix_matrix(self, col):
         assert is_taxonomy_column(col) is True
 
@@ -44,28 +51,52 @@ class TestIsTaxonomyColumn:
     def test_suffix_case_insensitive(self, col):
         assert is_taxonomy_column(col) is True
 
-    @pytest.mark.parametrize("col", [
-        "region_term", "region-term",         # term
-        "cat_services", "tax-region",         # корень в начале
-        "rb_cat_services", "a-term-b",        # корень в середине
-    ])
+    @pytest.mark.parametrize(
+        "col",
+        [
+            "region_term",
+            "region-term",  # term
+            "cat_services",
+            "tax-region",  # корень в начале
+            "rb_cat_services",
+            "a-term-b",  # корень в середине
+        ],
+    )
     def test_root_anywhere_between_separators(self, col):
         assert is_taxonomy_column(col) is True
 
-    @pytest.mark.parametrize("col", [
-        "title", "content", "slug", "status", "acf_price",
-        "id", "action",
-        "catalog",     # заканчивается на 'cat', но без разделителя
-        "cat", "tag_", "taxonomy", "category_id",
-        "catalog_url", "terms_of_use",   # корень — лишь начало слова
-    ])
+    @pytest.mark.parametrize(
+        "col",
+        [
+            "title",
+            "content",
+            "slug",
+            "status",
+            "acf_price",
+            "id",
+            "action",
+            "catalog",  # заканчивается на 'cat', но без разделителя
+            "cat",
+            "tag_",
+            "taxonomy",
+            "category_id",
+            "catalog_url",
+            "terms_of_use",  # корень — лишь начало слова
+        ],
+    )
     def test_negative_cases(self, col):
         assert is_taxonomy_column(col) is False
 
-    @pytest.mark.parametrize("col", [
-        "acf.product_cat", "seo.meta_tag", "meta.custom_tax",  # dot-нотация
-        "acf_service_cat", "acf_meta-tag",                     # legacy ACF префикс
-    ])
+    @pytest.mark.parametrize(
+        "col",
+        [
+            "acf.product_cat",
+            "seo.meta_tag",
+            "meta.custom_tax",  # dot-нотация
+            "acf_service_cat",
+            "acf_meta-tag",  # legacy ACF префикс
+        ],
+    )
     def test_suffix_does_not_shadow_nested_and_acf(self, col):
         """Суффикс-эвристика не должна съедать dot-нотацию и acf_-колонки."""
         assert is_taxonomy_column(col) is False
@@ -91,6 +122,7 @@ class TestIsTaxonomyColumn:
 
 # ── is_dot_notation_column ──────────────────────────────────────────
 
+
 class TestIsDotNotationColumn:
     @pytest.mark.parametrize("col", ["seo.title", "seo.og.image", "a.b.c.d"])
     def test_positive(self, col):
@@ -107,6 +139,7 @@ class TestIsDotNotationColumn:
 
 # ── build_nested_payload ────────────────────────────────────────────
 
+
 class TestBuildNestedPayload:
     def test_flat_key(self):
         assert build_nested_payload("title", "X", {}) == {"title": "X"}
@@ -115,9 +148,7 @@ class TestBuildNestedPayload:
         assert build_nested_payload("seo.title", "X", {}) == {"seo": {"title": "X"}}
 
     def test_deep_nesting(self):
-        assert build_nested_payload("seo.og.image", "img.jpg", {}) == {
-            "seo": {"og": {"image": "img.jpg"}}
-        }
+        assert build_nested_payload("seo.og.image", "img.jpg", {}) == {"seo": {"og": {"image": "img.jpg"}}}
 
     def test_merges_into_existing(self):
         p = {"seo": {"title": "T"}}
@@ -142,6 +173,7 @@ class TestBuildNestedPayload:
 
 # ── read_nested_value ───────────────────────────────────────────────
 
+
 class TestReadNestedValue:
     def test_flat_key(self):
         assert read_nested_value("title", {"title": "T"}) == "T"
@@ -161,6 +193,7 @@ class TestReadNestedValue:
 
 
 # ── wp_rendered ─────────────────────────────────────────────────────
+
 
 class TestWpRendered:
     def test_dict_with_rendered(self):
@@ -190,6 +223,7 @@ class TestWpRendered:
 
 # ── convert_taxonomy_ids_to_names ───────────────────────────────────
 
+
 class TestConvertTaxonomyIdsToNames:
     def test_normal_conversion(self, taxonomy_cache):
         result = convert_taxonomy_ids_to_names([3, 5], taxonomy_cache, "categories")
@@ -215,6 +249,7 @@ class TestConvertTaxonomyIdsToNames:
 
 
 # ── resolve_media_file ──────────────────────────────────────────────
+
 
 class TestResolveMediaFile:
     def test_absolute_path(self, tmp_path):
@@ -243,13 +278,29 @@ class TestResolveMediaFile:
 
 
 class TestNormalizeAction:
-    @pytest.mark.parametrize("raw, expected", [
-        ("update", "update"), ("edit", "update"), ("e", "update"), ("U", "update"), (" Edit ", "update"),
-        ("add", "add"), ("a", "add"), ("A", "add"),
-        ("skip", "skip"), ("s", "skip"), ("0", "skip"), (0, "skip"), (0.0, "skip"),
-        ("delete", "delete"), ("d", "delete"),
-        ("", ""), (None, ""), (float("nan"), ""),
-        ("publish", "publish"),  # неизвестное — как есть, дальше пропускается
-    ])
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("update", "update"),
+            ("edit", "update"),
+            ("e", "update"),
+            ("U", "update"),
+            (" Edit ", "update"),
+            ("add", "add"),
+            ("a", "add"),
+            ("A", "add"),
+            ("skip", "skip"),
+            ("s", "skip"),
+            ("0", "skip"),
+            (0, "skip"),
+            (0.0, "skip"),
+            ("delete", "delete"),
+            ("d", "delete"),
+            ("", ""),
+            (None, ""),
+            (float("nan"), ""),
+            ("publish", "publish"),  # неизвестное — как есть, дальше пропускается
+        ],
+    )
     def test_aliases(self, raw, expected):
         assert normalize_action(raw) == expected

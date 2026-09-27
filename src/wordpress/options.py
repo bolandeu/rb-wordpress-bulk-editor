@@ -60,5 +60,5 @@ class OptionsEndpoint:
 
         result = await self.client.post(self.endpoint, options)
 
-        logger.info(f"Настройки обновлены успешно")
+        logger.info("Настройки обновлены успешно")
         return result

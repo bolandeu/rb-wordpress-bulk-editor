@@ -21,7 +21,7 @@
 """
 
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, cast
 
 import httpx
 from loguru import logger
@@ -152,8 +152,7 @@ class HttpProvider:
 
         if status in (401, 403):
             raise AuthenticationError(
-                f"Ошибка аутентификации. Проверьте credentials. "
-                f"URL: {response.url}. {self._error_message(response)}",
+                f"Ошибка аутентификации. Проверьте credentials. URL: {response.url}. {self._error_message(response)}",
                 provider=self.name,
                 status=status,
             )
@@ -195,9 +194,7 @@ class HttpProvider:
                 f"Body: {response.text[:500]}"
             )
             raise WordPressError(
-                f"WordPress API returned invalid JSON. "
-                f"Status: {response.status_code}, "
-                f"Response: {response.text[:200]}",
+                f"WordPress API returned invalid JSON. Status: {response.status_code}, Response: {response.text[:200]}",
                 provider=self.name,
                 status=response.status_code,
             )
@@ -217,8 +214,9 @@ class HttpProvider:
         if self._client is None:
             await self.open()
 
+        client = cast(httpx.AsyncClient, self._client)  # open() выше его создал
         try:
-            response = await self._client.request(method, endpoint, **kwargs)
+            response = await client.request(method, endpoint, **kwargs)
         except httpx.TimeoutException as e:
             raise NetworkError(f"Timeout: {e}", provider=self.name)
         except httpx.TransportError as e:

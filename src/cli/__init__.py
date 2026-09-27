@@ -58,7 +58,8 @@ def app_callback(
     ctx: typer.Context,
     project: Optional[str] = typer.Option(
         None,
-        "--project", "-P",
+        "--project",
+        "-P",
         help="Путь к директории проекта или её имя внутри projects/ (по умолчанию — "
         "автопоиск .env вверх от текущей директории)",
         envvar="WP_PROJECT",

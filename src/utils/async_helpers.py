@@ -26,6 +26,7 @@ class ProcessResult:
         api_response: Ответ от WordPress API (если success=True)
         error: Исключение (если success=False)
     """
+
     success: bool
     action: str
     row_index: WriteKey
@@ -65,13 +66,7 @@ class AsyncBatchProcessor:
         logger.debug(f"AsyncBatchProcessor initialized with concurrency={concurrency}")
 
     async def process_row(
-        self,
-        action: str,
-        row_index: WriteKey,
-        row: Mapping[str, Any],
-        process_func: Callable,
-        *args,
-        **kwargs
+        self, action: str, row_index: WriteKey, row: Mapping[str, Any], process_func: Callable, *args, **kwargs
     ) -> ProcessResult:
         """
         Обработать одну строку с Semaphore.
@@ -107,20 +102,10 @@ class AsyncBatchProcessor:
                 # Успешная обработка
                 logger.debug(f"Row {row_index} ({action}): success")
 
-                return ProcessResult(
-                    success=True,
-                    action=action,
-                    row_index=row_index,
-                    api_response=api_response
-                )
+                return ProcessResult(success=True, action=action, row_index=row_index, api_response=api_response)
 
             except Exception as e:
                 # Ошибка при обработке
                 logger.error(f"Row {row_index} ({action}): {e}")
 
-                return ProcessResult(
-                    success=False,
-                    action=action,
-                    row_index=row_index,
-                    error=e
-                )
+                return ProcessResult(success=False, action=action, row_index=row_index, error=e)

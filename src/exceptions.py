@@ -54,33 +54,39 @@ CliError = WPBulkEditorError
 
 class ConfigurationError(WPBulkEditorError):
     """Ошибка конфигурации"""
+
     code = "INVALID_ARGUMENTS"
     exit_code = 2
 
 
 class ExcelError(WPBulkEditorError):
     """Базовая ошибка работы с Excel"""
+
     code = "INVALID_ARGUMENTS"
     exit_code = 2
 
 
 class ExcelStructureError(ExcelError):
     """Ошибка структуры Excel файла"""
+
     pass
 
 
 class ExcelValidationError(ExcelError):
     """Ошибка валидации данных Excel"""
+
     pass
 
 
 class ProfileSheetMissingError(ExcelError):
     """Отсутствует лист profile"""
+
     pass
 
 
 class RecordSourceError(WPBulkEditorError):
     """Ошибка источника записей (структура файла, нераспознаваемая запись)"""
+
     code = "INVALID_ARGUMENTS"
     exit_code = 2
 
@@ -102,6 +108,8 @@ class WordPressError(WPBulkEditorError):
         super().__init__(*args, action=action)
         self.provider = provider
         self.status = status
+        # Пауза из Retry-After (429/5xx) — её подхватывает async_retry.
+        self.retry_after: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         payload = super().to_dict()
@@ -114,42 +122,46 @@ class WordPressError(WPBulkEditorError):
 
 class AuthenticationError(WordPressError):
     """Ошибка аутентификации"""
+
     code = "AUTH_REQUIRED"
     exit_code = 3
-    default_action = (
-        "Укажите credentials: --username/--password "
-        "или переменные окружения WP_API_USER / WP_API_TOKEN."
-    )
+    default_action = "Укажите credentials: --username/--password или переменные окружения WP_API_USER / WP_API_TOKEN."
 
 
 class NotFoundError(WordPressError):
     """Запись не найдена"""
+
     pass
 
 
 class ServerError(WordPressError):
     """Ошибка сервера WordPress"""
+
     pass
 
 
 class NetworkError(WordPressError):
     """Сетевая ошибка"""
+
     default_action = "Проверьте сеть и доступность сайта, затем повторите."
 
 
 class ValidationError(WPBulkEditorError):
     """Ошибка валидации данных"""
+
     code = "INVALID_ARGUMENTS"
     exit_code = 2
 
 
 class MediaUploadError(WordPressError):
     """Ошибка загрузки медиафайла"""
+
     pass
 
 
 class ImageProcessingError(WPBulkEditorError):
     """Ошибка обработки изображения"""
+
     pass
 
 
@@ -173,10 +185,7 @@ class CredentialStoreUnavailable(WPBulkEditorError):
 
     code = "CREDENTIAL_STORE_UNAVAILABLE"
     exit_code = 1
-    default_action = (
-        "Передайте credentials через переменные окружения "
-        "(WP_API_USER / WP_API_TOKEN) вместо keychain."
-    )
+    default_action = "Передайте credentials через переменные окружения (WP_API_USER / WP_API_TOKEN) вместо keychain."
 
 
 class CredentialsUnhealthy(WPBulkEditorError):

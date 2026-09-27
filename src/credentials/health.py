@@ -88,7 +88,9 @@ def _locate_stored(domain: str, environ: Mapping[str, str]) -> Dict[str, Tuple[s
     return found
 
 
-def _locate_project(env_file: Optional[Path], environ: Mapping[str, str]) -> Tuple[str, Dict[str, Tuple[str, str, str]]]:
+def _locate_project(
+    env_file: Optional[Path], environ: Mapping[str, str]
+) -> Tuple[str, Dict[str, Tuple[str, str, str]]]:
     """(домен, поля) активного проекта — ровно та цепочка, что увидит `sync`."""
     from ..utils.auth import _LEGACY_ENV_VARS, _env_names, resolve_credentials
 

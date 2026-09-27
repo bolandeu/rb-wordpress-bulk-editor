@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict
 from loguru import logger
 from openpyxl import Workbook
 
@@ -29,7 +29,7 @@ class ExcelCreator:
         "image_url",
         "excerpt",
         "content_path",
-        "content"
+        "content",
     ]
 
     # SEO колонки (добавляются всегда)
@@ -39,21 +39,14 @@ class ExcelCreator:
         "seo_meta_keywords",
         "seo_noindex",
         "seo_nofollow",
-        "custom_permalink"
+        "custom_permalink",
     ]
 
     # Стандартные таксономии
     POST_STANDARD_TAXONOMIES = ["categories", "tags"]
 
     # Базовые колонки для таксономий
-    TAXONOMY_BASE_COLUMNS = [
-        "action",
-        "id",
-        "name",
-        "slug",
-        "link",
-        "description"
-    ]
+    TAXONOMY_BASE_COLUMNS = ["action", "id", "name", "slug", "link", "description"]
 
     # SEO колонки для таксономий
     TAXONOMY_SEO_COLUMNS = [
@@ -63,14 +56,10 @@ class ExcelCreator:
         "seo_description",
         "seo_noindex",
         "seo_nofollow",
-        "custom_permalink"
+        "custom_permalink",
     ]
 
-    def create_file_with_fields(
-        self,
-        file_path: Path,
-        sheets_fields: Dict[str, List[str]]
-    ):
+    def create_file_with_fields(self, file_path: Path, sheets_fields: Dict[str, List[str]]):
         """
         Создать Excel файл со всеми листами на основе реальных полей.
 
@@ -102,11 +91,7 @@ class ExcelCreator:
         wb.save(file_path)
         logger.info(f"Excel файл успешно создан: {file_path}")
 
-    def create_file_with_metadata(
-        self,
-        file_path: Path,
-        sheets_metadata: Dict[str, Dict]
-    ):
+    def create_file_with_metadata(self, file_path: Path, sheets_metadata: Dict[str, Dict]):
         """
         Создать Excel файл со всеми листами (старый метод для совместимости).
 
@@ -162,11 +147,7 @@ class ExcelCreator:
         wb.save(file_path)
         logger.info(f"Excel файл успешно создан: {file_path}")
 
-    def _build_post_columns(
-        self,
-        acf_fields: List[str],
-        custom_taxonomies: List[str]
-    ) -> List[str]:
+    def _build_post_columns(self, acf_fields: List[str], custom_taxonomies: List[str]) -> List[str]:
         """
         Построить список колонок для типа записи.
 
@@ -185,11 +166,11 @@ class ExcelCreator:
             Список названий колонок
         """
         columns = (
-            self.POST_BASE_COLUMNS.copy() +
-            self._seo_columns(self.POST_SEO_COLUMNS) +
-            self.POST_STANDARD_TAXONOMIES.copy() +
-            custom_taxonomies +
-            [f"acf_{field}" for field in acf_fields]
+            self.POST_BASE_COLUMNS.copy()
+            + self._seo_columns(self.POST_SEO_COLUMNS)
+            + self.POST_STANDARD_TAXONOMIES.copy()
+            + custom_taxonomies
+            + [f"acf_{field}" for field in acf_fields]
         )
 
         logger.debug(f"Построен список колонок для записей: {len(columns)} колонок")
@@ -199,6 +180,7 @@ class ExcelCreator:
     def _seo_columns(legacy_default: List[str]) -> List[str]:
         """SEO-колонки: WP_SEO_FIELDS из .env, fallback на переданный legacy-список."""
         from ..config import Settings
+
         return Settings().get_seo_fields() or legacy_default.copy()
 
     def _build_taxonomy_columns(self, acf_fields: List[str]) -> List[str]:
@@ -217,20 +199,15 @@ class ExcelCreator:
             Список названий колонок
         """
         columns = (
-            self.TAXONOMY_BASE_COLUMNS.copy() +
-            self._seo_columns(self.TAXONOMY_SEO_COLUMNS) +
-            [f"acf_{field}" for field in acf_fields]
+            self.TAXONOMY_BASE_COLUMNS.copy()
+            + self._seo_columns(self.TAXONOMY_SEO_COLUMNS)
+            + [f"acf_{field}" for field in acf_fields]
         )
 
         logger.debug(f"Построен список колонок для таксономии: {len(columns)} колонок")
         return columns
 
-    def _create_empty_sheet(
-        self,
-        workbook: Workbook,
-        sheet_name: str,
-        columns: List[str]
-    ):
+    def _create_empty_sheet(self, workbook: Workbook, sheet_name: str, columns: List[str]):
         """
         Создать пустой лист с заголовками.
 

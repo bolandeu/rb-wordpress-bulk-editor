@@ -54,8 +54,7 @@ def _project_check(ctx: typer.Context) -> Dict[str, Any]:
     return _check(
         "project",
         OK if env_file else WARN,
-        f"Проект '{proj.name}': {proj.root}"
-        + ("" if env_file else " (.env не найден)"),
+        f"Проект '{proj.name}': {proj.root}" + ("" if env_file else " (.env не найден)"),
         active=True,
         project=proj.name,
         root=str(proj.root),
@@ -91,9 +90,7 @@ def _cli_compat_check(ctx: typer.Context) -> Dict[str, Any]:
     except CliTooOld as e:
         return _check("cli_compat", FAIL, e.message, **details)
 
-    return _check(
-        "cli_compat", OK, f"Версия {current} >= требуемой {required}.", **details
-    )
+    return _check("cli_compat", OK, f"Версия {current} >= требуемой {required}.", **details)
 
 
 def _settings_check(env_file: Optional[Path]) -> Dict[str, Any]:
@@ -134,7 +131,8 @@ def _credentials_check(resolved: ResolvedCredentials) -> Dict[str, Any]:
         return _check(
             "credentials",
             WARN,
-            "Не разрешены: " + ", ".join(missing)
+            "Не разрешены: "
+            + ", ".join(missing)
             + f" (например, переменная {hint_var}). Read-only командам этого достаточно.",
             missing=missing,
             **details,
@@ -161,15 +159,11 @@ def _connection_check(resolved: ResolvedCredentials) -> Dict[str, Any]:
     """Опциональная проверка доступности сайта (только по --check-connection)."""
     domain = resolved.domain
     if not domain:
-        return _check(
-            "connection", WARN, "Домен не разрешён — проверять нечего.", domain=None
-        )
+        return _check("connection", WARN, "Домен не разрешён — проверять нечего.", domain=None)
 
     authenticated = bool(resolved.username and resolved.password)
     try:
-        config = WordPressConfig.from_credentials(
-            domain, resolved.username, resolved.password
-        )
+        config = WordPressConfig.from_credentials(domain, resolved.username, resolved.password)
         asyncio.run(_probe(config, authenticated))
     except WPBulkEditorError as e:
         return _check("connection", FAIL, e.message, domain=domain, authenticated=authenticated)
@@ -177,8 +171,7 @@ def _connection_check(resolved: ResolvedCredentials) -> Dict[str, Any]:
     return _check(
         "connection",
         OK,
-        f"WordPress REST API отвечает ({domain}"
-        + (", авторизовано)." if authenticated else ", анонимно)."),
+        f"WordPress REST API отвечает ({domain}" + (", авторизовано)." if authenticated else ", анонимно)."),
         domain=domain,
         authenticated=authenticated,
     )
@@ -208,9 +201,7 @@ def doctor(
     ctx: typer.Context,
     domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain"),
     username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
-    password: Optional[str] = typer.Option(
-        None, "--password", help="WordPress Application Password"
-    ),
+    password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     env_file: Optional[Path] = typer.Option(
         None,
         "--env-file",

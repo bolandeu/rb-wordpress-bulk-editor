@@ -135,19 +135,16 @@ def resolve_credentials(
     from_keychain: Dict[str, str] = {}
     if domain:
         from_env = read_fields_from_env(domain, list(CREDENTIAL_FIELDS), environ=process_env)
-        merged = get_credential(
-            domain, env_fields=list(CREDENTIAL_FIELDS), environ=process_env
-        ) or {}
+        merged = get_credential(domain, env_fields=list(CREDENTIAL_FIELDS), environ=process_env) or {}
         from_keychain = {k: v for k, v in merged.items() if k not in from_env}
 
     overrides = {"username": username_override, "password": password_override}
     values: Dict[str, str] = {}
     for name in CREDENTIAL_FIELDS:
-        legacy_var, legacy_value = _first_set(
-            _env_names(name, _LEGACY_ENV_VARS[name], dotenv_env), dotenv_env
-        )
-        if overrides[name]:
-            values[name], sources[name] = overrides[name].strip(), "cli"
+        legacy_var, legacy_value = _first_set(_env_names(name, _LEGACY_ENV_VARS[name], dotenv_env), dotenv_env)
+        override = overrides[name]
+        if override:
+            values[name], sources[name] = override.strip(), "cli"
         elif from_env.get(name):
             values[name], sources[name] = from_env[name].strip(), "env"
         elif from_keychain.get(name):
@@ -173,7 +170,7 @@ def load_credentials_from_env(
     env_file: Optional[Path] = None,
     domain_override: Optional[str] = None,
     username_override: Optional[str] = None,
-    password_override: Optional[str] = None
+    password_override: Optional[str] = None,
 ) -> Tuple[str, str, str]:
     """
     Разрешить credentials WordPress (см. `resolve_credentials`) и потребовать их наличия.
@@ -220,9 +217,7 @@ def load_credentials_from_env(
 
 
 def load_async_config_from_env(
-    env_file: Optional[Path] = None,
-    cli_concurrency: Optional[int] = None,
-    cli_max_retries: Optional[int] = None
+    env_file: Optional[Path] = None, cli_concurrency: Optional[int] = None, cli_max_retries: Optional[int] = None
 ) -> Tuple:
     """
     Загрузить async конфигурацию из .env файла или CLI параметров.
@@ -269,15 +264,11 @@ def load_async_config_from_env(
     max_retries = cli_max_retries or settings.max_retries
 
     # Создаем RetryConfig
-    retry_config = RetryConfig(
-        max_retries=max_retries,
-        base_delay=settings.retry_delay
-    )
+    retry_config = RetryConfig(max_retries=max_retries, base_delay=settings.retry_delay)
 
     # Создаем CircuitBreaker
     circuit_breaker = CircuitBreaker(
-        failure_threshold=settings.circuit_breaker_threshold,
-        recovery_timeout=settings.circuit_breaker_recovery
+        failure_threshold=settings.circuit_breaker_threshold, recovery_timeout=settings.circuit_breaker_recovery
     )
 
     logger.debug(

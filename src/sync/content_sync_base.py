@@ -6,8 +6,7 @@ _add_item, _update_item, _delete_item, _process_taxonomies, _upload_media
 """
 
 from abc import abstractmethod
-from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence, cast
 from loguru import logger
 
 from ..wordpress.client import WordPressClient
@@ -34,12 +33,7 @@ class ContentSyncBase(BaseSync):
     Наследники (ContentSync, ContentSyncAsync) реализуют только sync_records().
     """
 
-    def __init__(
-        self,
-        wp_client: WordPressClient,
-        config: AppConfig,
-        taxonomy_cache: TaxonomyCache
-    ):
+    def __init__(self, wp_client: WordPressClient, config: AppConfig, taxonomy_cache: TaxonomyCache):
         super().__init__(wp_client, config)
         self.taxonomy_cache = taxonomy_cache
 
@@ -66,7 +60,7 @@ class ContentSyncBase(BaseSync):
         media_endpoint: MediaEndpoint,
         mapper: ContentMapper,
         content_processor: ContentProcessor,
-        row: Mapping[str, Any]
+        row: Mapping[str, Any],
     ) -> Dict[str, Any]:
         """Создать новую запись."""
         # Dry-run: только логируем, не отправляем
@@ -106,7 +100,8 @@ class ContentSyncBase(BaseSync):
         # 5. Логируем что отправляем
         has_content = "content" in payload
         content_len = len(payload["content"]) if has_content else 0
-        logger.info(f"Sending create: payload keys={list(payload.keys())}, content={'yes (' + str(content_len) + ' chars)' if has_content else 'no'}")
+        content_note = f"yes ({content_len} chars)" if has_content else "no"
+        logger.info(f"Sending create: payload keys={list(payload.keys())}, content={content_note}")
 
         # 6. Проверяем дубликаты по slug (если slug заполнен)
         slug = payload.get("slug")
@@ -116,8 +111,7 @@ class ContentSyncBase(BaseSync):
                 # Запись с таким slug уже существует - делаем update вместо add
                 post_id = existing_post["id"]
                 logger.warning(
-                    f"Post with slug='{slug}' already exists (ID={post_id}). "
-                    f"Converting action from 'add' to 'update'."
+                    f"Post with slug='{slug}' already exists (ID={post_id}). Converting action from 'add' to 'update'."
                 )
                 result = await posts_endpoint.update(post_id, payload)
                 logger.info(f"Updated existing post ID={post_id} (found by slug='{slug}')")
@@ -139,7 +133,7 @@ class ContentSyncBase(BaseSync):
         # Пропускаем если --skip-media или columns_filter активен и img_path/featured_media не в фильтре
         _should_media = not self.config.sync.skip_media and (not _cf or "img_path" in _cf or "featured_media" in _cf)
         if _should_media and mapper.should_upload_media(row):
-            media_path = mapper.extract_media_path(row)
+            media_path = cast(str, mapper.extract_media_path(row))  # should_upload_media() его гарантирует
             # Берем title и alt_text из строки
             title = row.get("title", "") if has_value(row, "title") else ""
             alt_text = row.get("alt_text", "") if has_value(row, "alt_text") else ""
@@ -150,25 +144,16 @@ class ContentSyncBase(BaseSync):
 
             try:
                 logger.debug(f"Uploading media for post {post_id}: {media_path}")
-                media_result = await self._upload_media(
-                    media_endpoint,
-                    media_path,
-                    title,
-                    alt_text,
-                    caption
-                )
+                media_result = await self._upload_media(media_endpoint, media_path, title, alt_text, caption)
 
                 # Обновляем пост с featured_media
                 if media_result:
-                    await posts_endpoint.update(
-                        post_id,
-                        {"featured_media": media_result["id"]}
-                    )
+                    await posts_endpoint.update(post_id, {"featured_media": media_result["id"]})
                     result["featured_media"] = media_result["id"]
                     result["image_url"] = media_result.get("source_url")
                     logger.info(f"Attached media ID={media_result['id']} to post ID={post_id}")
                 else:
-                    logger.warning(f"Media upload returned None, skipping featured_media update")
+                    logger.warning("Media upload returned None, skipping featured_media update")
 
             except Exception as e:
                 logger.warning(f"Failed to upload media for post {post_id}: {e}")
@@ -182,7 +167,7 @@ class ContentSyncBase(BaseSync):
         media_endpoint: MediaEndpoint,
         mapper: ContentMapper,
         content_processor: ContentProcessor,
-        row: Mapping[str, Any]
+        row: Mapping[str, Any],
     ) -> Dict[str, Any]:
         """Обновить существующую запись."""
         post_id = int(row["id"])
@@ -229,11 +214,13 @@ class ContentSyncBase(BaseSync):
             # Пропускаем если columns_filter активен и img_path/featured_media не в фильтре
             _should_media = not _cf or "img_path" in _cf or "featured_media" in _cf
             img_path_filled = _should_media and mapper.should_upload_media(row)
-            featured_media_in_excel = _should_media and has_value(row, "featured_media") and str(row["featured_media"]).strip() != ""
+            featured_media_in_excel = (
+                _should_media and has_value(row, "featured_media") and str(row["featured_media"]).strip() != ""
+            )
 
             if img_path_filled:
                 # Загружаем новую картинку
-                media_path = mapper.extract_media_path(row)
+                media_path = cast(str, mapper.extract_media_path(row))  # should_upload_media() его гарантирует
                 # Берем title и alt_text из строки
                 title = row.get("title", "") if has_value(row, "title") else ""
                 alt_text = row.get("alt_text", "") if has_value(row, "alt_text") else ""
@@ -244,13 +231,7 @@ class ContentSyncBase(BaseSync):
 
                 try:
                     logger.debug(f"Uploading media for post {post_id}: {media_path}")
-                    media_result = await self._upload_media(
-                        media_endpoint,
-                        media_path,
-                        title,
-                        alt_text,
-                        caption
-                    )
+                    media_result = await self._upload_media(media_endpoint, media_path, title, alt_text, caption)
 
                     if media_result:
                         # Добавляем featured_media в payload для одновременного обновления
@@ -259,7 +240,7 @@ class ContentSyncBase(BaseSync):
                         # Сохраняем media_result для последующего добавления в result
                         saved_media_result = media_result
                     else:
-                        logger.warning(f"Media upload returned None, skipping featured_media update")
+                        logger.warning("Media upload returned None, skipping featured_media update")
                         saved_media_result = None
 
                 except Exception as e:
@@ -278,22 +259,19 @@ class ContentSyncBase(BaseSync):
                     # Получаем данные медиа для image_url
                     try:
                         media_data = await media_endpoint.get(media_id)
-                        saved_media_result = {
-                            'id': media_id,
-                            'source_url': media_data.get('source_url')
-                        }
+                        saved_media_result = {"id": media_id, "source_url": media_data.get("source_url")}
                         logger.debug(f"Got existing media data: ID={media_id}, URL={saved_media_result['source_url']}")
                     except Exception as e:
                         logger.warning(f"Failed to get media data for ID={media_id}: {e}")
-                        saved_media_result = {
-                            'id': media_id,
-                            'source_url': ''
-                        }
+                        saved_media_result = {"id": media_id, "source_url": ""}
 
         # 6. Обновляем запись
         has_content = "content" in payload
         content_len = len(payload["content"]) if has_content else 0
-        logger.info(f"Sending update for post ID={post_id}: payload keys={list(payload.keys())}, content={'yes (' + str(content_len) + ' chars)' if has_content else 'no'}")
+        content_note = f"yes ({content_len} chars)" if has_content else "no"
+        logger.info(
+            f"Sending update for post ID={post_id}: payload keys={list(payload.keys())}, content={content_note}"
+        )
         result = await posts_endpoint.update(post_id, payload)
 
         # 6a. Основные (primary) термины таксономий — best-effort
@@ -301,9 +279,14 @@ class ContentSyncBase(BaseSync):
 
         # 7. Проверяем что content реально обновился (сравниваем хеши текста без тегов)
         if has_content:
-            import hashlib, re
-            _strip = lambda s: re.sub(r'\s+', '', re.sub(r'<[^>]+>', '', s))
-            sent_hash = hashlib.md5(_strip(payload["content"]).encode()).hexdigest()[:8]
+            import hashlib
+            import re
+
+            def _strip(s: str) -> str:
+                return re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", s))
+
+            # md5 — сверка отправленного текста с сохранённым, не криптография.
+            sent_hash = hashlib.md5(_strip(payload["content"]).encode(), usedforsecurity=False).hexdigest()[:8]
 
             response_content = result.get("content", {})
             if isinstance(response_content, dict):
@@ -312,7 +295,7 @@ class ContentSyncBase(BaseSync):
                 raw = str(response_content) if response_content else ""
 
             if raw:
-                recv_hash = hashlib.md5(_strip(raw).encode()).hexdigest()[:8]
+                recv_hash = hashlib.md5(_strip(raw).encode(), usedforsecurity=False).hexdigest()[:8]
                 if sent_hash == recv_hash:
                     logger.info(f"Content CONFIRMED for post ID={post_id}: hash match ({sent_hash})")
                 else:
@@ -328,7 +311,10 @@ class ContentSyncBase(BaseSync):
         if saved_media_result:
             result["featured_media"] = saved_media_result.get("id")
             result["image_url"] = saved_media_result.get("source_url")
-            logger.info(f"Added media data to result: featured_media={result['featured_media']}, image_url={result['image_url']}")
+            logger.info(
+                f"Added media data to result: featured_media={result['featured_media']}, "
+                f"image_url={result['image_url']}"
+            )
 
         # 9. Получаем актуальные данные записи (link, modified могут отсутствовать в ответе update)
         if "link" not in result or "modified" not in result:
@@ -338,17 +324,16 @@ class ContentSyncBase(BaseSync):
                     result["link"] = fresh_data.get("link")
                 if "modified" not in result:
                     result["modified"] = fresh_data.get("modified")
-                logger.debug(f"Fetched fresh data for post {post_id}: link={result.get('link')}, modified={result.get('modified')}")
+                logger.debug(
+                    f"Fetched fresh data for post {post_id}: link={result.get('link')}, "
+                    f"modified={result.get('modified')}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to fetch updated data for post {post_id}: {e}")
 
         return result
 
-    async def _delete_item(
-        self,
-        posts_endpoint: PostsEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _delete_item(self, posts_endpoint: PostsEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Удалить запись (в корзину)."""
         post_id = int(row["id"])
 
@@ -378,9 +363,7 @@ class ContentSyncBase(BaseSync):
         return result
 
     async def _process_taxonomies(
-        self,
-        row: Mapping[str, Any],
-        mapper: ContentMapper
+        self, row: Mapping[str, Any], mapper: ContentMapper
     ) -> tuple[Dict[str, list[int]], Dict[str, int]]:
         """
         Обработать таксономии из записи.
@@ -428,9 +411,7 @@ class ContentSyncBase(BaseSync):
             # dry_run пробрасывается до create-веток get_or_create*: поиск
             # существующих терминов выполняется как обычно, но ничего не создаётся
             term_ids, primary_id = await tax_endpoint.process_taxonomy_string(
-                str(value),
-                taxonomy_cache=self.taxonomy_cache,
-                dry_run=self.config.sync.dry_run
+                str(value), taxonomy_cache=self.taxonomy_cache, dry_run=self.config.sync.dry_run
             )
 
             if term_ids:
@@ -442,10 +423,7 @@ class ContentSyncBase(BaseSync):
         return taxonomy_ids, primary_terms
 
     async def _apply_primary_terms(
-        self,
-        posts_endpoint: PostsEndpoint,
-        post_id: int,
-        primary_terms: Dict[str, int]
+        self, posts_endpoint: PostsEndpoint, post_id: int, primary_terms: Dict[str, int]
     ) -> None:
         """
         Записать основные (primary) термины в мета-поля Yoast SEO.
@@ -465,10 +443,7 @@ class ContentSyncBase(BaseSync):
         if not primary_terms:
             return
 
-        meta = {
-            primary_term_meta_key(taxonomy): term_id
-            for taxonomy, term_id in primary_terms.items()
-        }
+        meta = {primary_term_meta_key(taxonomy): term_id for taxonomy, term_id in primary_terms.items()}
 
         try:
             await posts_endpoint.update(post_id, {"meta": meta})
@@ -477,12 +452,7 @@ class ContentSyncBase(BaseSync):
             logger.warning(f"Failed to set primary terms for post ID={post_id}: {e}")
 
     async def _upload_media(
-        self,
-        media_endpoint: MediaEndpoint,
-        media_path: str,
-        title: str = "",
-        alt_text: str = "",
-        caption: str = ""
+        self, media_endpoint: MediaEndpoint, media_path: str, title: str = "", alt_text: str = "", caption: str = ""
     ) -> Optional[Dict[str, Any]]:
         """
         Загрузить медиафайл.
@@ -501,13 +471,12 @@ class ContentSyncBase(BaseSync):
         if media_path.startswith("http://") or media_path.startswith("https://"):
             # Загрузка по URL
             return await media_endpoint.upload_from_url(
-                media_path,
-                title=title if title else None,
-                alt_text=alt_text if alt_text else None
+                media_path, title=title if title else None, alt_text=alt_text if alt_text else None
             )
         else:
             # Локальный файл
             from ..utils.path_utils import resolve_media_file
+
             file_path = resolve_media_file(media_path, self.config.paths.media_folder)
 
             if not file_path.exists():
@@ -518,5 +487,5 @@ class ContentSyncBase(BaseSync):
                 file_path,
                 title=title if title else None,
                 alt_text=alt_text if alt_text else None,
-                caption=caption if caption else None
+                caption=caption if caption else None,
             )

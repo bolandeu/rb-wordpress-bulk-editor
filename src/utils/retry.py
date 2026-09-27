@@ -11,7 +11,7 @@ import asyncio
 import functools
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar, Callable, Optional
+from typing import Awaitable, Callable, Optional, TypeVar
 from loguru import logger
 
 from ..exceptions import (
@@ -20,10 +20,10 @@ from ..exceptions import (
     WordPressError,
     WPBulkEditorError,
     AuthenticationError,
-    NotFoundError
+    NotFoundError,
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class RetryConfig:
@@ -38,11 +38,7 @@ class RetryConfig:
     """
 
     def __init__(
-        self,
-        max_retries: int = 3,
-        base_delay: float = 1.0,
-        max_delay: float = 30.0,
-        exponential_base: float = 2.0
+        self, max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 30.0, exponential_base: float = 2.0
     ):
         self.max_retries = max_retries
         self.base_delay = base_delay
@@ -117,10 +113,12 @@ def async_retry(config: Optional[RetryConfig] = None):
     if config is None:
         config = RetryConfig()
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        name = getattr(func, "__name__", repr(func))
+
         @functools.wraps(func)
         async def wrapper(*args, **kwargs) -> T:
-            last_exception = None
+            last_exception: Optional[Exception] = None
 
             for attempt in range(config.max_retries + 1):
                 try:
@@ -134,34 +132,25 @@ def async_retry(config: Optional[RetryConfig] = None):
                         # Для ошибки "превышение страниц" используем DEBUG (это нормальная ситуация при пагинации)
                         error_msg = str(e)
                         if kwargs.get("suppress_non_retryable_log"):
-                            logger.debug(
-                                f"{func.__name__}: Suppressed non-retryable error: {e}"
-                            )
-                        elif "превышает количество имеющихся страниц" in error_msg or "exceeds the number of pages" in error_msg.lower():
-                            logger.debug(
-                                f"{func.__name__}: Pagination limit reached: {e}"
-                            )
+                            logger.debug(f"{name}: Suppressed non-retryable error: {e}")
+                        elif (
+                            "превышает количество имеющихся страниц" in error_msg
+                            or "exceeds the number of pages" in error_msg.lower()
+                        ):
+                            logger.debug(f"{name}: Pagination limit reached: {e}")
                         else:
-                            logger.error(
-                                f"{func.__name__}: Non-retryable error: {e}"
-                            )
+                            logger.error(f"{name}: Non-retryable error: {e}")
                         raise
 
                     # Если это последняя попытка - кидаем ошибку
                     if attempt == config.max_retries:
-                        logger.error(
-                            f"{func.__name__}: Max retries ({config.max_retries}) "
-                            f"exceeded: {e}"
-                        )
+                        logger.error(f"{name}: Max retries ({config.max_retries}) exceeded: {e}")
                         raise
 
                     # Вычисляем delay с exponential backoff.
                     # Если сервер прислал Retry-After (провайдер кладёт его
                     # в атрибут исключения) — он имеет приоритет.
-                    delay = min(
-                        config.base_delay * (config.exponential_base ** attempt),
-                        config.max_delay
-                    )
+                    delay = min(config.base_delay * (config.exponential_base**attempt), config.max_delay)
                     retry_after = getattr(e, "retry_after", None)
                     if retry_after is not None:
                         # Retry-After тоже ограничен max_delay: сайт с
@@ -170,23 +159,24 @@ def async_retry(config: Optional[RetryConfig] = None):
                         requested = float(retry_after)
                         if requested > config.max_delay:
                             logger.warning(
-                                f"{func.__name__}: Retry-After={requested:.0f}s превышает "
+                                f"{name}: Retry-After={requested:.0f}s превышает "
                                 f"max_delay={config.max_delay:.0f}s, ждём {config.max_delay:.0f}s"
                             )
                         delay = max(delay, min(requested, config.max_delay))
 
                     logger.warning(
-                        f"{func.__name__}: Attempt {attempt + 1}/{config.max_retries + 1} "
+                        f"{name}: Attempt {attempt + 1}/{config.max_retries + 1} "
                         f"failed: {e}. Retrying in {delay:.2f}s..."
                     )
 
                     # Ждем перед следующей попыткой
                     await asyncio.sleep(delay)
 
-            # Не должны сюда попасть, но на всякий случай
-            raise last_exception
+            # Не должны сюда попасть (попыток всегда ≥ 1), но на всякий случай
+            raise last_exception if last_exception is not None else RuntimeError(f"{name}: нет попыток")
 
         return wrapper
+
     return decorator
 
 
@@ -198,6 +188,7 @@ class CircuitState(Enum):
     - OPEN: Блокировка запросов, слишком много ошибок
     - HALF_OPEN: Проверка восстановления, пропускаем 1 запрос
     """
+
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
@@ -240,11 +231,7 @@ class CircuitBreaker:
         recovery_timeout: Время восстановления в секундах (default: 60)
     """
 
-    def __init__(
-        self,
-        failure_threshold: int = 10,
-        recovery_timeout: float = 60.0
-    ):
+    def __init__(self, failure_threshold: int = 10, recovery_timeout: float = 60.0):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
 
@@ -278,8 +265,7 @@ class CircuitBreaker:
                     elapsed = (datetime.now() - self.last_failure_time).total_seconds()
                     if elapsed >= self.recovery_timeout:
                         logger.info(
-                            f"Circuit breaker: OPEN → HALF_OPEN "
-                            f"(recovery timeout {self.recovery_timeout}s elapsed)"
+                            f"Circuit breaker: OPEN → HALF_OPEN (recovery timeout {self.recovery_timeout}s elapsed)"
                         )
                         self.state = CircuitState.HALF_OPEN
                         is_half_open_probe = True
@@ -312,16 +298,11 @@ class CircuitBreaker:
                 self.last_failure_time = datetime.now()
 
                 if is_half_open_probe:
-                    logger.warning(
-                        f"Circuit breaker: HALF_OPEN → OPEN (failed request: {e})"
-                    )
+                    logger.warning(f"Circuit breaker: HALF_OPEN → OPEN (failed request: {e})")
                     self.state = CircuitState.OPEN
 
                 elif self.consecutive_failures >= self.failure_threshold:
-                    logger.error(
-                        f"Circuit breaker: CLOSED → OPEN "
-                        f"({self.consecutive_failures} consecutive failures)"
-                    )
+                    logger.error(f"Circuit breaker: CLOSED → OPEN ({self.consecutive_failures} consecutive failures)")
                     self.state = CircuitState.OPEN
 
             raise
@@ -350,5 +331,5 @@ class CircuitBreaker:
         return {
             "state": self.state.value,
             "consecutive_failures": self.consecutive_failures,
-            "last_failure_time": self.last_failure_time.isoformat() if self.last_failure_time else None
+            "last_failure_time": self.last_failure_time.isoformat() if self.last_failure_time else None,
         }

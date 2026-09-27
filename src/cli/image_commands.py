@@ -5,7 +5,6 @@
 from pathlib import Path
 from typing import Optional
 
-from loguru import logger
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -37,9 +36,7 @@ def _resolve_input_folder(ctx: typer.Context, explicit: Optional[Path]) -> Path:
     raise typer.Exit(1)
 
 
-def _resolve_output_folder(
-    input_folder: Path, explicit: Optional[Path], default_subfolder: str
-) -> Path:
+def _resolve_output_folder(input_folder: Path, explicit: Optional[Path], default_subfolder: str) -> Path:
     """Разрешить output: явный путь > input/subfolder."""
     if explicit:
         return explicit
@@ -103,49 +100,29 @@ def _make_progress() -> Progress:
 @app.command()
 def image_crop(
     ctx: typer.Context,
-    input_folder: Optional[Path] = typer.Option(
-        None, "--input", "-i", help="Папка с изображениями"
-    ),
-    output_folder: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Папка для результатов"
-    ),
-    width: Optional[int] = typer.Option(
-        None, "--width", "-W", help="Ширина в пикселях"
-    ),
-    height: Optional[int] = typer.Option(
-        None, "--height", "-H", help="Высота в пикселях"
-    ),
+    input_folder: Optional[Path] = typer.Option(None, "--input", "-i", help="Папка с изображениями"),
+    output_folder: Optional[Path] = typer.Option(None, "--output", "-o", help="Папка для результатов"),
+    width: Optional[int] = typer.Option(None, "--width", "-W", help="Ширина в пикселях"),
+    height: Optional[int] = typer.Option(None, "--height", "-H", help="Высота в пикселях"),
     aspect_ratio: Optional[str] = typer.Option(
         None, "--aspect-ratio", "-a", help="Соотношение сторон (16:9, 4:3, 1:1)"
     ),
     strategy: str = typer.Option(
         "center", "--strategy", "-s", help="Стратегия обрезки: center, top, bottom, left, right"
     ),
-    glob_pattern: str = typer.Option(
-        "*.{jpg,jpeg,png,webp}", "--glob", "-g", help="Паттерн файлов"
-    ),
-    recursive: bool = typer.Option(
-        False, "--recursive", "-r", help="Искать в подпапках"
-    ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", help="Перезаписать существующие"
-    ),
+    glob_pattern: str = typer.Option("*.{jpg,jpeg,png,webp}", "--glob", "-g", help="Паттерн файлов"),
+    recursive: bool = typer.Option(False, "--recursive", "-r", help="Искать в подпапках"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Перезаписать существующие"),
     # Gradient overlay
-    gradient: float = typer.Option(
-        0.0, "--gradient", help="Затемняющий градиент снизу (opacity 0.0-1.0)"
-    ),
-    gradient_height: float = typer.Option(
-        0.5, "--gradient-height", help="Высота градиента (доля 0.0-1.0)"
-    ),
+    gradient: float = typer.Option(0.0, "--gradient", help="Затемняющий градиент снизу (opacity 0.0-1.0)"),
+    gradient_height: float = typer.Option(0.5, "--gradient-height", help="Высота градиента (доля 0.0-1.0)"),
     # Watermark
-    watermark_text: Optional[str] = typer.Option(
-        None, "--watermark-text", "--wt", help="Текст водяного знака"
-    ),
-    watermark_image: Optional[Path] = typer.Option(
-        None, "--watermark-image", "--wi", help="Картинка водяного знака"
-    ),
+    watermark_text: Optional[str] = typer.Option(None, "--watermark-text", "--wt", help="Текст водяного знака"),
+    watermark_image: Optional[Path] = typer.Option(None, "--watermark-image", "--wi", help="Картинка водяного знака"),
     watermark_position: str = typer.Option(
-        "bottom-right", "--watermark-position", "--wp",
+        "bottom-right",
+        "--watermark-position",
+        "--wp",
         help="Позиция: center, bottom-right, bottom-left, top-right, top-left, bottom-center",
     ),
     watermark_opacity: float = typer.Option(
@@ -154,15 +131,11 @@ def image_crop(
     watermark_size: Optional[int] = typer.Option(
         None, "--watermark-size", "--ws", help="Размер шрифта (авто если не указан)"
     ),
-    watermark_color: str = typer.Option(
-        "#FFFFFF", "--watermark-color", "--wc", help="Цвет текста (#RRGGBB)"
-    ),
+    watermark_color: str = typer.Option("#FFFFFF", "--watermark-color", "--wc", help="Цвет текста (#RRGGBB)"),
     watermark_scale: float = typer.Option(
         0.2, "--watermark-scale", help="Масштаб картинки-водяного знака (доля от ширины)"
     ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-d", help="Показать что будет сделано"
-    ),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет сделано"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробный вывод"),
 ):
     """
@@ -185,9 +158,7 @@ def image_crop(
     Example: wp-bulk image-crop --input ./photos --aspect-ratio 16:9
     """
     if not aspect_ratio and not (width and height):
-        console.print(
-            "[red]ERROR: Укажите --aspect-ratio или (--width и --height)[/red]"
-        )
+        console.print("[red]ERROR: Укажите --aspect-ratio или (--width и --height)[/red]")
         raise typer.Exit(1)
 
     resolved_input = _resolve_input_folder(ctx, input_folder)
@@ -199,7 +170,7 @@ def image_crop(
 
     log_file = _setup_logging(ctx, "image_crop", verbose)
 
-    console.print(f"\n[bold blue]Image Crop[/bold blue]")
+    console.print("\n[bold blue]Image Crop[/bold blue]")
     console.print("=" * 60)
     console.print(f"  Input:    [cyan]{resolved_input}[/cyan]")
     console.print(f"  Output:   [cyan]{resolved_output}[/cyan]")
@@ -280,36 +251,16 @@ def image_crop(
 @app.command()
 def image_compress(
     ctx: typer.Context,
-    input_folder: Optional[Path] = typer.Option(
-        None, "--input", "-i", help="Папка с изображениями"
-    ),
-    output_folder: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Папка для результатов"
-    ),
-    quality: int = typer.Option(
-        80, "--quality", "-q", help="Качество JPEG/WebP (1-100)", min=1, max=100
-    ),
-    max_width: Optional[int] = typer.Option(
-        None, "--max-width", help="Максимальная ширина (пропорционально)"
-    ),
-    max_height: Optional[int] = typer.Option(
-        None, "--max-height", help="Максимальная высота (пропорционально)"
-    ),
-    strip_metadata: bool = typer.Option(
-        True, "--strip-metadata/--keep-metadata", help="Удалить EXIF метаданные"
-    ),
-    glob_pattern: str = typer.Option(
-        "*.{jpg,jpeg,png,webp}", "--glob", "-g", help="Паттерн файлов"
-    ),
-    recursive: bool = typer.Option(
-        False, "--recursive", "-r", help="Искать в подпапках"
-    ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", help="Перезаписать существующие"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-d", help="Показать что будет сделано"
-    ),
+    input_folder: Optional[Path] = typer.Option(None, "--input", "-i", help="Папка с изображениями"),
+    output_folder: Optional[Path] = typer.Option(None, "--output", "-o", help="Папка для результатов"),
+    quality: int = typer.Option(80, "--quality", "-q", help="Качество JPEG/WebP (1-100)", min=1, max=100),
+    max_width: Optional[int] = typer.Option(None, "--max-width", help="Максимальная ширина (пропорционально)"),
+    max_height: Optional[int] = typer.Option(None, "--max-height", help="Максимальная высота (пропорционально)"),
+    strip_metadata: bool = typer.Option(True, "--strip-metadata/--keep-metadata", help="Удалить EXIF метаданные"),
+    glob_pattern: str = typer.Option("*.{jpg,jpeg,png,webp}", "--glob", "-g", help="Паттерн файлов"),
+    recursive: bool = typer.Option(False, "--recursive", "-r", help="Искать в подпапках"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Перезаписать существующие"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет сделано"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробный вывод"),
 ):
     """
@@ -324,9 +275,7 @@ def image_compress(
     Example: wp-bulk image-compress --input ./photos --quality 80
     """
     resolved_input = _resolve_input_folder(ctx, input_folder)
-    resolved_output = _resolve_output_folder(
-        resolved_input, output_folder, "compressed"
-    )
+    resolved_output = _resolve_output_folder(resolved_input, output_folder, "compressed")
 
     if not resolved_input.exists():
         console.print(f"[red]ERROR: Папка не найдена: {resolved_input}[/red]")
@@ -334,7 +283,7 @@ def image_compress(
 
     log_file = _setup_logging(ctx, "image_compress", verbose)
 
-    console.print(f"\n[bold blue]Image Compress[/bold blue]")
+    console.print("\n[bold blue]Image Compress[/bold blue]")
     console.print("=" * 60)
     console.print(f"  Input:    [cyan]{resolved_input}[/cyan]")
     console.print(f"  Output:   [cyan]{resolved_output}[/cyan]")
@@ -343,9 +292,7 @@ def image_compress(
         console.print(f"  Max W:    [cyan]{max_width}px[/cyan]")
     if max_height:
         console.print(f"  Max H:    [cyan]{max_height}px[/cyan]")
-    console.print(
-        f"  Metadata: [cyan]{'strip' if strip_metadata else 'keep'}[/cyan]"
-    )
+    console.print(f"  Metadata: [cyan]{'strip' if strip_metadata else 'keep'}[/cyan]")
     console.print()
 
     processor = ImageProcessor()
@@ -403,33 +350,15 @@ def image_compress(
 @app.command()
 def image_convert(
     ctx: typer.Context,
-    input_folder: Optional[Path] = typer.Option(
-        None, "--input", "-i", help="Папка с изображениями"
-    ),
-    output_folder: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Папка для результатов"
-    ),
-    target_format: str = typer.Option(
-        "webp", "--format", "-f", help="Целевой формат: webp, jpg, png"
-    ),
-    quality: int = typer.Option(
-        85, "--quality", "-q", help="Качество для lossy форматов (1-100)", min=1, max=100
-    ),
-    strip_metadata: bool = typer.Option(
-        True, "--strip-metadata/--keep-metadata", help="Удалить EXIF метаданные"
-    ),
-    glob_pattern: str = typer.Option(
-        "*.{jpg,jpeg,png,gif,bmp,tiff}", "--glob", "-g", help="Паттерн файлов"
-    ),
-    recursive: bool = typer.Option(
-        False, "--recursive", "-r", help="Искать в подпапках"
-    ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", help="Перезаписать существующие"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-d", help="Показать что будет сделано"
-    ),
+    input_folder: Optional[Path] = typer.Option(None, "--input", "-i", help="Папка с изображениями"),
+    output_folder: Optional[Path] = typer.Option(None, "--output", "-o", help="Папка для результатов"),
+    target_format: str = typer.Option("webp", "--format", "-f", help="Целевой формат: webp, jpg, png"),
+    quality: int = typer.Option(85, "--quality", "-q", help="Качество для lossy форматов (1-100)", min=1, max=100),
+    strip_metadata: bool = typer.Option(True, "--strip-metadata/--keep-metadata", help="Удалить EXIF метаданные"),
+    glob_pattern: str = typer.Option("*.{jpg,jpeg,png,gif,bmp,tiff}", "--glob", "-g", help="Паттерн файлов"),
+    recursive: bool = typer.Option(False, "--recursive", "-r", help="Искать в подпапках"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Перезаписать существующие"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет сделано"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробный вывод"),
 ):
     """
@@ -452,9 +381,7 @@ def image_convert(
         raise typer.Exit(1)
 
     resolved_input = _resolve_input_folder(ctx, input_folder)
-    resolved_output = _resolve_output_folder(
-        resolved_input, output_folder, target_format.lower()
-    )
+    resolved_output = _resolve_output_folder(resolved_input, output_folder, target_format.lower())
 
     if not resolved_input.exists():
         console.print(f"[red]ERROR: Папка не найдена: {resolved_input}[/red]")
@@ -462,7 +389,7 @@ def image_convert(
 
     log_file = _setup_logging(ctx, "image_convert", verbose)
 
-    console.print(f"\n[bold blue]Image Convert[/bold blue]")
+    console.print("\n[bold blue]Image Convert[/bold blue]")
     console.print("=" * 60)
     console.print(f"  Input:    [cyan]{resolved_input}[/cyan]")
     console.print(f"  Output:   [cyan]{resolved_output}[/cyan]")
@@ -495,9 +422,7 @@ def image_convert(
 
         for file_path in files:
             rel_path = file_path.relative_to(resolved_input)
-            output_path = resolved_output / rel_path.with_suffix(
-                f".{target_format.lower()}"
-            )
+            output_path = resolved_output / rel_path.with_suffix(f".{target_format.lower()}")
 
             if output_path.exists() and not overwrite:
                 stats.skipped += 1

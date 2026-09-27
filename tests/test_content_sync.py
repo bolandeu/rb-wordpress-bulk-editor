@@ -2,8 +2,7 @@
 Tests for ContentSync pipeline (integration tests with mocked WordPress client)
 """
 
-from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -18,6 +17,7 @@ from src.wordpress.taxonomies import TaxonomyCache
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
+
 def make_records(df: pd.DataFrame, discriminator: str = "posts") -> list[Record]:
     """DataFrame → список Record (как их отдаёт ExcelRecordSource)."""
     return [
@@ -27,6 +27,7 @@ def make_records(df: pd.DataFrame, discriminator: str = "posts") -> list[Record]
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def excel_file(tmp_path) -> Path:
@@ -76,8 +77,28 @@ def mock_wp_client():
     """Mock WordPress client, возвращающий фиктивные ответы."""
     client = MagicMock()
     client.get = AsyncMock(return_value=[])
-    client.post = AsyncMock(return_value={"id": 99, "slug": "new-post", "link": "https://example.com/new-post", "modified": "", "date": "", "featured_media": 0, "image_url": ""})
-    client.put = AsyncMock(return_value={"id": 10, "slug": "updated-slug", "link": "https://example.com/updated", "modified": "2024-01-01", "date": "2024-01-01", "featured_media": 0, "image_url": ""})
+    client.post = AsyncMock(
+        return_value={
+            "id": 99,
+            "slug": "new-post",
+            "link": "https://example.com/new-post",
+            "modified": "",
+            "date": "",
+            "featured_media": 0,
+            "image_url": "",
+        }
+    )
+    client.put = AsyncMock(
+        return_value={
+            "id": 10,
+            "slug": "updated-slug",
+            "link": "https://example.com/updated",
+            "modified": "2024-01-01",
+            "date": "2024-01-01",
+            "featured_media": 0,
+            "image_url": "",
+        }
+    )
     client.delete = AsyncMock(return_value={"id": 20, "status": "trash"})
     return client
 
@@ -92,16 +113,17 @@ def mock_taxonomy_cache():
 
 # ── ContentSync return type ───────────────────────────────────────────
 
+
 class TestContentSyncReturnType:
-    async def test_sync_records_returns_sync_report(
-        self, app_config, mock_wp_client, mock_taxonomy_cache
-    ):
+    async def test_sync_records_returns_sync_report(self, app_config, mock_wp_client, mock_taxonomy_cache):
         """sync_records должен возвращать SyncReport, а не dict."""
-        df = pd.DataFrame({
-            "id": ["", "10"],
-            "action": ["skip", "skip"],
-            "title": ["A", "B"],
-        })
+        df = pd.DataFrame(
+            {
+                "id": ["", "10"],
+                "action": ["skip", "skip"],
+                "title": ["A", "B"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
         result = await sync.sync_records("posts", make_records(df), writer=None)
@@ -114,15 +136,15 @@ class TestContentSyncReturnType:
         assert hasattr(result, "errors")
         assert isinstance(result.errors, list)
 
-    async def test_sync_report_to_stats_dict(
-        self, app_config, mock_wp_client, mock_taxonomy_cache
-    ):
+    async def test_sync_report_to_stats_dict(self, app_config, mock_wp_client, mock_taxonomy_cache):
         """SyncReport.to_stats() должен возвращать словарь с нужными ключами."""
-        df = pd.DataFrame({
-            "id": [""],
-            "action": ["skip"],
-            "title": ["A"],
-        })
+        df = pd.DataFrame(
+            {
+                "id": [""],
+                "action": ["skip"],
+                "title": ["A"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
         report = await sync.sync_records("posts", make_records(df), writer=None)
@@ -138,15 +160,16 @@ class TestContentSyncReturnType:
 
 # ── ContentSync stats counting ────────────────────────────────────────
 
+
 class TestContentSyncStats:
-    async def test_skipped_rows_counted(
-        self, app_config, mock_wp_client, mock_taxonomy_cache
-    ):
-        df = pd.DataFrame({
-            "id": ["1", "2", "3"],
-            "action": ["skip", "skip", "skip"],
-            "title": ["A", "B", "C"],
-        })
+    async def test_skipped_rows_counted(self, app_config, mock_wp_client, mock_taxonomy_cache):
+        df = pd.DataFrame(
+            {
+                "id": ["1", "2", "3"],
+                "action": ["skip", "skip", "skip"],
+                "title": ["A", "B", "C"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
         report = await sync.sync_records("posts", make_records(df), writer=None)
@@ -155,14 +178,14 @@ class TestContentSyncStats:
         assert report.skipped == 3
         assert report.created == 0
 
-    async def test_total_equals_df_length(
-        self, app_config, mock_wp_client, mock_taxonomy_cache
-    ):
-        df = pd.DataFrame({
-            "id": ["", "", ""],
-            "action": ["skip", "skip", "skip"],
-            "title": ["A", "B", "C"],
-        })
+    async def test_total_equals_df_length(self, app_config, mock_wp_client, mock_taxonomy_cache):
+        df = pd.DataFrame(
+            {
+                "id": ["", "", ""],
+                "action": ["skip", "skip", "skip"],
+                "title": ["A", "B", "C"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
         report = await sync.sync_records("posts", make_records(df), writer=None)
@@ -172,20 +195,21 @@ class TestContentSyncStats:
 
 # ── SyncResult error tracking ─────────────────────────────────────────
 
+
 class TestSyncResultErrors:
-    async def test_error_captured_in_sync_result(
-        self, app_config, mock_wp_client, mock_taxonomy_cache
-    ):
+    async def test_error_captured_in_sync_result(self, app_config, mock_wp_client, mock_taxonomy_cache):
         """Ошибки API должны попасть в SyncReport.errors как SyncResult."""
         # API всегда бросает исключение
         mock_wp_client.post = AsyncMock(side_effect=Exception("API error"))
         mock_wp_client.put = AsyncMock(side_effect=Exception("API error"))
 
-        df = pd.DataFrame({
-            "id": [""],
-            "action": ["add"],
-            "title": ["Post with error"],
-        })
+        df = pd.DataFrame(
+            {
+                "id": [""],
+                "action": ["add"],
+                "title": ["Post with error"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, app_config, mock_taxonomy_cache)
         report = await sync.sync_records("posts", make_records(df), writer=None)
@@ -200,16 +224,17 @@ class TestSyncResultErrors:
 
 # ── Dry-run mode ──────────────────────────────────────────────────────
 
+
 class TestDryRunMode:
-    async def test_dry_run_does_not_call_api(
-        self, dry_run_config, mock_wp_client, mock_taxonomy_cache
-    ):
+    async def test_dry_run_does_not_call_api(self, dry_run_config, mock_wp_client, mock_taxonomy_cache):
         """В dry-run режиме API не вызывается."""
-        df = pd.DataFrame({
-            "id": ["", "10"],
-            "action": ["add", "update"],
-            "title": ["New", "Updated"],
-        })
+        df = pd.DataFrame(
+            {
+                "id": ["", "10"],
+                "action": ["add", "update"],
+                "title": ["New", "Updated"],
+            }
+        )
 
         sync = ContentSync(mock_wp_client, dry_run_config, mock_taxonomy_cache)
         await sync.sync_records("posts", make_records(df), writer=None)
@@ -221,6 +246,7 @@ class TestDryRunMode:
 
 
 # ── Таксономии: иерархия и primary-термин ─────────────────────────────
+
 
 class RoutingClient:
     """Фейковый WP-клиент: маршрутизирует запросы постов и терминов по endpoint."""
@@ -268,17 +294,19 @@ class TestTaxonomyHierarchyEndToEnd:
     async def test_hierarchy_and_primary_term(self, app_config):
         """Смешанная строка таксономии: иерархия создаётся, primary — первый термин."""
         client = RoutingClient()
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={
-                "id": "",
-                "action": "add",
-                "title": "Post",
-                "services_cat": "термин1; термин2>термин2.1",
-            },
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={
+                    "id": "",
+                    "action": "add",
+                    "title": "Post",
+                    "services_cat": "термин1; термин2>термин2.1",
+                },
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, app_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -294,21 +322,25 @@ class TestTaxonomyHierarchyEndToEnd:
         payload = client.created_posts[0]
         assert payload["services_cat"] == [100, 102]
         # Primary — первая спецификация строки (термин1)
-        assert client.put_calls == [(
-            "/wp-json/wp/v2/posts/99",
-            {"meta": {"_yoast_wpseo_primary_services_cat": 100}},
-        )]
+        assert client.put_calls == [
+            (
+                "/wp-json/wp/v2/posts/99",
+                {"meta": {"_yoast_wpseo_primary_services_cat": 100}},
+            )
+        ]
 
     async def test_primary_meta_failure_does_not_break_sync(self, app_config):
         """Падение записи primary-меты не ломает синхронизацию записи."""
         client = RoutingClient()
         client.put = AsyncMock(side_effect=Exception("meta not registered"))
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={"id": "", "action": "add", "title": "Post", "services_cat": "термин1"},
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={"id": "", "action": "add", "title": "Post", "services_cat": "термин1"},
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, app_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -324,12 +356,14 @@ class TestTaxonomyDryRunDoesNotCreate:
     async def test_missing_term_not_created(self, dry_run_config):
         """Термин, которого ещё нет на сайте: под dry-run — только поиск, без create."""
         client = RoutingClient()
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={"id": "", "action": "add", "title": "Post", "services_cat": "Новая категория"},
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={"id": "", "action": "add", "title": "Post", "services_cat": "Новая категория"},
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, dry_run_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -347,12 +381,14 @@ class TestTaxonomyDryRunDoesNotCreate:
         """Уже существующий термин находится под dry-run как обычно (без create)."""
         client = RoutingClient()
         client.terms.append({"id": 100, "name": "Портьеры", "parent": 0})
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={"id": "", "action": "add", "title": "Post", "services_cat": "Портьеры"},
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={"id": "", "action": "add", "title": "Post", "services_cat": "Портьеры"},
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, dry_run_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -365,17 +401,19 @@ class TestTaxonomyDryRunDoesNotCreate:
     async def test_hierarchy_missing_ancestors_not_created(self, dry_run_config):
         """Иерархический термин с несуществующими предками: под dry-run ничего не создаётся."""
         client = RoutingClient()
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={
-                "id": "",
-                "action": "add",
-                "title": "Post",
-                "services_cat": "термин1; термин2>термин2.1",
-            },
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={
+                    "id": "",
+                    "action": "add",
+                    "title": "Post",
+                    "services_cat": "термин1; термин2>термин2.1",
+                },
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, dry_run_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -387,12 +425,14 @@ class TestTaxonomyDryRunDoesNotCreate:
     async def test_primary_term_meta_not_written(self, dry_run_config):
         """Primary-термин под dry-run не пишется в мета-поле (нет реального PUT)."""
         client = RoutingClient()
-        records = [Record(
-            discriminator="posts",
-            is_taxonomy=False,
-            data={"id": "", "action": "add", "title": "Post", "services_cat": "термин1"},
-            write_key=0,
-        )]
+        records = [
+            Record(
+                discriminator="posts",
+                is_taxonomy=False,
+                data={"id": "", "action": "add", "title": "Post", "services_cat": "термин1"},
+                write_key=0,
+            )
+        ]
 
         sync = ContentSync(client, dry_run_config, TaxonomyCache())
         report = await sync.sync_records("posts", records, writer=None)
@@ -403,6 +443,7 @@ class TestTaxonomyDryRunDoesNotCreate:
 
 
 # ── SyncReport.from_stats() ───────────────────────────────────────────
+
 
 class TestSyncReportFromStats:
     def test_from_stats_basic(self):

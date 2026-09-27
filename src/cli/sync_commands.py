@@ -5,7 +5,7 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 import asyncio
 from datetime import datetime
 
@@ -19,7 +19,7 @@ from ..config import AppConfig, SyncConfig, LoggingConfig, known_taxonomies
 from ..wordpress.site_schema import load_site_schema
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
-from ..exceptions import ValidationError, WPBulkEditorError
+from ..exceptions import WPBulkEditorError
 from ..wordpress.client import WordPressClient
 from ..wordpress.taxonomies import TaxonomyCache
 from ..records import filters as record_filters_mod
@@ -50,12 +50,15 @@ import typer
 # Shared helpers
 # ============================================================
 
+
 def _validate_test_mode(test_mode: bool, sheets: Optional[str]):
     """Валидация --test-mode (общая для sync и async)."""
     if not test_mode:
         return
     if not sheets:
-        console.print("[bold red]ERROR: Тестовый режим (--test-mode) требует указания одного листа через --sheets[/bold red]\n")
+        console.print(
+            "[bold red]ERROR: Тестовый режим (--test-mode) требует указания одного листа через --sheets[/bold red]\n"
+        )
         raise typer.Exit(code=1)
     sheets_list = [s.strip() for s in sheets.split(",")]
     if len(sheets_list) > 1:
@@ -91,7 +94,7 @@ def _build_sync_config(
     )
 
 
-def _console_log_level(verbose: bool, opts) -> str:
+def _console_log_level(verbose: bool, opts) -> Literal["DEBUG", "INFO", "WARNING", "ERROR"]:
     """Уровень консольного лога: --quiet оставляет только ошибки (в файл пишется всё)."""
     if verbose or opts.verbose:
         return "DEBUG"
@@ -101,8 +104,12 @@ def _console_log_level(verbose: bool, opts) -> str:
 def _empty_stats(total: int = 0, skipped: int = 0, errors: int = 0) -> dict:
     """Пустая статистика для листа."""
     return {
-        "total": total, "added": 0, "updated": 0,
-        "deleted": 0, "skipped": skipped, "errors": errors,
+        "total": total,
+        "added": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": skipped,
+        "errors": errors,
     }
 
 
@@ -121,6 +128,7 @@ def _writeback_enabled(config: AppConfig) -> bool:
 # Наборы данных прогона (лист Excel / таб JSON)
 # ============================================================
 
+
 @dataclass
 class _Dataset:
     """
@@ -135,6 +143,7 @@ class _Dataset:
         own_file: Writer владеет своим файлом — грузить и сохранять вокруг
             обработки набора (JSON: таб за табом по одному и тому же файлу).
     """
+
     name: str
     kind: str
     source: Any
@@ -201,9 +210,7 @@ class _JsonPlan:
             # Валидация таба целиком — до подключения к сайту: выбранный не тот
             # таб (служебный) должен падать понятной ошибкой, а не на полпути.
             source.read()
-            self.datasets.append(
-                _Dataset(name=tab, kind="mixed", source=source, own_file=True)
-            )
+            self.datasets.append(_Dataset(name=tab, kind="mixed", source=source, own_file=True))
 
     def open_writers(self, taxonomy_cache: TaxonomyCache) -> None:
         if not _writeback_enabled(self.config):
@@ -238,7 +245,9 @@ def _preflight(plan, config: AppConfig, filters, site=None) -> None:
     data_file = Path(config.paths.excel_file)
     checks = check_sources(
         [d.source for d in plan.datasets if d.kind != "media"],
-        FieldRules.from_settings(site=site), base_dir=data_file.parent, keep=keep,
+        FieldRules.from_settings(site=site),
+        base_dir=data_file.parent,
+        keep=keep,
     )
     for check in checks:
         for warning in check.warnings:
@@ -248,7 +257,12 @@ def _preflight(plan, config: AppConfig, filters, site=None) -> None:
 
 @contextmanager
 def _open_plan(
-    config: AppConfig, sheets_filter: Optional[str], ctx, confirm: bool, filters=None, site=None,
+    config: AppConfig,
+    sheets_filter: Optional[str],
+    ctx,
+    confirm: bool,
+    filters=None,
+    site=None,
 ):
     """
     Открыть источник данных и составить план прогона по его наборам.
@@ -313,6 +327,7 @@ def _taxonomies_to_cache(datasets: List[_Dataset], config: AppConfig) -> List[st
 # Unified sync engine (used by both sync and async commands)
 # ============================================================
 
+
 def _count_permanent_media_deletes(
     reader: ExcelReader,
     sheets_to_process: list,
@@ -361,10 +376,7 @@ def _confirm_irreversible(
         return
 
     reasons = []
-    media_deletes = (
-        _count_permanent_media_deletes(reader, sheets_to_process, config)
-        if reader is not None else 0
-    )
+    media_deletes = _count_permanent_media_deletes(reader, sheets_to_process, config) if reader is not None else 0
     if media_deletes:
         reasons.append(f"{media_deletes} медиафайлов будут удалены навсегда (action=delete)")
     if config.sync.delete_featured_media:
@@ -407,17 +419,12 @@ async def _run_sync_engine(
         "file": str(config.paths.excel_file),
         "started_at": started_at.isoformat(),
         "sheets": {},
-        "overall": {
-            "total": 0,
-            "successful": 0,
-            "errors": 0,
-            "success_rate": 0.0
-        }
+        "overall": {"total": 0, "successful": 0, "errors": 0, "success_rate": 0.0},
     }
 
     try:
         # WordPressClient — async версия передаёт retry/circuit_breaker/timeout
-        wp_kwargs = {"config": config.wordpress}
+        wp_kwargs: Dict[str, Any] = {"config": config.wordpress}
         if retry_config is not None:
             wp_kwargs["retry_config"] = retry_config
         if circuit_breaker is not None:
@@ -451,9 +458,9 @@ async def _run_sync_engine(
                 plan.open_writers(taxonomy_cache)
 
                 for dataset in plan.datasets:
-                    logger.info(f"\n{'='*50}")
+                    logger.info(f"\n{'=' * 50}")
                     logger.info(f"Обработка набора: {dataset.name}")
-                    logger.info(f"{'='*50}")
+                    logger.info(f"{'=' * 50}")
 
                     sheet_stats = await _process_dataset(
                         dataset=dataset,
@@ -468,22 +475,16 @@ async def _run_sync_engine(
                     stats["sheets"][dataset.name] = sheet_stats
                     stats["overall"]["total"] += sheet_stats.get("total", 0)
                     stats["overall"]["successful"] += (
-                        sheet_stats.get("added", 0) +
-                        sheet_stats.get("updated", 0) +
-                        sheet_stats.get("deleted", 0)
+                        sheet_stats.get("added", 0) + sheet_stats.get("updated", 0) + sheet_stats.get("deleted", 0)
                     )
                     stats["overall"]["errors"] += sheet_stats.get("errors", 0)
 
                 plan.save()
 
-        total_skipped = sum(
-            sheet.get("skipped", 0) for sheet in stats["sheets"].values()
-        )
+        total_skipped = sum(sheet.get("skipped", 0) for sheet in stats["sheets"].values())
         processed = stats["overall"]["total"] - total_skipped
         if processed > 0:
-            stats["overall"]["success_rate"] = (
-                stats["overall"]["successful"] / processed
-            ) * 100
+            stats["overall"]["success_rate"] = (stats["overall"]["successful"] / processed) * 100
         elif stats["overall"]["total"] > 0:
             stats["overall"]["success_rate"] = 100.0
 
@@ -590,41 +591,62 @@ async def _process_dataset(
 # Sync command
 # ============================================================
 
+
 @app.command()
 @output.guard
 def sync(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Путь к файлу данных .xlsx или .json (авто-определяется из --project)",
     ),
     domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain (например, https://example.com)"),
     username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
     password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     sheets: Optional[str] = typer.Option(
-        None, "--sheets",
+        None,
+        "--sheets",
         help="Листы Excel / табы JSON через запятую (posts,pages). Для JSON обязателен",
     ),
     filters: Optional[List[str]] = typer.Option(
-        None, "--filter",
+        None,
+        "--filter",
         help="Фильтр записей field=value (повторяемый, условия по И): --filter type=rb_services",
     ),
     env_file: Optional[Path] = typer.Option(
-        None, "--env-file", help="Путь к .env файлу (по умолчанию .env)",
-        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
     dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Режим dry-run (без изменений)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
     concurrency: int = typer.Option(5, "--concurrency", help="Количество параллельных запросов"),
     skip_media: bool = typer.Option(False, "--skip-media", help="Пропустить загрузку медиа"),
     skip_tax: bool = typer.Option(False, "--skip-tax", help="Пропустить обновление таксономий (категории, теги)"),
-    no_update_excel: bool = typer.Option(False, "--no-update-excel", help="Не записывать ID обратно в файл данных (Excel или JSON)"),
-    delete_media: bool = typer.Option(False, "--delete-media", help="Удалять featured media при удалении записей (action=delete)"),
-    skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
-    test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"),
-    columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    no_update_excel: bool = typer.Option(
+        False, "--no-update-excel", help="Не записывать ID обратно в файл данных (Excel или JSON)"
+    ),
+    delete_media: bool = typer.Option(
+        False, "--delete-media", help="Удалять featured media при удалении записей (action=delete)"
+    ),
+    skip_existing_media: bool = typer.Option(
+        False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"
+    ),
+    test_mode: bool = typer.Option(
+        False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки из одного листа"
+    ),
+    columns: Optional[str] = typer.Option(
+        None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"
+    ),
     skip_checks: bool = typer.Option(
-        False, "--skip-checks",
+        False,
+        "--skip-checks",
         help="Не проверять данные перед отправкой (имена полей, таксономий, значения)",
     ),
     confirm: bool = output.ConfirmOption,
@@ -672,7 +694,7 @@ def sync(
     human_mode = not opts.json and not opts.quiet
 
     if human_mode:
-        console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")
+        console.print(f"\n[bold blue]WordPress Bulk Editor - Sync[/bold blue]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
         console.print(f"Файл данных: [cyan]{file}[/cyan]\n")
 
     _validate_test_mode(test_mode, sheets)
@@ -681,20 +703,32 @@ def sync(
     _validate_dataset_selection(file, sheets)
 
     domain, username, password = load_and_print_credentials(
-        env_file=env_file, domain=domain, username=username, password=password, ctx=ctx,
+        env_file=env_file,
+        domain=domain,
+        username=username,
+        password=password,
+        ctx=ctx,
     )
 
     sync_config = _build_sync_config(
-        dry_run=dry_run, concurrency=concurrency,
-        skip_media=skip_media, skip_tax=skip_tax,
-        no_update_excel=no_update_excel, delete_media=delete_media,
-        skip_existing_media=skip_existing_media, columns=columns,
+        dry_run=dry_run,
+        concurrency=concurrency,
+        skip_media=skip_media,
+        skip_tax=skip_tax,
+        no_update_excel=no_update_excel,
+        delete_media=delete_media,
+        skip_existing_media=skip_existing_media,
+        columns=columns,
         skip_checks=skip_checks,
     )
 
     config = AppConfig.from_excel(
-        excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
-        project_root=proj.root, sync=sync_config,
+        excel_file=file,
+        wp_url=domain,
+        wp_username=username,
+        wp_password=password,
+        project_root=proj.root,
+        sync=sync_config,
         logging=LoggingConfig(level=_console_log_level(verbose, opts)),
     )
 
@@ -709,13 +743,20 @@ def sync(
         console_stream=output.log_stream(ctx),
     )
 
-    stats = asyncio.run(_run_sync_engine(
-        config, sheets, test_mode=test_mode, command_name="sync", ctx=ctx, confirm=confirm,
-        filters=record_filters,
-    ))
+    stats = asyncio.run(
+        _run_sync_engine(
+            config,
+            sheets,
+            test_mode=test_mode,
+            command_name="sync",
+            ctx=ctx,
+            confirm=confirm,
+            filters=record_filters,
+        )
+    )
 
     def _render(payload: dict):
-        console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")
+        console.print(f"\n[bold green]SUCCESS! Синхронизация завершена![/bold green]")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
         console.print(f"Лог-файл: [cyan]{payload['log_file']}[/cyan]\n")
 
     output.emit_success(ctx, {**(stats or {}), "log_file": str(log_file)}, _render)
@@ -725,44 +766,67 @@ def sync(
 # Async sync command
 # ============================================================
 
+
 @app.command(name="async")
 @output.guard
 def async_sync(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Путь к файлу данных .xlsx или .json (авто-определяется из --project)",
     ),
     domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain (например, https://example.com)"),
     username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
     password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     sheets: Optional[str] = typer.Option(
-        None, "--sheets",
+        None,
+        "--sheets",
         help="Листы Excel / табы JSON через запятую (posts,pages). Для JSON обязателен",
     ),
     filters: Optional[List[str]] = typer.Option(
-        None, "--filter",
+        None,
+        "--filter",
         help="Фильтр записей field=value (повторяемый, условия по И): --filter type=rb_services",
     ),
     env_file: Optional[Path] = typer.Option(
-        None, "--env-file", help="Путь к .env файлу (по умолчанию .env)",
-        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        None,
+        "--env-file",
+        help="Путь к .env файлу (по умолчанию .env)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
     dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Режим dry-run (без изменений)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
-    concurrency: Optional[int] = typer.Option(None, "--concurrency", help="Количество параллельных запросов (default: 5)"),
+    concurrency: Optional[int] = typer.Option(
+        None, "--concurrency", help="Количество параллельных запросов (default: 5)"
+    ),
     api_timeout: Optional[int] = typer.Option(None, "--api-timeout", help="API timeout в секундах (default: 30)"),
     max_retries: Optional[int] = typer.Option(None, "--max-retries", help="Максимум повторных попыток (default: 3)"),
-    enable_circuit_breaker: bool = typer.Option(True, "--circuit-breaker/--no-circuit-breaker", help="Включить circuit breaker"),
+    enable_circuit_breaker: bool = typer.Option(
+        True, "--circuit-breaker/--no-circuit-breaker", help="Включить circuit breaker"
+    ),
     skip_media: bool = typer.Option(False, "--skip-media", help="Пропустить загрузку медиа"),
     skip_tax: bool = typer.Option(False, "--skip-tax", help="Пропустить обновление таксономий (категории, теги)"),
-    no_update_excel: bool = typer.Option(False, "--no-update-excel", help="Не записывать ID обратно в файл данных (Excel или JSON)"),
-    delete_media: bool = typer.Option(False, "--delete-media", help="Удалять featured media при удалении записей (action=delete)"),
-    skip_existing_media: bool = typer.Option(False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"),
+    no_update_excel: bool = typer.Option(
+        False, "--no-update-excel", help="Не записывать ID обратно в файл данных (Excel или JSON)"
+    ),
+    delete_media: bool = typer.Option(
+        False, "--delete-media", help="Удалять featured media при удалении записей (action=delete)"
+    ),
+    skip_existing_media: bool = typer.Option(
+        False, "--skip-existing-media", help="Не прикреплять существующие featured_media при update"
+    ),
     test_mode: bool = typer.Option(False, "--test-mode", help="Тестовый режим: обрабатывает только первые 3 строки"),
-    columns: Optional[str] = typer.Option(None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"),
+    columns: Optional[str] = typer.Option(
+        None, "--columns", help="Колонки для обновления через запятую (excerpt,seo_title)"
+    ),
     skip_checks: bool = typer.Option(
-        False, "--skip-checks",
+        False,
+        "--skip-checks",
         help="Не проверять данные перед отправкой (имена полей, таксономий, значения)",
     ),
     confirm: bool = output.ConfirmOption,
@@ -798,32 +862,47 @@ def async_sync(
     human_mode = not opts.json and not opts.quiet
 
     if human_mode:
-        console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")
+        console.print(f"\n[bold cyan] WordPress Bulk Editor - Async Sync[/bold cyan]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
         console.print(f"Файл данных: [cyan]{file}[/cyan]\n")
 
     _validate_test_mode(test_mode, sheets)
     _validate_dataset_selection(file, sheets)
     domain, username, password = load_and_print_credentials(
-        env_file=env_file, domain=domain, username=username, password=password, ctx=ctx,
+        env_file=env_file,
+        domain=domain,
+        username=username,
+        password=password,
+        ctx=ctx,
     )
 
     concurrency_val, retry_cfg, circuit_breaker_obj = load_async_config_from_env(
-        env_file=env_file, cli_concurrency=concurrency, cli_max_retries=max_retries,
+        env_file=env_file,
+        cli_concurrency=concurrency,
+        cli_max_retries=max_retries,
     )
     if not enable_circuit_breaker:
         circuit_breaker_obj = None
 
     sync_config = _build_sync_config(
-        dry_run=dry_run, concurrency=concurrency_val,
-        skip_media=skip_media, skip_tax=skip_tax,
-        no_update_excel=no_update_excel, delete_media=delete_media,
-        skip_existing_media=skip_existing_media, columns=columns,
-        timeout=api_timeout or 30, skip_checks=skip_checks,
+        dry_run=dry_run,
+        concurrency=concurrency_val,
+        skip_media=skip_media,
+        skip_tax=skip_tax,
+        no_update_excel=no_update_excel,
+        delete_media=delete_media,
+        skip_existing_media=skip_existing_media,
+        columns=columns,
+        timeout=api_timeout or 30,
+        skip_checks=skip_checks,
     )
 
     config = AppConfig.from_excel(
-        excel_file=file, wp_url=domain, wp_username=username, wp_password=password,
-        project_root=proj.root, sync=sync_config,
+        excel_file=file,
+        wp_url=domain,
+        wp_username=username,
+        wp_password=password,
+        project_root=proj.root,
+        sync=sync_config,
         logging=LoggingConfig(level=_console_log_level(verbose, opts)),
     )
 
@@ -838,20 +917,24 @@ def async_sync(
         console_stream=output.log_stream(ctx),
     )
 
-    stats = asyncio.run(_run_sync_engine(
-        config, sheets, test_mode=test_mode,
-        content_sync_cls=ContentSyncAsync,
-        taxonomy_sync_cls=TaxonomySyncAsync,
-        retry_config=retry_cfg,
-        circuit_breaker=circuit_breaker_obj,
-        command_name="async_sync",
-        ctx=ctx,
-        confirm=confirm,
-        filters=record_filters,
-    ))
+    stats = asyncio.run(
+        _run_sync_engine(
+            config,
+            sheets,
+            test_mode=test_mode,
+            content_sync_cls=ContentSyncAsync,
+            taxonomy_sync_cls=TaxonomySyncAsync,
+            retry_config=retry_cfg,
+            circuit_breaker=circuit_breaker_obj,
+            command_name="async_sync",
+            ctx=ctx,
+            confirm=confirm,
+            filters=record_filters,
+        )
+    )
 
     def _render(payload: dict):
-        console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")
+        console.print(f"\n[bold green]SUCCESS! Асинхронная синхронизация завершена![/bold green]")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
         console.print(f"Лог-файл: [cyan]{payload['log_file']}[/cyan]\n")
 
     output.emit_success(ctx, {**(stats or {}), "log_file": str(log_file)}, _render)

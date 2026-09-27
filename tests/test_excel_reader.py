@@ -13,6 +13,7 @@ from src.exceptions import ExcelError, ExcelStructureError
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def excel_with_sheets(tmp_path) -> Path:
     """Excel файл с несколькими листами разных типов."""
@@ -46,6 +47,7 @@ def excel_with_sheets(tmp_path) -> Path:
 
 # ── ExcelReader.classify_sheet() ─────────────────────────────────────
 
+
 class TestClassifySheet:
     def test_content_sheet(self):
         r = ExcelReader(Path("."))  # path не важен для classify_sheet
@@ -73,6 +75,7 @@ class TestClassifySheet:
 
 
 # ── ExcelReader.read_sheet() ─────────────────────────────────────────
+
 
 class TestReadSheet:
     def test_read_basic_sheet(self, excel_with_sheets):
@@ -211,6 +214,7 @@ class TestReadSheet:
 
 # ── ExcelReader.get_sheets_by_type() ─────────────────────────────────
 
+
 class TestGetSheetsByType:
     def test_classifies_all_sheets(self, excel_with_sheets):
         with ExcelReader(excel_with_sheets) as r:
@@ -222,6 +226,7 @@ class TestGetSheetsByType:
 
 
 # ── ExcelReader.filter_by_action() ───────────────────────────────────
+
 
 class TestFilterByAction:
     def test_filter_add(self, excel_with_sheets):
@@ -246,6 +251,7 @@ class TestFilterByAction:
 
 # ── ExcelReader.validate_sheet_structure() ───────────────────────────
 
+
 class TestValidateSheetStructure:
     def test_valid_structure(self, excel_with_sheets):
         with ExcelReader(excel_with_sheets) as r:
@@ -258,6 +264,7 @@ class TestValidateSheetStructure:
 
 
 # ── ExcelReader.check_duplicate_ids() ────────────────────────────────
+
 
 class TestCheckDuplicateIds:
     def test_no_duplicates(self, excel_with_sheets):
@@ -285,6 +292,7 @@ class TestCheckDuplicateIds:
 
 # ── ExcelReader.validate_actions() ───────────────────────────────────
 
+
 class TestValidateActions:
     def test_all_valid_actions(self, excel_with_sheets):
         with ExcelReader(excel_with_sheets) as r:
@@ -309,6 +317,7 @@ class TestValidateActions:
 
 
 # ── known_taxonomies override ────────────────────────────────────────
+
 
 class TestKnownTaxonomiesOverride:
     @pytest.fixture

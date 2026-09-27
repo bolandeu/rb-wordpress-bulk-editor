@@ -26,9 +26,7 @@ def resolve_media_file(media_path: str, media_folder) -> Path:
     """
     # Запрещаем откровенно опасные паттерны
     if ".." in Path(media_path).parts:
-        raise ValidationError(
-            f"Недопустимый путь к медиафайлу (содержит '..'): {media_path}"
-        )
+        raise ValidationError(f"Недопустимый путь к медиафайлу (содержит '..'): {media_path}")
 
     file_path = Path(media_path)
     if file_path.is_absolute():
@@ -41,9 +39,7 @@ def resolve_media_file(media_path: str, media_folder) -> Path:
         try:
             resolved.relative_to(cwd)
         except ValueError:
-            raise ValidationError(
-                f"Путь выходит за пределы рабочей директории: {media_path}"
-            )
+            raise ValidationError(f"Путь выходит за пределы рабочей директории: {media_path}")
         return file_path
 
     # Fallback: относительно media_folder
@@ -53,9 +49,7 @@ def resolve_media_file(media_path: str, media_folder) -> Path:
     try:
         resolved_fallback.relative_to(media_folder_path)
     except ValueError:
-        raise ValidationError(
-            f"Путь выходит за пределы папки медиафайлов: {media_path}"
-        )
+        raise ValidationError(f"Путь выходит за пределы папки медиафайлов: {media_path}")
 
     if fallback.exists():
         return fallback

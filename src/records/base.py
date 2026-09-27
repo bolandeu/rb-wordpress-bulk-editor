@@ -21,6 +21,7 @@ class Record(NamedTuple):
         data: Поля записи (Mapping: `in`, `.get()`, `.keys()`).
         write_key: Ключ, по которому writer найдёт ту же запись обратно.
     """
+
     discriminator: str
     is_taxonomy: bool
     data: Mapping[str, Any]

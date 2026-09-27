@@ -99,10 +99,14 @@ class TestDoctorOutput:
             runner.invoke(
                 app,
                 [
-                    "doctor", "--json",
-                    "--domain", "https://example.com",
-                    "--username", "admin",
-                    "--password", "secret",
+                    "doctor",
+                    "--json",
+                    "--domain",
+                    "https://example.com",
+                    "--username",
+                    "admin",
+                    "--password",
+                    "secret",
                 ],
             ).stdout.strip()
         )

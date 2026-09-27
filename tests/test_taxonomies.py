@@ -51,6 +51,7 @@ class FakeTermsClient:
 
 # ── parse_term_specs ────────────────────────────────────────────────
 
+
 class TestParseTermSpecs:
     def test_empty(self):
         assert parse_term_specs("") == []
@@ -88,6 +89,7 @@ class TestParseTermSpecs:
 
 # ── primary_term_meta_key ───────────────────────────────────────────
 
+
 class TestPrimaryTermMetaKey:
     @pytest.mark.parametrize("taxonomy", ["categories", "category", "Categories"])
     def test_category(self, taxonomy):
@@ -102,6 +104,7 @@ class TestPrimaryTermMetaKey:
 
 
 # ── process_taxonomy_string ─────────────────────────────────────────
+
 
 class TestProcessTaxonomyString:
     async def test_empty_string(self):
@@ -157,11 +160,13 @@ class TestProcessTaxonomyString:
         assert term_ids == [client.terms[-1]["id"]]
 
     async def test_same_name_under_different_parents_not_conflated(self):
-        client = FakeTermsClient([
-            {"id": 1, "name": "A", "parent": 0},
-            {"id": 2, "name": "B", "parent": 0},
-            {"id": 3, "name": "Общий", "parent": 1},
-        ])
+        client = FakeTermsClient(
+            [
+                {"id": 1, "name": "A", "parent": 0},
+                {"id": 2, "name": "B", "parent": 0},
+                {"id": 3, "name": "Общий", "parent": 1},
+            ]
+        )
         endpoint = TaxonomiesEndpoint(client, "services_cat")
 
         term_ids, _ = await endpoint.process_taxonomy_string("B>Общий")
@@ -228,6 +233,7 @@ class TestProcessTaxonomyString:
 
 # ── Кэш при иерархии ────────────────────────────────────────────────
 
+
 class TestHierarchyWithCache:
     async def test_cached_hierarchy_avoids_repeated_api_calls(self):
         client = FakeTermsClient()
@@ -242,10 +248,12 @@ class TestHierarchyWithCache:
         assert len(client.created) == created_after_first
 
     async def test_child_does_not_shadow_root_in_flat_cache(self):
-        client = FakeTermsClient([
-            {"id": 1, "name": "Родитель", "parent": 0},
-            {"id": 2, "name": "Общий", "parent": 0},
-        ])
+        client = FakeTermsClient(
+            [
+                {"id": 1, "name": "Родитель", "parent": 0},
+                {"id": 2, "name": "Общий", "parent": 0},
+            ]
+        )
         cache = TaxonomyCache()
         endpoint = TaxonomiesEndpoint(client, "services_cat")
 
@@ -260,15 +268,14 @@ class TestHierarchyWithCache:
 
 # ── dry_run: не создаёт термины на сайте ────────────────────────────
 
+
 class TestProcessTaxonomyStringDryRun:
     async def test_missing_term_not_created(self):
         """Несуществующий термин под dry_run не создаётся, возвращается ID=0."""
         client = FakeTermsClient()
         endpoint = TaxonomiesEndpoint(client, "categories")
 
-        term_ids, primary = await endpoint.process_taxonomy_string(
-            "Новая категория", dry_run=True
-        )
+        term_ids, primary = await endpoint.process_taxonomy_string("Новая категория", dry_run=True)
 
         assert client.created == []
         assert term_ids == [0]
@@ -279,9 +286,7 @@ class TestProcessTaxonomyStringDryRun:
         client = FakeTermsClient([{"id": 5, "name": "Портьеры", "parent": 0}])
         endpoint = TaxonomiesEndpoint(client, "categories")
 
-        term_ids, primary = await endpoint.process_taxonomy_string(
-            "Портьеры", dry_run=True
-        )
+        term_ids, primary = await endpoint.process_taxonomy_string("Портьеры", dry_run=True)
 
         assert client.created == []
         assert term_ids == [5]
@@ -292,9 +297,7 @@ class TestProcessTaxonomyStringDryRun:
         client = FakeTermsClient([{"id": 5, "name": "Портьеры", "parent": 0}])
         endpoint = TaxonomiesEndpoint(client, "categories")
 
-        term_ids, primary = await endpoint.process_taxonomy_string(
-            "Портьеры; Новая", dry_run=True
-        )
+        term_ids, primary = await endpoint.process_taxonomy_string("Портьеры; Новая", dry_run=True)
 
         assert client.created == []
         assert term_ids == [5, 0]
@@ -305,9 +308,7 @@ class TestProcessTaxonomyStringDryRun:
         client = FakeTermsClient()
         endpoint = TaxonomiesEndpoint(client, "services_cat")
 
-        term_ids, primary = await endpoint.process_taxonomy_string(
-            "Родитель>Ребёнок", dry_run=True
-        )
+        term_ids, primary = await endpoint.process_taxonomy_string("Родитель>Ребёнок", dry_run=True)
 
         assert client.created == []
         assert client.terms == []
@@ -319,9 +320,7 @@ class TestProcessTaxonomyStringDryRun:
         client = FakeTermsClient([{"id": 7, "name": "Родитель", "parent": 0}])
         endpoint = TaxonomiesEndpoint(client, "services_cat")
 
-        term_ids, primary = await endpoint.process_taxonomy_string(
-            "Родитель>Ребёнок", dry_run=True
-        )
+        term_ids, primary = await endpoint.process_taxonomy_string("Родитель>Ребёнок", dry_run=True)
 
         assert client.created == []
         assert term_ids == [0]
@@ -333,24 +332,21 @@ class TestProcessTaxonomyStringDryRun:
         cache = TaxonomyCache()
         endpoint = TaxonomiesEndpoint(client, "categories")
 
-        first_ids, _ = await endpoint.process_taxonomy_string(
-            "Новая", taxonomy_cache=cache, dry_run=True
-        )
+        first_ids, _ = await endpoint.process_taxonomy_string("Новая", taxonomy_cache=cache, dry_run=True)
         assert first_ids == [0]
         assert client.created == []
         # Кэш не должен думать, что термин уже существует под ID=0
         assert cache.find("categories", "Новая") is None
 
         # Следующий (уже не dry_run) прогон реально создаёт термин
-        second_ids, _ = await endpoint.process_taxonomy_string(
-            "Новая", taxonomy_cache=cache, dry_run=False
-        )
+        second_ids, _ = await endpoint.process_taxonomy_string("Новая", taxonomy_cache=cache, dry_run=False)
         assert len(client.created) == 1
         assert second_ids != [0]
         assert cache.find("categories", "Новая") is not None
 
 
 # ── normalize_taxonomy_name (регресс) ───────────────────────────────
+
 
 class TestNormalizeTaxonomyName:
     def test_standard(self):

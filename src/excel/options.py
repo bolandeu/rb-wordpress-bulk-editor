@@ -5,7 +5,7 @@
 from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
-from openpyxl import load_workbook, Workbook
+from openpyxl import load_workbook
 from loguru import logger
 
 from ..exceptions import ExcelError
@@ -51,14 +51,12 @@ class OptionsReader:
                 self.excel_file,
                 sheet_name="options",
                 header=0,  # Первая строка - заголовки
-                dtype=str  # Все как строки
+                dtype=str,  # Все как строки
             )
 
             # Проверяем что есть минимум 2 столбца
             if len(df.columns) < 2:
-                raise ExcelError(
-                    f"Лист 'options' должен содержать минимум 2 столбца (option, value)"
-                )
+                raise ExcelError("Лист 'options' должен содержать минимум 2 столбца (option, value)")
 
             options = {}
 
@@ -102,9 +100,7 @@ class OptionsReader:
             raise ExcelError(f"Файл не найден: {self.excel_file}")
         except ValueError as e:
             if "Worksheet named 'options' not found" in str(e):
-                raise ExcelError(
-                    f"Лист 'options' не найден в файле {self.excel_file}"
-                )
+                raise ExcelError(f"Лист 'options' не найден в файле {self.excel_file}")
             raise ExcelError(f"Ошибка чтения листа 'options': {e}")
         except Exception as e:
             raise ExcelError(f"Неожиданная ошибка при чтении 'options': {e}")
@@ -164,11 +160,7 @@ class OptionsWriter:
             if "options" in wb.sheetnames:
                 if mode == "append":
                     # Читаем существующие данные
-                    existing_df = pd.read_excel(
-                        self.excel_file,
-                        sheet_name="options",
-                        header=0
-                    )
+                    existing_df = pd.read_excel(self.excel_file, sheet_name="options", header=0)
                     # Объединяем с новыми данными
                     combined_df = pd.concat([existing_df, new_df], ignore_index=True)
                     logger.debug(f"Добавлено {len(new_df)} строк к {len(existing_df)} существующим")

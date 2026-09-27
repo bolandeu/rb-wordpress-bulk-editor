@@ -6,7 +6,7 @@ Excel как источник записей: обёртки над сущест
 `ExcelWriter` с его dirty-флагом.
 """
 
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, cast
 
 from ..excel.reader import ExcelReader
 from ..excel.writer import ExcelWriter
@@ -53,7 +53,7 @@ class ExcelRecordSource:
                 discriminator=self.sheet_name,
                 is_taxonomy=is_taxonomy,
                 data=row.to_dict(),
-                write_key=idx,
+                write_key=cast(int, idx),
             )
 
 
@@ -77,7 +77,7 @@ class ExcelRecordWriter:
     ) -> None:
         self.excel_writer.update_from_api_response(
             self.sheet_name,
-            write_key,
+            cast(int, write_key),
             api_response,
             action,
             columns_filter=columns_filter,
@@ -92,7 +92,7 @@ class ExcelRecordWriter:
     ) -> None:
         await self.excel_writer.update_from_api_response_async(
             self.sheet_name,
-            write_key,
+            cast(int, write_key),
             api_response,
             action,
             columns_filter=columns_filter,
@@ -100,7 +100,7 @@ class ExcelRecordWriter:
 
     def update_record(self, write_key: WriteKey, data: Dict[str, Any]) -> None:
         """Записать значения в строку листа; колонок, которых нет, ExcelWriter не создаёт."""
-        self.excel_writer.update_row(self.sheet_name, write_key, data)
+        self.excel_writer.update_row(self.sheet_name, cast(int, write_key), data)
 
     def save(self) -> None:
         self.excel_writer.save()

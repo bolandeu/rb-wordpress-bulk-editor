@@ -19,7 +19,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, cast
 
 from loguru import logger
 
@@ -41,9 +41,18 @@ SOURCE_META_FIELDS = frozenset({ROW_NUM_FIELD, TYPE_FIELD, TAXONOMY_FIELD})
 
 # Поля-идентификаторы: дописываются в запись, даже если их там не было
 # (без этого потерялся бы `id` только что созданной записи WordPress).
-NEW_FIELDS_ALWAYS = frozenset({
-    "id", "action", "date", "modified", "link", "slug", "featured_media", "image_url",
-})
+NEW_FIELDS_ALWAYS = frozenset(
+    {
+        "id",
+        "action",
+        "date",
+        "modified",
+        "link",
+        "slug",
+        "featured_media",
+        "image_url",
+    }
+)
 
 
 def _load_tabs(path: Path) -> Dict[str, Any]:
@@ -139,7 +148,7 @@ def _write_key_for(record: Dict[str, Any], position: int) -> WriteKey:
     row_num = record.get(ROW_NUM_FIELD)
     if is_blank(row_num):
         return position
-    return row_num
+    return cast(WriteKey, row_num)
 
 
 class JsonRecordSource:
@@ -180,10 +189,7 @@ class JsonRecordSource:
 
         for position, record in enumerate(self._raw_records()):
             if not isinstance(record, dict):
-                raise RecordSourceError(
-                    f"{self._where(position)}: ожидался объект, "
-                    f"получен {type(record).__name__}"
-                )
+                raise RecordSourceError(f"{self._where(position)}: ожидался объект, получен {type(record).__name__}")
 
             post_type = record.get(TYPE_FIELD)
             taxonomy = record.get(TAXONOMY_FIELD)
@@ -207,12 +213,14 @@ class JsonRecordSource:
             # уезжать в payload WordPress.
             data = {k: v for k, v in record.items() if k not in SOURCE_META_FIELDS}
 
-            records.append(Record(
-                discriminator=str(taxonomy if has_taxonomy else post_type).strip(),
-                is_taxonomy=has_taxonomy,
-                data=data,
-                write_key=write_key,
-            ))
+            records.append(
+                Record(
+                    discriminator=str(taxonomy if has_taxonomy else post_type).strip(),
+                    is_taxonomy=has_taxonomy,
+                    data=data,
+                    write_key=write_key,
+                )
+            )
 
         self._parsed = records
         return records
@@ -437,7 +445,7 @@ def write_tab(
         document = _load_tabs(path)
         _tabs_of(document, path)
     else:
-        document = {"project": project, "tabs": {}}
+        document: Dict[str, Any] = {"project": project, "tabs": {}}
     if project and not document.get("project"):
         document["project"] = project
     document["tabs"][tab_name] = records

@@ -23,12 +23,14 @@ from src.wordpress.media import MediaEndpoint
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+
 def make_config(url="https://example.com", username="admin", password="secret") -> WordPressConfig:
     return WordPressConfig(url=url, username=username, password=password)
 
 
 def sequence_transport(responses: list, calls: list) -> httpx.MockTransport:
     """Отдаёт ответы по порядку, последний повторяется; пишет запросы в calls."""
+
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
         index = min(len(calls) - 1, len(responses) - 1)
@@ -61,6 +63,7 @@ def recorded_sleeps(monkeypatch):
 
 
 # ── Маппинг статусов ─────────────────────────────────────────────────
+
 
 class TestErrorMapping:
     async def test_401_raises_auth_required(self):
@@ -131,6 +134,7 @@ class TestErrorMapping:
 
 # ── Ретраи ───────────────────────────────────────────────────────────
 
+
 class TestRetries:
     async def test_429_honors_retry_after_header(self, recorded_sleeps):
         calls = []
@@ -197,6 +201,7 @@ class TestRetries:
 
 # ── Circuit breaker ──────────────────────────────────────────────────
 
+
 class TestCircuitBreaker:
     async def test_opens_after_threshold_and_blocks(self, recorded_sleeps):
         calls = []
@@ -242,6 +247,7 @@ class TestCircuitBreaker:
 
 # ── Клиент поверх провайдера ─────────────────────────────────────────
 
+
 class TestClientOverProvider:
     async def test_transport_seam_on_client(self):
         calls = []
@@ -269,6 +275,7 @@ class TestClientOverProvider:
 
 # ── Загрузка медиа через провайдер ───────────────────────────────────
 
+
 class TestMediaUpload:
     async def test_upload_goes_through_provider_with_auth(self):
         calls = []
@@ -287,7 +294,7 @@ class TestMediaUpload:
     async def test_upload_tolerates_php_warnings_before_json(self):
         """PHP-хостинг подмешал warning перед JSON — это не ошибка провайдера."""
         calls = []
-        body = "<br />\nWarning: something in /var/www on line 1\n{\"id\": 42, \"source_url\": \"u\"}"
+        body = '<br />\nWarning: something in /var/www on line 1\n{"id": 42, "source_url": "u"}'
         client = WordPressClient(
             make_config(),
             transport=sequence_transport([httpx.Response(201, text=body)], calls),

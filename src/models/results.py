@@ -11,6 +11,7 @@ from ..records.base import WriteKey
 @dataclass
 class SyncResult:
     """Результат обработки одной записи источника."""
+
     row_index: WriteKey
     action: str
     post_id: Optional[int]
@@ -21,6 +22,7 @@ class SyncResult:
 @dataclass
 class SyncReport:
     """Сводный отчёт по sync-операции для одного листа."""
+
     total: int
     created: int
     updated: int

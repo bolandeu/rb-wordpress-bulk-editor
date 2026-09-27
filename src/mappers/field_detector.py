@@ -45,13 +45,7 @@ class FieldDetector:
         if self._analysis_cache is not None:
             return self._analysis_cache
 
-        result = {
-            "system": [],
-            "acf": [],
-            "taxonomies": [],
-            "nested": [],
-            "content": []
-        }
+        result = {"system": [], "acf": [], "taxonomies": [], "nested": [], "content": []}
 
         system_lower = {c.lower() for c in SYSTEM_COLUMNS}
 
@@ -76,7 +70,7 @@ class FieldDetector:
 
             # Legacy ACF (acf_field_name)
             if col.startswith(ACF_PREFIX):
-                field_name = col[len(ACF_PREFIX):]
+                field_name = col[len(ACF_PREFIX) :]
                 result["acf"].append(field_name)
                 continue
 
@@ -112,8 +106,4 @@ class FieldDetector:
         Исключает служебные колонки.
         """
         analysis = self.analyze()
-        return (
-            analysis["content"] +
-            analysis["taxonomies"] +
-            analysis["nested"]
-        )
+        return analysis["content"] + analysis["taxonomies"] + analysis["nested"]

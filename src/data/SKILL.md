@@ -39,7 +39,7 @@ uv tool upgrade rb-wordpress-bulk-editor
 | 0 | успех |
 | 1 | общая ошибка (`UNEXPECTED`, `ABORTED`, `CREDENTIAL_STORE_UNAVAILABLE`) |
 | 2 | неверные аргументы (`INVALID_ARGUMENTS`) |
-| 3 | нужны credentials (`AUTH_REQUIRED`) |
+| 3 | нужны credentials (`AUTH_REQUIRED`) или доступ неисправен (`CREDENTIALS_UNHEALTHY`, `auth status`) |
 | 4 | проект не инициализирован (`PROJECT_NOT_INITIALIZED`) |
 | 5 | ошибка внешнего сервиса (`PROVIDER_ERROR`: сеть, таймаут, 5xx, 429) |
 | 6 | CLI старее, чем требует проект (`CLI_TOO_OLD`) |
@@ -53,12 +53,19 @@ uv tool upgrade rb-wordpress-bulk-editor
 Переменные: общие `WP_DOMAIN`, `WP_API_USER`, `WP_API_TOKEN`; для конкретного
 сайта — `WP_<DOMAIN>_API_USER` / `WP_<DOMAIN>_API_TOKEN` (домен в верхнем
 регистре, не-буквенно-цифровые символы → `_`: `example.com` → `WP_EXAMPLE_COM_API_USER`).
-В keychain credential хранится по домену сайта — у каждого сайта свой логин.
+В keychain credential хранится по домену сайта — у каждого сайта свой логин:
+`wp-bulk auth login --provider wp:<домен>` (пароль — из окружения или скрытым
+вводом), `wp-bulk auth logout --provider wp:<домен>`.
 
 `.env` проекта antagor тоже понимается без переименования: `SITE_DOMAIN`,
 `SITE_REST_API_USER`, `SITE_REST_API_PASSWORD` — запасные имена для `WP_DOMAIN`,
 `WP_API_USER`, `WP_API_TOKEN` (свои имена главнее). Учитываются, только если
 `SITE_CMS` не задан или равен `wordpress`.
+
+Здоровье доступов: `wp-bulk auth status [--check] --json` — общая форма отчёта
+всех наших CLI (запись `wp:<домен>` на каждый сохранённый сайт и сайт проекта,
+ключи LLM — `llmkit:<провайдер>`; значения не печатаются). Exit 3 и
+`CREDENTIALS_UNHEALTHY` — обязательный доступ не в порядке или любой неверен.
 
 Проверить готовность окружения: `wp-bulk doctor --json`
 (credentials и их источник, проект, конфиг, совместимость версии;

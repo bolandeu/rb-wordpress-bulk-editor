@@ -34,6 +34,7 @@ class PullTarget:
         known_fields: Поля, которые можно записать (колонки листа Excel);
             None — любые (JSON: у записи нет фиксированной шапки).
     """
+
     name: str
     records: List[Record]
     writer: Optional[Any] = None
@@ -43,6 +44,7 @@ class PullTarget:
 @dataclass
 class PullReport:
     """Итог прогона."""
+
     found: int = 0
     updated: int = 0
     items: List[Dict[str, Any]] = field(default_factory=list)
@@ -169,9 +171,7 @@ async def pull_fields(
             try:
                 api_response = await endpoints.for_record(record).get(record_id)
             except NotFoundError:
-                report.warnings.append(
-                    f"'{target.name}': id={record_id} ({record.discriminator}) не найден (404)"
-                )
+                report.warnings.append(f"'{target.name}': id={record_id} ({record.discriminator}) не найден (404)")
                 continue
 
             update_data: Dict[str, Any] = {}
@@ -180,21 +180,21 @@ async def pull_fields(
                 if value is not None:
                     update_data[column] = value
             if not update_data:
-                report.warnings.append(
-                    f"'{target.name}': id={record_id} — запрошенных полей нет в ответе API"
-                )
+                report.warnings.append(f"'{target.name}': id={record_id} — запрошенных полей нет в ответе API")
                 continue
 
             if target.writer is not None:
                 target.writer.update_record(record.write_key, update_data)
             logger.debug(f"'{target.name}' id={record_id}: {list(update_data)}")
             report.updated += 1
-            report.items.append({
-                "dataset": target.name,
-                "id": record_id,
-                "type": record.discriminator,
-                "is_taxonomy": record.is_taxonomy,
-                "fields": update_data,
-            })
+            report.items.append(
+                {
+                    "dataset": target.name,
+                    "id": record_id,
+                    "type": record.discriminator,
+                    "is_taxonomy": record.is_taxonomy,
+                    "fields": update_data,
+                }
+            )
 
     return report

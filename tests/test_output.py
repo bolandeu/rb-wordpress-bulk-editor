@@ -35,11 +35,15 @@ def read_json(capsys) -> dict:
 
 # ── Конверт ──────────────────────────────────────────────────────────
 
+
 class TestEnvelope:
     def test_success_envelope(self, capsys):
         output.emit_success(make_ctx(json_mode=True), {"file": "a.xlsx", "count": 2})
         assert read_json(capsys) == {
-            "ok": True, "file": "a.xlsx", "count": 2, "cli_version": installed_version(),
+            "ok": True,
+            "file": "a.xlsx",
+            "count": 2,
+            "cli_version": installed_version(),
         }
 
     def test_cli_version_in_every_envelope(self, capsys, monkeypatch):
@@ -94,6 +98,7 @@ class TestEnvelope:
 
 # ── guard: exit-коды ─────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize(
     "error, expected_code, expected_exit",
     [
@@ -143,6 +148,7 @@ def test_guard_passes_through_typer_exit():
 
 
 # ── Гейт подтверждения ───────────────────────────────────────────────
+
 
 class TestRequireConfirmation:
     def test_confirm_flag_skips_the_question(self, monkeypatch):

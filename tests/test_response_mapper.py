@@ -9,6 +9,7 @@ from src.mappers.response_mapper import ResponseMapper
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def full_post():
     return {
@@ -41,6 +42,7 @@ def taxonomy_cache_full():
 
 # ── ResponseMapper.map_post_to_excel() ───────────────────────────────
 
+
 class TestMapPostToExcel:
     def test_basic_fields(self, full_post):
         mapper = ResponseMapper()
@@ -60,11 +62,13 @@ class TestMapPostToExcel:
     def test_long_content_saved_to_file(self, tmp_path):
         mapper = ResponseMapper(content_output_dir=tmp_path)
         long_content = "<p>" + ("x" * 33000) + "</p>"
-        row = mapper.map_post_to_excel({
-            "id": 42,
-            "slug": "hello-world",
-            "content": {"rendered": long_content},
-        })
+        row = mapper.map_post_to_excel(
+            {
+                "id": 42,
+                "slug": "hello-world",
+                "content": {"rendered": long_content},
+            }
+        )
 
         assert row["content"] == ""
         assert row["content_path"] == "42-hello-world.html"
@@ -122,6 +126,7 @@ class TestMapPostToExcel:
 
 # ── ResponseMapper.map_term_to_excel() ───────────────────────────────
 
+
 class TestMapTermToExcel:
     def test_basic_term_fields(self):
         term = {
@@ -156,6 +161,7 @@ class TestMapTermToExcel:
 
 # ── nested_paths (dot-notation при fetch) ─────────────────────────────
 
+
 class TestNestedPathsExtraction:
     def _post(self, **extras):
         base = {
@@ -179,9 +185,7 @@ class TestNestedPathsExtraction:
 
     def test_multiple_paths(self):
         mapper = ResponseMapper(nested_paths=["seo.title", "seo.description", "seo.h1"])
-        row = mapper.map_post_to_excel(self._post(
-            seo={"title": "T", "description": "D", "h1": "H"}
-        ))
+        row = mapper.map_post_to_excel(self._post(seo={"title": "T", "description": "D", "h1": "H"}))
         assert row["seo.title"] == "T"
         assert row["seo.description"] == "D"
         assert row["seo.h1"] == "H"

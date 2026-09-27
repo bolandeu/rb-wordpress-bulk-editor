@@ -17,7 +17,8 @@ runner = CliRunner()
 @pytest.fixture
 def site(monkeypatch):
     monkeypatch.setattr(
-        tool_commands, "load_and_print_credentials",
+        tool_commands,
+        "load_and_print_credentials",
         lambda **kwargs: ("https://example.com", "admin", "secret"),
     )
     state = {"slugs": ["categories", "tags", "rb_services_cat", "brand"], "include_system": None}

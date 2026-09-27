@@ -124,10 +124,7 @@ class WordPressHttpProvider(HttpProvider):
             logger.debug(f"Multipart data keys: {list(data.keys()) if data else 'None'}")
             logger.debug(f"Multipart files keys: {list(files.keys())}")
             for key, file_info in files.items():
-                logger.debug(
-                    f"File '{key}': name={file_info[0]}, MIME={file_info[2]}, "
-                    f"size={len(file_info[1])} bytes"
-                )
+                logger.debug(f"File '{key}': name={file_info[0]}, MIME={file_info[2]}, size={len(file_info[1])} bytes")
             # Content-Type для multipart выставляет httpx сам — свой убираем.
             headers = {k: v for k, v in self._request_headers().items() if k.lower() != "content-type"}
             return await self.request_json("POST", endpoint, data=data, files=files, headers=headers)

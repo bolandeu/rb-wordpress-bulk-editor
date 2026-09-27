@@ -60,20 +60,11 @@ class TaxonomySync(TaxonomySyncBase):
                 try:
                     # Обработка в зависимости от action
                     if action == "delete":
-                        result = await self._delete_term(
-                            taxonomy_endpoint,
-                            row
-                        )
+                        result = await self._delete_term(taxonomy_endpoint, row)
                     elif action == "update":
-                        result = await self._update_term(
-                            taxonomy_endpoint,
-                            row
-                        )
+                        result = await self._update_term(taxonomy_endpoint, row)
                     else:  # add
-                        result = await self._add_term(
-                            taxonomy_endpoint,
-                            row
-                        )
+                        result = await self._add_term(taxonomy_endpoint, row)
 
                     # Обновляем статистику
                     if action == "add":
@@ -85,11 +76,7 @@ class TaxonomySync(TaxonomySyncBase):
 
                     # Записываем обратно в источник
                     if writer and result and self.config.sync.update_excel:
-                        writer.update_from_result(
-                            idx,
-                            result,
-                            action
-                        )
+                        writer.update_from_result(idx, result, action)
 
                     if progress:
                         progress.record_done(record, action, result)
@@ -99,13 +86,15 @@ class TaxonomySync(TaxonomySyncBase):
                     stats["errors"] += 1
                     if progress:
                         progress.record_done(record, action, error=True)
-                    error_results.append(SyncResult(
-                        row_index=idx,
-                        action=action,
-                        post_id=None,
-                        success=False,
-                        error=str(e),
-                    ))
+                    error_results.append(
+                        SyncResult(
+                            row_index=idx,
+                            action=action,
+                            post_id=None,
+                            success=False,
+                            error=str(e),
+                        )
+                    )
 
         # Подсчитываем пропущенные
         stats["skipped"] = self._count_skipped(records)

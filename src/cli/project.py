@@ -50,6 +50,7 @@ def find_repo_root() -> Path:
 @dataclass
 class ProjectContext:
     """Контекст проекта. Хранится в typer.Context.obj."""
+
     name: Optional[str] = None
     root: Optional[Path] = None
 
@@ -112,9 +113,7 @@ class ProjectContext:
         """
         if not self.root:
             return []
-        files = sorted(
-            p for p in self.root.glob(f"*{suffix}") if not p.name.startswith("~$")
-        )
+        files = sorted(p for p in self.root.glob(f"*{suffix}") if not p.name.startswith("~$"))
         if suffix == ".json":
             files = [p for p in files if is_data_file(p)]
         return files
@@ -224,10 +223,7 @@ def resolve_project(project_value: Optional[str]) -> ProjectContext:
     project_dir = repo_root / "projects" / project_value
 
     if not project_dir.exists():
-        raise FileNotFoundError(
-            f"Папка проекта не найдена: {project_dir}\n"
-            f"Создайте: mkdir projects/{project_value}"
-        )
+        raise FileNotFoundError(f"Папка проекта не найдена: {project_dir}\nСоздайте: mkdir projects/{project_value}")
 
     return ProjectContext(name=project_value, root=project_dir.resolve())
 
@@ -263,7 +259,4 @@ def check_cli_compat(project: ProjectContext, version: Optional[str] = None) -> 
         return
 
     if _version_key(current) < _version_key(required):
-        raise CliTooOld(
-            f"Проект '{project.name}' требует wp-bulk >= {required}, "
-            f"установлена версия {current}."
-        )
+        raise CliTooOld(f"Проект '{project.name}' требует wp-bulk >= {required}, установлена версия {current}.")

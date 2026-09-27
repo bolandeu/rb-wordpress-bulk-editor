@@ -3,7 +3,6 @@ Shared fixtures for WordPress Bulk Editor tests.
 """
 
 import pytest
-from pathlib import Path
 
 
 @pytest.fixture

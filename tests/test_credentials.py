@@ -53,6 +53,7 @@ def clean_env(monkeypatch):
 
 # ── Имена переменных окружения ───────────────────────────────────────
 
+
 class TestEnvVarNames:
     def test_site_specific_first_then_global(self):
         assert manager.env_var_names("example.com", "password") == [
@@ -70,6 +71,7 @@ class TestEnvVarNames:
 
 
 # ── Keychain ─────────────────────────────────────────────────────────
+
 
 class TestKeychain:
     def test_store_and_get_roundtrip(self, fake_keyring):
@@ -109,6 +111,7 @@ class TestKeychain:
 
 # ── Переменные окружения ─────────────────────────────────────────────
 
+
 class TestEnvOverrides:
     def test_env_beats_keychain_field_by_field(self, fake_keyring, monkeypatch):
         manager.store_credential("example.com", {"username": "admin", "password": "old"})
@@ -121,7 +124,5 @@ class TestEnvOverrides:
         assert manager.read_fields_from_env("example.com", ["password"]) == {"password": "site"}
 
     def test_explicit_environ_snapshot_is_used(self):
-        fields = manager.read_fields_from_env(
-            "example.com", ["username"], environ={"WP_API_USER": "snapshot"}
-        )
+        fields = manager.read_fields_from_env("example.com", ["username"], environ={"WP_API_USER": "snapshot"})
         assert fields == {"username": "snapshot"}

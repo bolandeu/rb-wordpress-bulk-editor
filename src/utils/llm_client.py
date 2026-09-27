@@ -16,10 +16,11 @@ from llmkit import LlmKit
 
 class LLMError(Exception):
     """Ошибка при работе с LLM API"""
+
     pass
 
 
-_PLACEHOLDER_RE = re.compile(r'\[([^\]]+)\]')
+_PLACEHOLDER_RE = re.compile(r"\[([^\]]+)\]")
 
 
 class LLMClient:
@@ -111,12 +112,7 @@ class LLMClient:
         logger.info(f"✓ llmkit сгенерировал текст ({len(result)} символов)")
         return result.strip()
 
-    async def generate_image(
-        self,
-        prompt: str,
-        models: List[str],
-        max_retries: int = 3
-    ) -> Tuple[bytes, str]:
+    async def generate_image(self, prompt: str, models: List[str], max_retries: int = 3) -> Tuple[bytes, str]:
         """
         Генерировать изображение с fallback между моделями.
 
@@ -152,15 +148,14 @@ class LLMClient:
                     logger.warning(f"[IMG] Модель {model}, попытка {attempt + 1}/{max_retries}: {e}")
 
                     if attempt < max_retries - 1:
-                        delay = 2 ** attempt
+                        delay = 2**attempt
                         logger.debug(f"[IMG] Ждем {delay}s перед повтором...")
                         await asyncio.sleep(delay)
 
             logger.error(f"[IMG] Модель {model} не смогла сгенерировать изображение после {max_retries} попыток")
 
         raise LLMError(
-            f"Все модели ({', '.join(models)}) не смогли сгенерировать изображение. "
-            f"Последняя ошибка: {last_error}"
+            f"Все модели ({', '.join(models)}) не смогли сгенерировать изображение. Последняя ошибка: {last_error}"
         )
 
     def _call_image_api_sync(self, prompt: str, model: str) -> Tuple[bytes, str]:
@@ -173,28 +168,16 @@ class LLMClient:
         Returns:
             Tuple (image_bytes, extension)
         """
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
 
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False
-        }
+        payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "stream": False}
 
         try:
             session = requests.Session()
             session.trust_env = False
 
             response = session.post(
-                self.endpoint,
-                headers=headers,
-                json=payload,
-                timeout=(self.connect_timeout, self.image_timeout)
+                self.endpoint, headers=headers, json=payload, timeout=(self.connect_timeout, self.image_timeout)
             )
 
             if response.status_code != 200:
@@ -275,7 +258,7 @@ class LLMClient:
             value = row_data.get(placeholder, "")
 
             # Конвертируем в строку и обрабатываем None/NaN
-            if value is None or (isinstance(value, float) and str(value) == 'nan'):
+            if value is None or (isinstance(value, float) and str(value) == "nan"):
                 value = ""
             else:
                 value = str(value)
@@ -330,22 +313,22 @@ class LLMClient:
         result = text
 
         # <p> -> перенос строки
-        for p in soup.find_all('p'):
+        for p in soup.find_all("p"):
             p_text = p.get_text()
             result = result.replace(str(p), f"\n{p_text}\n")
 
         # <br> -> \n
-        result = result.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+        result = result.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
 
         # <strong> и <b> -> **text**
-        for tag in soup.find_all(['strong', 'b']):
+        for tag in soup.find_all(["strong", "b"]):
             result = result.replace(str(tag), f"**{tag.get_text()}**")
 
         # <em> и <i> -> *text*
-        for tag in soup.find_all(['em', 'i']):
+        for tag in soup.find_all(["em", "i"]):
             result = result.replace(str(tag), f"*{tag.get_text()}*")
 
         # Удаляем оставшиеся теги
-        result = re.sub(r'<[^>]+>', '', result)
+        result = re.sub(r"<[^>]+>", "", result)
 
         return result.strip()

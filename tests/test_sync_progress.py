@@ -3,8 +3,6 @@ Tests for счётчика прогресса синхронизации: стр
 по завершении каждой записи — по ней вызывающий (antagor) видит долю сделанного.
 """
 
-import re
-
 import pytest
 from loguru import logger
 

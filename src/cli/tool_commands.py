@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Any, Dict, List, Optional
 import asyncio
 
 import pandas as pd
@@ -12,7 +12,12 @@ from loguru import logger
 from . import app, console
 from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
 from .helpers import (
-    get_project, require_data_file, require_excel_file, resolve_env_file, resolve_excel_file, resolve_output,
+    get_project,
+    require_data_file,
+    require_excel_file,
+    resolve_env_file,
+    resolve_excel_file,
+    resolve_output,
 )
 from .project import find_repo_root
 from .. import output
@@ -42,10 +47,7 @@ def _make_wp_config(domain: str, username: str, password: str) -> WordPressConfi
 def validate(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None,
-        "--file",
-        "-f",
-        help="Файл данных .xlsx или .json (авто-определяется из --project)"
+        None, "--file", "-f", help="Файл данных .xlsx или .json (авто-определяется из --project)"
     ),
     sheets: Optional[str] = typer.Option(
         None,
@@ -59,7 +61,7 @@ def validate(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
     offline: bool = typer.Option(
         False,
@@ -114,14 +116,16 @@ def validate(
 
     by_type = None
     if is_json:
-        checks = [check_tab(file, tab, rules) for tab in tabs]
+        checks = [check_tab(file, tab, rules) for tab in tabs]  # ty: ignore[not-iterable]  # is_json ⇒ tabs задан
     else:
         output.vecho(ctx, "Проверка листов...")
         with ExcelReader(file, known_taxonomies=rules.taxonomies()) as reader:
             by_type = reader.get_sheets_by_type()
             names = dataset_names(sheets) if sheets is not None else by_type["content"] + by_type["taxonomy"]
             checks = check_sources(
-                [ExcelRecordSource(reader, name) for name in names], rules, base_dir=file.parent,
+                [ExcelRecordSource(reader, name) for name in names],
+                rules,
+                base_dir=file.parent,
             )
     raise_if_errors(file.name, checks)
 
@@ -184,14 +188,7 @@ def _render_checks(tabs: List[dict]) -> None:
 def options(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None,
-        "--file",
-        "-f",
-        help="Путь к Excel файлу",
-        exists=False,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True
+        None, "--file", "-f", help="Путь к Excel файлу", exists=False, file_okay=True, dir_okay=False, resolve_path=True
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -200,19 +197,10 @@ def options(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    fetch: bool = typer.Option(
-        False,
-        "--fetch",
-        help="Получить настройки из WordPress в Excel (вместо загрузки)"
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-d",
-        help="Показать что будет отправлено, без отправки"
-    ),
+    fetch: bool = typer.Option(False, "--fetch", help="Получить настройки из WordPress в Excel (вместо загрузки)"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет отправлено, без отправки"),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
     json_output: bool = output.JsonOption,
@@ -244,7 +232,7 @@ def options(
     human_mode = not opts.json and not opts.quiet
 
     if human_mode:
-        console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
+        console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
 
     command_name = "options_fetch" if fetch else "options"
     setup_command_logging(ctx, command_name)
@@ -260,9 +248,7 @@ def options(
 
             # Проверяем существование
             if file.exists():
-                output.require_confirmation(
-                    ctx, f"Файл {file} уже существует. Перезаписать?", confirm
-                )
+                output.require_confirmation(ctx, f"Файл {file} уже существует. Перезаписать?", confirm)
         elif human_mode:
             console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
 
@@ -290,6 +276,7 @@ def options(
         # 3. Записываем в Excel
         output.vecho(ctx, "Запись настроек в Excel...")
         from ..excel.options import OptionsWriter
+
         writer = OptionsWriter(file)
         writer.write(site_options, mode="replace")
 
@@ -321,6 +308,7 @@ def options(
         # 2. Читаем опции
         output.vecho(ctx, "Чтение настроек из листа 'options'...")
         from ..excel.options import OptionsReader
+
         options_reader = OptionsReader(file)
         site_options = options_reader.read()
 
@@ -333,6 +321,7 @@ def options(
             return
 
         if dry_run:
+
             def _render_dry(payload: dict):
                 console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
                 output.human.key_values("Настройки для обновления:", payload["options"])
@@ -365,7 +354,7 @@ def options(
         def _render_update(payload: dict):
             console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
             output.human.key_values("Обновлённые настройки:", payload["options"])
-            console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
+            console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
 
         output.emit_success(
             ctx,
@@ -394,21 +383,9 @@ async def _fetch_options(wp_config: WordPressConfig) -> dict:
 @output.guard
 def bulk_delete(
     ctx: typer.Context,
-    domain: Optional[str] = typer.Option(
-        None,
-        "--domain",
-        help="WordPress domain (например, https://example.com)"
-    ),
-    username: Optional[str] = typer.Option(
-        None,
-        "--username",
-        help="WordPress username"
-    ),
-    password: Optional[str] = typer.Option(
-        None,
-        "--password",
-        help="WordPress Application Password"
-    ),
+    domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain (например, https://example.com)"),
+    username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
+    password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     env_file: Optional[Path] = typer.Option(
         None,
         "--env-file",
@@ -416,45 +393,20 @@ def bulk_delete(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
     post_type: str = typer.Option(
-        ...,
-        "--post-type",
-        "-t",
-        help="Тип контента для удаления (posts, pages, service, и т.д.)"
+        ..., "--post-type", "-t", help="Тип контента для удаления (posts, pages, service, и т.д.)"
     ),
-    status: str = typer.Option(
-        "any",
-        "--status",
-        help="Статус записей для удаления (any, publish, draft, etc.)"
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        help="Удалить полностью (минуя корзину)"
-    ),
-    delete_media: bool = typer.Option(
-        False,
-        "--delete-media",
-        help="Удалять связанные featured media"
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-d",
-        help="Показать что будет удалено, без удаления"
-    ),
+    status: str = typer.Option("any", "--status", help="Статус записей для удаления (any, publish, draft, etc.)"),
+    force: bool = typer.Option(False, "--force", help="Удалить полностью (минуя корзину)"),
+    delete_media: bool = typer.Option(False, "--delete-media", help="Удалять связанные featured media"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет удалено, без удаления"),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Подробные логи"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
 ):
     """
     Массовое удаление всех записей указанного типа
@@ -527,10 +479,7 @@ def bulk_delete(
     all_posts = asyncio.run(_collect_posts(wp_config, post_type, status))
     say(f"[yellow]->[/yellow] Найдено записей: {len(all_posts)}\n")
 
-    targets = [
-        {"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")}
-        for post in all_posts
-    ]
+    targets = [{"id": post.get("id"), "title": wp_rendered(post.get("title", {}), "No title")} for post in all_posts]
 
     if dry_run:
         # Превью никогда не спрашивает и ничего не меняет.
@@ -561,19 +510,12 @@ def bulk_delete(
         media_note = " вместе с featured media" if delete_media else ""
         output.require_confirmation(
             ctx,
-            f"Удалить {len(all_posts)} записей типа '{post_type}' "
-            f"(статус: {status}) {mode}{media_note}?",
+            f"Удалить {len(all_posts)} записей типа '{post_type}' (статус: {status}) {mode}{media_note}?",
             confirm,
         )
 
     # Запускаем удаление
-    stats = asyncio.run(_run_bulk_delete(
-        wp_config,
-        all_posts,
-        post_type,
-        force,
-        delete_media
-    ))
+    stats = asyncio.run(_run_bulk_delete(wp_config, all_posts, post_type, force, delete_media))
 
     # Показываем результаты
     def _render_done(payload: Dict):
@@ -615,21 +557,12 @@ async def _collect_posts(
 
 
 async def _run_bulk_delete(
-    wp_config: WordPressConfig,
-    all_posts: List[Dict],
-    post_type: str,
-    force: bool,
-    delete_media: bool
+    wp_config: WordPressConfig, all_posts: List[Dict], post_type: str, force: bool, delete_media: bool
 ) -> Dict[str, int]:
     """Выполнить массовое удаление уже собранных записей."""
     from ..wordpress.media import MediaEndpoint
 
-    stats = {
-        "found": len(all_posts),
-        "deleted": 0,
-        "media_deleted": 0,
-        "errors": 0
-    }
+    stats = {"found": len(all_posts), "deleted": 0, "media_deleted": 0, "errors": 0}
 
     async with WordPressClient(wp_config) as client:
         posts_endpoint = PostsEndpoint(client, post_type)
@@ -665,21 +598,9 @@ async def _run_bulk_delete(
 @app.command()
 def counter(
     ctx: typer.Context,
-    domain: Optional[str] = typer.Option(
-        None,
-        "--domain",
-        help="WordPress domain (например, https://example.com)"
-    ),
-    username: Optional[str] = typer.Option(
-        None,
-        "--username",
-        help="WordPress username"
-    ),
-    password: Optional[str] = typer.Option(
-        None,
-        "--password",
-        help="WordPress Application Password"
-    ),
+    domain: Optional[str] = typer.Option(None, "--domain", help="WordPress domain (например, https://example.com)"),
+    username: Optional[str] = typer.Option(None, "--username", help="WordPress username"),
+    password: Optional[str] = typer.Option(None, "--password", help="WordPress Application Password"),
     env_file: Optional[Path] = typer.Option(
         None,
         "--env-file",
@@ -687,38 +608,13 @@ def counter(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    post_type: str = typer.Option(
-        "posts",
-        "--type",
-        "-t",
-        help="Тип контента (posts, pages, или custom post type)"
-    ),
-    status: str = typer.Option(
-        "publish",
-        "--status",
-        "-s",
-        help="Статус записей (publish, draft, any)"
-    ),
-    output: Path = typer.Option(
-        Path("counter_output.csv"),
-        "--output",
-        "-o",
-        help="Путь к выходному CSV файлу"
-    ),
-    limit: Optional[int] = typer.Option(
-        None,
-        "--limit",
-        "-l",
-        help="Максимум записей для обработки"
-    ),
-    concurrency: int = typer.Option(
-        5,
-        "--concurrency",
-        "-c",
-        help="Количество параллельных запросов"
-    )
+    post_type: str = typer.Option("posts", "--type", "-t", help="Тип контента (posts, pages, или custom post type)"),
+    status: str = typer.Option("publish", "--status", "-s", help="Статус записей (publish, draft, any)"),
+    output: Path = typer.Option(Path("counter_output.csv"), "--output", "-o", help="Путь к выходному CSV файлу"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Максимум записей для обработки"),
+    concurrency: int = typer.Option(5, "--concurrency", "-c", help="Количество параллельных запросов"),
 ):
     """
     Подсчет количества слов и символов в контенте записей WordPress.
@@ -734,30 +630,29 @@ def counter(
     env_file = resolve_env_file(ctx, env_file)
     output = resolve_output(ctx, output, "counter_output.csv")
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
+    console.print("\n[bold blue]WordPress Bulk Editor - Counter[/bold blue]\n")
 
     setup_command_logging(ctx, "counter")
 
     with handle_command_errors(ctx):
         # 1. Загружаем credentials
         domain, username, password = load_and_print_credentials(
-            env_file=env_file,
-            domain=domain,
-            username=username,
-            password=password
+            env_file=env_file, domain=domain, username=username, password=password
         )
 
         # 2. Запускаем асинхронный подсчет
-        asyncio.run(_count_content_stats(
-            domain=domain,
-            username=username,
-            password=password,
-            post_type=post_type,
-            status=status,
-            output_file=output,
-            limit=limit,
-            concurrency=concurrency
-        ))
+        asyncio.run(
+            _count_content_stats(
+                domain=domain,
+                username=username,
+                password=password,
+                post_type=post_type,
+                status=status,
+                output_file=output,
+                limit=limit,
+                concurrency=concurrency,
+            )
+        )
 
 
 async def _count_content_stats(
@@ -768,7 +663,7 @@ async def _count_content_stats(
     status: str,
     output_file: Path,
     limit: Optional[int],
-    concurrency: int
+    concurrency: int,
 ):
     """Асинхронный подсчет статистики контента."""
     import csv
@@ -777,7 +672,7 @@ async def _count_content_stats(
 
     wp_config = _make_wp_config(domain, username, password)
 
-    results = []
+    results: List[Dict[str, Any]] = []
 
     async with WordPressClient(wp_config) as client:
         await client.test_connection()
@@ -787,7 +682,7 @@ async def _count_content_stats(
 
         console.print(f"[yellow]Получение записей типа '{post_type}'...[/yellow]")
 
-        params = {}
+        params: Dict[str, Any] = {}
         if status != "any":
             params["status"] = status
 
@@ -842,14 +737,16 @@ async def _count_content_stats(
 
             words, chars = count_words_and_chars(content_html)
 
-            results.append({
-                "id": post.get("id", ""),
-                "slug": post.get("slug", ""),
-                "link": post.get("link", ""),
-                "title": html.unescape(BeautifulSoup(title_text, "html.parser").get_text()),
-                "words": words,
-                "chars": chars
-            })
+            results.append(
+                {
+                    "id": post.get("id", ""),
+                    "slug": post.get("slug", ""),
+                    "link": post.get("link", ""),
+                    "title": html.unescape(BeautifulSoup(title_text, "html.parser").get_text()),
+                    "words": words,
+                    "chars": chars,
+                }
+            )
 
         console.print(f"[green]OK[/green] Обработано: {len(results)} записей\n")
 
@@ -857,11 +754,7 @@ async def _count_content_stats(
     console.print(f"[yellow]Запись в CSV: {output_file}[/yellow]")
 
     with open(output_file, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["id", "slug", "link", "title", "words", "chars"],
-            delimiter=";"
-        )
+        writer = csv.DictWriter(f, fieldnames=["id", "slug", "link", "title", "words", "chars"], delimiter=";")
         writer.writeheader()
         writer.writerows(results)
 
@@ -885,23 +778,14 @@ async def _count_content_stats(
 @app.command()
 def llm(
     ctx: typer.Context,
-    column: str = typer.Option(
-        ...,
-        "--column",
-        "-c",
-        help="Колонка для генерации контента"
-    ),
+    column: str = typer.Option(..., "--column", "-c", help="Колонка для генерации контента"),
     file: Optional[Path] = typer.Option(
         None,
         "--file",
         "-f",
         help="Путь к Excel файлу (авто-определяется из --project)",
     ),
-    sheets: Optional[str] = typer.Option(
-        None,
-        "--sheets",
-        help="Список листов через запятую (posts,pages)"
-    ),
+    sheets: Optional[str] = typer.Option(None, "--sheets", help="Список листов через запятую (posts,pages)"),
     model: Optional[str] = typer.Option(
         None,
         "--model",
@@ -910,7 +794,7 @@ def llm(
             "Модели через запятую. Текст: цепочка llmkit ('провайдер/модель'), "
             "по умолчанию LLM_MODELS из .env. Картинки (--column img_path): "
             "модели endpoint'а, по умолчанию LLM_IMG_MODELS/LLM_MODELS"
-        )
+        ),
     ),
     level: Optional[str] = typer.Option(
         None,
@@ -919,50 +803,24 @@ def llm(
             "Уровень llmkit (cheap/judge/strong — что настроено в его конфиге). "
             "Только для текста, по умолчанию LLM_LEVEL из .env. Если не задан "
             "ни --level, ни --model — llmkit берёт свой уровень по умолчанию"
-        )
+        ),
     ),
     prompt: Optional[str] = typer.Option(
-        None,
-        "--prompt",
-        "-p",
-        help="Промпт для генерации (используйте [column] для подстановки значений)"
+        None, "--prompt", "-p", help="Промпт для генерации (используйте [column] для подстановки значений)"
     ),
     endpoint: Optional[str] = typer.Option(
         None,
         "--endpoint",
-        help="LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_ENDPOINT"
+        help="LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_ENDPOINT",
     ),
     token: Optional[str] = typer.Option(
-        None,
-        "--token",
-        help="LLM API token — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_TOKEN"
+        None, "--token", help="LLM API token — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_TOKEN"
     ),
-    overwrite: bool = typer.Option(
-        False,
-        "--overwrite",
-        help="Перезаписывать существующие значения в колонке"
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        "-d",
-        help="Режим тестирования без записи в Excel"
-    ),
-    strip_tags: bool = typer.Option(
-        False,
-        "--strip-tags",
-        help="Удалить HTML теги из результата"
-    ),
-    md_to_html: bool = typer.Option(
-        False,
-        "--md-to-html",
-        help="Конвертировать Markdown в HTML"
-    ),
-    html_to_md: bool = typer.Option(
-        False,
-        "--html-to-md",
-        help="Конвертировать HTML в Markdown"
-    ),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Перезаписывать существующие значения в колонке"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Режим тестирования без записи в Excel"),
+    strip_tags: bool = typer.Option(False, "--strip-tags", help="Удалить HTML теги из результата"),
+    md_to_html: bool = typer.Option(False, "--md-to-html", help="Конвертировать Markdown в HTML"),
+    html_to_md: bool = typer.Option(False, "--html-to-md", help="Конвертировать HTML в Markdown"),
     env_file: Optional[Path] = typer.Option(
         None,
         "--env-file",
@@ -970,14 +828,9 @@ def llm(
         exists=True,
         file_okay=True,
         dir_okay=False,
-        resolve_path=True
+        resolve_path=True,
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Подробные логи"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
 ):
     """
     Массовая генерация контента через LLM.
@@ -1016,7 +869,7 @@ def llm(
     file = require_excel_file(ctx, file)
     env_file = resolve_env_file(ctx, env_file)
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - LLM Generator[/bold blue]\n")
+    console.print("\n[bold blue]WordPress Bulk Editor - LLM Generator[/bold blue]\n")
 
     log_file = setup_command_logging(ctx, "llm", verbose)
 
@@ -1030,7 +883,7 @@ def llm(
         else:
             load_dotenv()
 
-        is_img = (column == "img_path")
+        is_img = column == "img_path"
 
         # endpoint/token нужны только картинкам: текст ходит через llmkit,
         # который берёт ключи из своего конфига, а не из .env проекта.
@@ -1064,8 +917,7 @@ def llm(
         # llmkit возьмёт свой уровень по умолчанию.
         if is_img and not final_models:
             console.print(
-                "[red]ERROR: Модели не указаны "
-                "(используйте --model или .env: LLM_IMG_MODELS или LLM_MODELS)[/red]\n"
+                "[red]ERROR: Модели не указаны (используйте --model или .env: LLM_IMG_MODELS или LLM_MODELS)[/red]\n"
             )
             raise typer.Exit(code=1)
 
@@ -1087,7 +939,7 @@ def llm(
                 console.print("[green]OK[/green] Модели: уровень по умолчанию llmkit")
         console.print(f"[green]OK[/green] Промпт: {final_prompt[:100]}...")
         if dry_run:
-            console.print(f"[yellow]DRY-RUN режим: изменения не будут сохранены[/yellow]")
+            console.print("[yellow]DRY-RUN режим: изменения не будут сохранены[/yellow]")
         console.print()
 
         # 3. Определяем папки для файлов (content_path / img_path)
@@ -1096,25 +948,27 @@ def llm(
         media_folder = proj.media_folder
 
         # 3. Запускаем генерацию
-        asyncio.run(_run_llm_generation(
-            file=file,
-            sheets=sheets,
-            column=column,
-            models=models,
-            level=final_level,
-            prompt_template=final_prompt,
-            endpoint=final_endpoint,
-            token=final_token,
-            project_name=proj.name,
-            overwrite=overwrite,
-            dry_run=dry_run,
-            strip_tags=strip_tags,
-            md_to_html=md_to_html,
-            html_to_md=html_to_md,
-            log_file=log_file,
-            content_folder=content_folder,
-            media_folder=media_folder
-        ))
+        asyncio.run(
+            _run_llm_generation(
+                file=file,
+                sheets=sheets,
+                column=column,
+                models=models,
+                level=final_level,
+                prompt_template=final_prompt,
+                endpoint=final_endpoint,
+                token=final_token,
+                project_name=proj.name,
+                overwrite=overwrite,
+                dry_run=dry_run,
+                strip_tags=strip_tags,
+                md_to_html=md_to_html,
+                html_to_md=html_to_md,
+                log_file=log_file,
+                content_folder=content_folder,
+                media_folder=media_folder,
+            )
+        )
 
 
 async def _run_llm_generation(
@@ -1149,16 +1003,16 @@ async def _run_llm_generation(
     llm_client = LLMClient(endpoint=endpoint, token=token, tags=tags)
 
     # Определяем режим работы по имени колонки
-    is_content_path = (column == "content_path")
-    is_img_path = (column == "img_path")
+    is_content_path = column == "content_path"
+    is_img_path = column == "img_path"
 
     if is_content_path:
         content_folder.mkdir(parents=True, exist_ok=True)
-        console.print(f"[yellow]Режим:[/yellow] content_path (текст -> файл -> путь в Excel)")
+        console.print("[yellow]Режим:[/yellow] content_path (текст -> файл -> путь в Excel)")
         console.print(f"[yellow]Папка контента:[/yellow] {content_folder}")
     elif is_img_path:
         media_folder.mkdir(parents=True, exist_ok=True)
-        console.print(f"[yellow]Режим:[/yellow] img_path (изображение -> файл -> путь в Excel)")
+        console.print("[yellow]Режим:[/yellow] img_path (изображение -> файл -> путь в Excel)")
         console.print(f"[yellow]Папка медиа:[/yellow] {media_folder}")
     console.print()
 
@@ -1192,7 +1046,7 @@ async def _run_llm_generation(
         df = pd.read_excel(file, sheet_name=sheet_name)
 
         if "action" not in df.columns:
-            console.print(f"  [yellow]Пропущен (нет колонки 'action')[/yellow]\n")
+            console.print("  [yellow]Пропущен (нет колонки 'action')[/yellow]\n")
             continue
 
         if column not in df.columns:
@@ -1202,7 +1056,7 @@ async def _run_llm_generation(
         update_rows = df[df["action"].map(normalize_action) == "update"]
 
         if len(update_rows) == 0:
-            console.print(f"  [yellow]Нет строк с action=update[/yellow]\n")
+            console.print("  [yellow]Нет строк с action=update[/yellow]\n")
             continue
 
         console.print(f"  Найдено строк с action=update: {len(update_rows)}")
@@ -1219,7 +1073,7 @@ async def _run_llm_generation(
 
             # Получаем ID записи для именования файлов
             row_id = row_dict.get("id", "")
-            if not row_id or (isinstance(row_id, float) and str(row_id) == 'nan'):
+            if not row_id or (isinstance(row_id, float) and str(row_id) == "nan"):
                 row_id = f"row_{idx}"
             else:
                 row_id = str(int(row_id)) if isinstance(row_id, float) else str(row_id)
@@ -1231,23 +1085,23 @@ async def _run_llm_generation(
                 if is_img_path:
                     console.print(f"  [{idx}] Генерация изображения (ID={row_id})...")
                     image_bytes, ext = await llm_client.generate_image(
-                        prompt=filled_prompt,
-                        models=models,
-                        max_retries=3
+                        prompt=filled_prompt, models=models, max_retries=3
                     )
 
                     filename = f"{row_id}.{ext}"
                     filepath = media_folder / filename
                     if not dry_run:
                         filepath.write_bytes(image_bytes)
-                        logger.info(f"[{sheet_name}:{idx}] Изображение сохранено: {filepath} ({len(image_bytes)} bytes)")
+                        logger.info(
+                            f"[{sheet_name}:{idx}] Изображение сохранено: {filepath} ({len(image_bytes)} bytes)"
+                        )
 
                     # Записываем относительный путь в Excel
                     relative_path = f"{media_folder.name}/{filename}"
                     df.at[idx, column] = relative_path
 
-                    if 'action' in df.columns:
-                        df.at[idx, 'action'] = 'skip'
+                    if "action" in df.columns:
+                        df.at[idx, "action"] = "skip"
 
                     console.print(f"  [{idx}] OK Изображение ({len(image_bytes)} bytes) -> {relative_path}")
                     total_processed += 1
@@ -1279,14 +1133,16 @@ async def _run_llm_generation(
                     filepath = content_folder / filename
                     if not dry_run:
                         filepath.write_text(generated_text, encoding="utf-8")
-                        logger.info(f"[{sheet_name}:{idx}] Контент сохранен: {filepath} ({len(generated_text)} символов)")
+                        logger.info(
+                            f"[{sheet_name}:{idx}] Контент сохранен: {filepath} ({len(generated_text)} символов)"
+                        )
 
                     # Записываем относительный путь в Excel
                     relative_path = f"{content_folder.name}/{filename}"
                     df.at[idx, column] = relative_path
 
-                    if 'action' in df.columns:
-                        df.at[idx, 'action'] = 'skip'
+                    if "action" in df.columns:
+                        df.at[idx, "action"] = "skip"
 
                     console.print(f"  [{idx}] OK Контент ({len(generated_text)} символов) -> {relative_path}")
                     total_processed += 1
@@ -1314,8 +1170,8 @@ async def _run_llm_generation(
 
                     df.at[idx, column] = generated_text
 
-                    if 'action' in df.columns:
-                        df.at[idx, 'action'] = 'skip'
+                    if "action" in df.columns:
+                        df.at[idx, "action"] = "skip"
                         logger.debug(f"[{sheet_name}:{idx}] Action изменен на 'skip'")
 
                     console.print(f"  [{idx}] OK Сгенерировано ({len(generated_text)} символов)")
@@ -1330,7 +1186,7 @@ async def _run_llm_generation(
                 total_errors += 1
 
         if not dry_run:
-            writer.replace_rows(sheet_name, df.to_dict('records'))
+            writer.replace_rows(sheet_name, df.to_dict("records"))
             logger.info(f"Лист '{sheet_name}' обновлен в памяти")
 
         console.print()
@@ -1371,23 +1227,35 @@ def _resolve_template(template_name: Optional[str]) -> Path:
 def reshape(
     ctx: typer.Context,
     source: Optional[Path] = typer.Option(
-        None, "--source", "--src", "-s",
+        None,
+        "--source",
+        "--src",
+        "-s",
         help="Excel-источник (по умолчанию fetch.xlsx)",
     ),
     template: Optional[str] = typer.Option(
-        None, "--template", "--tpl", "-t",
+        None,
+        "--template",
+        "--tpl",
+        "-t",
         help="Шаблон: имя в templates/ или полный путь (по умолчанию default.xlsx)",
     ),
     output: Optional[Path] = typer.Option(
-        None, "--output", "-o",
+        None,
+        "--output",
+        "-o",
         help="Результирующий файл (по умолчанию export.xlsx)",
     ),
     extra_columns: Optional[str] = typer.Option(
-        None, "--extra", "-e",
+        None,
+        "--extra",
+        "-e",
         help="Доп. колонки из источника: список через запятую или 'none' чтобы не добавлять",
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v",
+        False,
+        "--verbose",
+        "-v",
         help="Подробные логи",
     ),
 ):
@@ -1415,7 +1283,7 @@ def reshape(
 
     # Резолвинг source
     if source is None:
-        if proj.active:
+        if proj.active and proj.root is not None:
             source = proj.root / "fetch.xlsx"
         else:
             source = Path("fetch.xlsx")
@@ -1425,14 +1293,14 @@ def reshape(
 
     # Резолвинг output
     if output is None:
-        if proj.active:
+        if proj.active and proj.root is not None:
             output = proj.root / "export.xlsx"
         else:
             output = Path("export.xlsx")
 
-    log_file = setup_command_logging(ctx, "reshape", verbose)
+    setup_command_logging(ctx, "reshape", verbose)
 
-    console.print(f"\n[bold blue]WordPress Bulk Editor - Reshape[/bold blue]\n")
+    console.print("\n[bold blue]WordPress Bulk Editor - Reshape[/bold blue]\n")
     console.print(f"  Source:   [cyan]{source}[/cyan]")
     console.print(f"  Template: [cyan]{template_path}[/cyan]")
     console.print(f"  Output:   [cyan]{output}[/cyan]\n")
@@ -1512,10 +1380,7 @@ def reshape(
                     for col_idx, col_name in enumerate(tpl_columns, 1):
                         ws.cell(row=1, column=col_idx, value=col_name)
 
-                    console.print(
-                        f"  {tpl_sheet}:".ljust(20)
-                        + "0 строк (нет в источнике)"
-                    )
+                    console.print(f"  {tpl_sheet}:".ljust(20) + "0 строк (нет в источнике)")
 
             wb.save(output)
 
@@ -1586,9 +1451,7 @@ def taxonomies(
     )
 
 
-async def _discover_taxonomy_slugs(
-    wp_config: WordPressConfig, include_system: bool
-) -> List[str]:
+async def _discover_taxonomy_slugs(wp_config: WordPressConfig, include_system: bool) -> List[str]:
     """Запросить таксономии через WP REST и вернуть отфильтрованный список slug-ов."""
     from ..wordpress.discovery import WordPressDiscovery
     from ..config import Settings

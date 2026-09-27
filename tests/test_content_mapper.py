@@ -3,12 +3,12 @@ Tests for src/mappers/content_mapper.py
 """
 
 import pandas as pd
-import pytest
 
 from src.mappers.content_mapper import ContentMapper
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
+
 
 def make_row(**kwargs) -> pd.Series:
     """Создать pandas Series из kwargs."""
@@ -16,6 +16,7 @@ def make_row(**kwargs) -> pd.Series:
 
 
 # ── ContentMapper.map_row() ──────────────────────────────────────────
+
 
 class TestMapRow:
     def test_basic_content_fields(self):
@@ -79,10 +80,7 @@ class TestMapRow:
         assert isinstance(payload["featured_media"], int)
 
     def test_allowed_columns_filter(self):
-        mapper = ContentMapper(
-            ["title", "slug", "status", "id", "action"],
-            allowed_columns=["title"]
-        )
+        mapper = ContentMapper(["title", "slug", "status", "id", "action"], allowed_columns=["title"])
         row = make_row(title="Hello", slug="hello", status="publish", id="", action="update")
         payload = mapper.map_row(row)
         assert "title" in payload
@@ -91,10 +89,7 @@ class TestMapRow:
 
     def test_allowed_columns_filter_acf(self):
         """Фильтр по acf_ колонкам."""
-        mapper = ContentMapper(
-            ["acf_price", "acf_color", "id", "action"],
-            allowed_columns=["acf_price"]
-        )
+        mapper = ContentMapper(["acf_price", "acf_color", "id", "action"], allowed_columns=["acf_price"])
         row = make_row(**{"acf_price": "100", "acf_color": "red", "id": "", "action": "update"})
         payload = mapper.map_row(row)
         assert "acf" in payload
@@ -110,6 +105,7 @@ class TestMapRow:
 
 
 # ── ContentMapper.validate_row() ─────────────────────────────────────
+
 
 class TestValidateRow:
     def test_add_requires_title(self):
@@ -154,6 +150,7 @@ class TestValidateRow:
 
 # ── ContentMapper.extract_media_path() ───────────────────────────────
 
+
 class TestExtractMediaPath:
     def test_returns_path(self):
         mapper = ContentMapper(["img_path", "id", "action"])
@@ -173,6 +170,7 @@ class TestExtractMediaPath:
 
 # ── Dot-notation (вложенный payload) ─────────────────────────────────
 
+
 class TestDotNotationPayload:
     def test_single_nesting(self):
         mapper = ContentMapper(["seo.title", "id", "action"])
@@ -181,16 +179,12 @@ class TestDotNotationPayload:
 
     def test_multiple_nested_merged(self):
         mapper = ContentMapper(["seo.title", "seo.description", "id", "action"])
-        payload = mapper.map_row(make_row(**{
-            "seo.title": "T", "seo.description": "D", "id": "", "action": "add"
-        }))
+        payload = mapper.map_row(make_row(**{"seo.title": "T", "seo.description": "D", "id": "", "action": "add"}))
         assert payload["seo"] == {"title": "T", "description": "D"}
 
     def test_deep_nesting(self):
         mapper = ContentMapper(["seo.og.image", "id", "action"])
-        payload = mapper.map_row(make_row(**{
-            "seo.og.image": "img.jpg", "id": "", "action": "add"
-        }))
+        payload = mapper.map_row(make_row(**{"seo.og.image": "img.jpg", "id": "", "action": "add"}))
         assert payload == {"seo": {"og": {"image": "img.jpg"}}}
 
     def test_empty_dot_value_skipped(self):
@@ -201,17 +195,13 @@ class TestDotNotationPayload:
     def test_legacy_seo_flat_and_dot_coexist(self):
         """seo_title (flat) и seo.title (nested) живут в разных ключах payload."""
         mapper = ContentMapper(["seo_title", "seo.title", "id", "action"])
-        payload = mapper.map_row(make_row(**{
-            "seo_title": "flat", "seo.title": "nested", "id": "", "action": "add"
-        }))
+        payload = mapper.map_row(make_row(**{"seo_title": "flat", "seo.title": "nested", "id": "", "action": "add"}))
         assert payload["seo_title"] == "flat"
         assert payload["seo"]["title"] == "nested"
 
     def test_acf_legacy_and_dot_merge(self):
         mapper = ContentMapper(["acf_old", "acf.new", "id", "action"])
-        payload = mapper.map_row(make_row(**{
-            "acf_old": "O", "acf.new": "N", "id": "", "action": "add"
-        }))
+        payload = mapper.map_row(make_row(**{"acf_old": "O", "acf.new": "N", "id": "", "action": "add"}))
         assert payload["acf"] == {"old": "O", "new": "N"}
 
     def test_filter_by_dot_path(self):
@@ -219,13 +209,12 @@ class TestDotNotationPayload:
             ["seo.title", "seo.description", "id", "action"],
             allowed_columns=["seo.title"],
         )
-        payload = mapper.map_row(make_row(**{
-            "seo.title": "X", "seo.description": "Y", "id": "", "action": "update"
-        }))
+        payload = mapper.map_row(make_row(**{"seo.title": "X", "seo.description": "Y", "id": "", "action": "update"}))
         assert payload == {"seo": {"title": "X"}}
 
 
 # ── Bool-поля «по умолчанию true» ────────────────────────────────────
+
 
 class TestBoolDefaultTrueFields:
     BOOL_COLS = ["seo.robots.index", "seo.robots.follow", "seo.sitemap.include"]
@@ -234,22 +223,32 @@ class TestBoolDefaultTrueFields:
         return ContentMapper(self.BOOL_COLS + ["id", "action"])
 
     def test_empty_defaults_to_true(self):
-        payload = self._cm().map_row(make_row(**{
-            "seo.robots.index": "",
-            "seo.robots.follow": "",
-            "seo.sitemap.include": "",
-            "id": "", "action": "update",
-        }))
+        payload = self._cm().map_row(
+            make_row(
+                **{
+                    "seo.robots.index": "",
+                    "seo.robots.follow": "",
+                    "seo.sitemap.include": "",
+                    "id": "",
+                    "action": "update",
+                }
+            )
+        )
         assert payload["seo"]["robots"] == {"index": True, "follow": True}
         assert payload["seo"]["sitemap"] == {"include": True}
 
     def test_falsy_values_parsed(self):
-        payload = self._cm().map_row(make_row(**{
-            "seo.robots.index": "нет",
-            "seo.robots.follow": "false",
-            "seo.sitemap.include": "0",
-            "id": "", "action": "update",
-        }))
+        payload = self._cm().map_row(
+            make_row(
+                **{
+                    "seo.robots.index": "нет",
+                    "seo.robots.follow": "false",
+                    "seo.sitemap.include": "0",
+                    "id": "",
+                    "action": "update",
+                }
+            )
+        )
         assert payload["seo"]["robots"] == {"index": False, "follow": False}
         assert payload["seo"]["sitemap"] == {"include": False}
 
@@ -262,6 +261,7 @@ class TestBoolDefaultTrueFields:
 
 
 # ── known_taxonomies override ────────────────────────────────────────
+
 
 class TestKnownTaxonomies:
     def test_custom_taxonomy_excluded_from_content(self):

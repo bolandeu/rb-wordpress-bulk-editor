@@ -29,7 +29,9 @@ SITE_SCHEMA = {
         "category": {"slug": "category", "rest_base": "categories", "types": ["post"]},
         "post_tag": {"slug": "post_tag", "rest_base": "tags", "types": ["post"]},
         "rb_services_cat": {
-            "slug": "rb_services_cat", "rest_base": "rb_services_cat", "types": ["rb_services"],
+            "slug": "rb_services_cat",
+            "rest_base": "rb_services_cat",
+            "types": ["rb_services"],
         },
         "rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]},
     },
@@ -92,8 +94,7 @@ class FakeWordPressClient:
     def created(self, wp_type: str):
         """Данные POST-запросов к endpoint типа записи/таксономии."""
         endpoint = f"/wp-json/wp/v2/{wp_type}"
-        return [data for method, url, data in self.requests
-                if method == "POST" and url == endpoint]
+        return [data for method, url, data in self.requests if method == "POST" and url == endpoint]
 
 
 @pytest.fixture
@@ -129,19 +130,31 @@ def json_project(tmp_path):
             ],
             CONTENT_TAB: [
                 {
-                    "_row_num": 2, "action": "add", "type": "rb_services",
-                    "title": "Перевозка грузов", "slug": "gruz", "status": "publish",
-                    "seo.title": "Перевозка грузов — SEO", "acf.f1": "да",
+                    "_row_num": 2,
+                    "action": "add",
+                    "type": "rb_services",
+                    "title": "Перевозка грузов",
+                    "slug": "gruz",
+                    "status": "publish",
+                    "seo.title": "Перевозка грузов — SEO",
+                    "acf.f1": "да",
                     "rb_services_cat": "Перевозки",
                 },
                 {
-                    "_row_num": 3, "action": "add", "type": "page",
-                    "title": "О компании", "slug": "about", "status": "draft",
+                    "_row_num": 3,
+                    "action": "add",
+                    "type": "page",
+                    "title": "О компании",
+                    "slug": "about",
+                    "status": "draft",
                     "acf.f1": "нет",
                 },
                 {
-                    "_row_num": 4, "action": "add", "taxonomy": "rb_services_cat",
-                    "name": "Перевозки", "slug": "perevozki",
+                    "_row_num": 4,
+                    "action": "add",
+                    "taxonomy": "rb_services_cat",
+                    "name": "Перевозки",
+                    "slug": "perevozki",
                 },
             ],
         },
@@ -185,6 +198,7 @@ def read_sheet_rows(path, sheet="posts"):
 
 # ── Выбор источника по расширению ────────────────────────────────────
 
+
 class TestSourceSelection:
     def test_json_file_is_synced_through_json_source(self, fake_wp, json_project):
         result = run_sync("--file", str(json_project), "--sheets", CONTENT_TAB)
@@ -208,7 +222,10 @@ class TestSourceSelection:
         assert records[2]["taxonomy"] == "rb_services_cat"
         # Служебные табы не тронуты.
         assert read_tab(json_project, "options")[0] == {
-            "_row_num": 2, "key": "phone", "label": "Телефон", "value": "+7 000",
+            "_row_num": 2,
+            "key": "phone",
+            "label": "Телефон",
+            "value": "+7 000",
         }
 
     def test_dry_run_does_not_touch_the_file(self, fake_wp, json_project):
@@ -242,10 +259,9 @@ class TestSourceSelection:
         У JSON writer свой на таб: результат уже созданных записей должен
         сохраниться, даже если обработка таба упала дальше по ходу.
         """
+
         async def explode(records, content_sync, taxonomy_sync, writer=None, progress=None):
-            writer.update_from_result(
-                records[0].write_key, {"id": 777, "link": "https://example.com/777"}, "add"
-            )
+            writer.update_from_result(records[0].write_key, {"id": 777, "link": "https://example.com/777"}, "add")
             raise RuntimeError("что-то сломалось посреди таба")
 
         monkeypatch.setattr(sync_commands, "sync_record_groups", explode)
@@ -268,9 +284,7 @@ class TestSourceSelection:
     def test_both_formats_in_project_require_explicit_file(self, fake_wp, json_project, tmp_path):
         (tmp_path / "mw.xlsx").write_bytes(b"")
 
-        result = runner.invoke(
-            app, ["--json", "--project", str(tmp_path), "sync", "--sheets", CONTENT_TAB]
-        )
+        result = runner.invoke(app, ["--json", "--project", str(tmp_path), "sync", "--sheets", CONTENT_TAB])
 
         assert result.exit_code == 2
         payload = json.loads(result.stdout.strip())
@@ -278,13 +292,10 @@ class TestSourceSelection:
         assert "--file" in payload["error"]["message"]
 
     def test_async_command_also_reads_json(self, fake_wp, json_project):
-        result = runner.invoke(
-            app, ["async", "--file", str(json_project), "--sheets", CONTENT_TAB]
-        )
+        result = runner.invoke(app, ["async", "--file", str(json_project), "--sheets", CONTENT_TAB])
 
         assert result.exit_code == 0, result.stdout
         assert len(fake_wp[0].created("page")) == 1
-
 
 
 class TestAsyncEnvelope:
@@ -316,13 +327,10 @@ class TestAsyncEnvelope:
         assert payload["error"]["code"] == "INVALID_ARGUMENTS"
 
     def test_quiet_prints_nothing(self, fake_wp, json_project):
-        result = runner.invoke(
-            app, ["async", "--file", str(json_project), "--sheets", CONTENT_TAB, "--quiet"]
-        )
+        result = runner.invoke(app, ["async", "--file", str(json_project), "--sheets", CONTENT_TAB, "--quiet"])
 
         assert result.exit_code == 0, result.stdout
         assert result.stdout.strip() == ""
-
 
 
 class TestProgressLines:
@@ -339,6 +347,7 @@ class TestProgressLines:
 
 # ── Выбор таба ───────────────────────────────────────────────────────
 
+
 class TestTabSelection:
     def test_missing_sheets_lists_available_tabs(self, fake_wp, json_project):
         result = run_sync("--file", str(json_project))
@@ -354,6 +363,7 @@ class TestTabSelection:
         «Какие табы в файле» — вопрос к файлу: ответ не должен требовать
         рабочих credentials, поэтому проверка идёт до их загрузки.
         """
+
         def fail(**kwargs):
             raise AssertionError("credentials не должны запрашиваться")
 
@@ -416,11 +426,16 @@ class TestTabSelection:
 
 # ── --filter ─────────────────────────────────────────────────────────
 
+
 class TestRecordFilter:
     def test_filter_by_type_on_json(self, fake_wp, json_project):
         result = run_sync(
-            "--file", str(json_project), "--sheets", CONTENT_TAB,
-            "--filter", "type=rb_services",
+            "--file",
+            str(json_project),
+            "--sheets",
+            CONTENT_TAB,
+            "--filter",
+            "type=rb_services",
         )
 
         assert result.exit_code == 0, result.stdout
@@ -434,7 +449,12 @@ class TestRecordFilter:
 
     def test_filter_by_dot_notation_field_on_json(self, fake_wp, json_project):
         result = run_sync(
-            "--file", str(json_project), "--sheets", CONTENT_TAB, "--filter", "acf.f1=нет",
+            "--file",
+            str(json_project),
+            "--sheets",
+            CONTENT_TAB,
+            "--filter",
+            "acf.f1=нет",
         )
 
         assert result.exit_code == 0, result.stdout
@@ -443,8 +463,14 @@ class TestRecordFilter:
 
     def test_filters_are_anded(self, fake_wp, json_project):
         result = run_sync(
-            "--file", str(json_project), "--sheets", CONTENT_TAB,
-            "--filter", "type=page", "--filter", "status=publish",
+            "--file",
+            str(json_project),
+            "--sheets",
+            CONTENT_TAB,
+            "--filter",
+            "type=page",
+            "--filter",
+            "status=publish",
         )
 
         assert result.exit_code == 0, result.stdout
@@ -452,8 +478,13 @@ class TestRecordFilter:
 
     def test_filter_on_excel_source(self, fake_wp, excel_project):
         result = run_sync(
-            "--file", str(excel_project), "--sheets", "posts",
-            "--filter", "status=publish", "--dry-run",
+            "--file",
+            str(excel_project),
+            "--sheets",
+            "posts",
+            "--filter",
+            "status=publish",
+            "--dry-run",
         )
 
         assert result.exit_code == 0, result.stdout
@@ -463,8 +494,13 @@ class TestRecordFilter:
 
     def test_filter_on_excel_dot_notation_column(self, fake_wp, excel_project):
         result = run_sync(
-            "--file", str(excel_project), "--sheets", "posts",
-            "--filter", "acf.f1=да", "--dry-run",
+            "--file",
+            str(excel_project),
+            "--sheets",
+            "posts",
+            "--filter",
+            "acf.f1=да",
+            "--dry-run",
         )
 
         assert stats_of(result)["sheets"]["posts"]["added"] == 1
@@ -478,14 +514,24 @@ class TestRecordFilter:
 
 # ── Гейт необратимых удалений ────────────────────────────────────────
 
+
 class TestDeleteMediaGate:
     """`--delete-media` удаляет вложения с force=True при любом источнике."""
 
     def test_json_delete_media_requires_confirmation(self, fake_wp, json_project):
-        result = runner.invoke(app, [
-            "--json", "sync", "--file", str(json_project), "--sheets", CONTENT_TAB,
-            "--delete-media", "--non-interactive",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "--json",
+                "sync",
+                "--file",
+                str(json_project),
+                "--sheets",
+                CONTENT_TAB,
+                "--delete-media",
+                "--non-interactive",
+            ],
+        )
 
         assert result.exit_code == 2
         payload = json.loads(result.stdout.strip())
@@ -494,24 +540,39 @@ class TestDeleteMediaGate:
         assert fake_wp[0].writes() == []
 
     def test_json_delete_media_with_confirm_proceeds(self, fake_wp, json_project):
-        result = runner.invoke(app, [
-            "--json", "sync", "--file", str(json_project), "--sheets", CONTENT_TAB,
-            "--delete-media", "--non-interactive", "--confirm",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "--json",
+                "sync",
+                "--file",
+                str(json_project),
+                "--sheets",
+                CONTENT_TAB,
+                "--delete-media",
+                "--non-interactive",
+                "--confirm",
+            ],
+        )
 
         assert result.exit_code == 0, result.stdout
         assert len(fake_wp[0].created("page")) == 1
 
     def test_json_dry_run_is_not_gated(self, fake_wp, json_project):
         result = run_sync(
-            "--file", str(json_project), "--sheets", CONTENT_TAB,
-            "--delete-media", "--dry-run",
+            "--file",
+            str(json_project),
+            "--sheets",
+            CONTENT_TAB,
+            "--delete-media",
+            "--dry-run",
         )
 
         assert result.exit_code == 0, result.stdout
 
 
 # ── Формат antagor: короткие action и значения-пути ──────────────────
+
 
 def write_json_tab(tmp_path, records):
     path = tmp_path / "mw.json"
@@ -522,13 +583,16 @@ def write_json_tab(tmp_path, records):
 
 class TestAntagorStyleRecords:
     def test_short_actions_are_understood(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "a", "type": "posts", "title": "Новая"},
-            {"_row_num": 3, "action": "edit", "id": "5", "type": "posts", "title": "Правка"},
-            {"_row_num": 4, "action": "e", "id": "6", "type": "posts", "title": "Правка 2"},
-            {"_row_num": 5, "action": "0", "id": "7", "type": "posts", "title": "Пропуск"},
-            {"_row_num": 6, "action": "s", "id": "8", "type": "posts", "title": "Пропуск 2"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "a", "type": "posts", "title": "Новая"},
+                {"_row_num": 3, "action": "edit", "id": "5", "type": "posts", "title": "Правка"},
+                {"_row_num": 4, "action": "e", "id": "6", "type": "posts", "title": "Правка 2"},
+                {"_row_num": 5, "action": "0", "id": "7", "type": "posts", "title": "Пропуск"},
+                {"_row_num": 6, "action": "s", "id": "8", "type": "posts", "title": "Пропуск 2"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
 
@@ -543,10 +607,20 @@ class TestAntagorStyleRecords:
         (tmp_path / "content-write" / "1.html").write_text("<p>Относительный</p>", encoding="utf-8")
         absolute = tmp_path / "abs.md"
         absolute.write_text("**Абсолютный**", encoding="utf-8")
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "a", "type": "posts", "title": "Статья",
-             "slug": "page.html", "acf.more": "content-write/1.html", "acf.extra": str(absolute)},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {
+                    "_row_num": 2,
+                    "action": "a",
+                    "type": "posts",
+                    "title": "Статья",
+                    "slug": "page.html",
+                    "acf.more": "content-write/1.html",
+                    "acf.extra": str(absolute),
+                },
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
 
@@ -557,10 +631,18 @@ class TestAntagorStyleRecords:
         assert created["slug"] == "page.html"  # идентификатор, не файл
 
     def test_missing_file_is_a_record_error_not_a_string(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "a", "type": "posts", "title": "Статья",
-             "acf.more": "content-write/404.html"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {
+                    "_row_num": 2,
+                    "action": "a",
+                    "type": "posts",
+                    "title": "Статья",
+                    "acf.more": "content-write/404.html",
+                },
+            ],
+        )
 
         # Проверка перед отправкой остановила бы прогон целиком — здесь
         # проверяется поведение самого sync, когда её отключили.
@@ -572,11 +654,15 @@ class TestAntagorStyleRecords:
 
 # ── Проверка перед отправкой ─────────────────────────────────────────
 
+
 class TestPreflight:
     def test_typo_in_field_blocks_sync_before_any_write(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
+            ],
+        )
         before = path.read_text(encoding="utf-8")
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
@@ -588,9 +674,12 @@ class TestPreflight:
         assert path.read_text(encoding="utf-8") == before
 
     def test_dry_run_is_blocked_too(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "update", "type": "posts", "title": "A"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "update", "type": "posts", "title": "A"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--dry-run")
 
@@ -598,9 +687,12 @@ class TestPreflight:
         assert "id" in stats_of(result)["error"]["message"]
 
     def test_skip_checks_lets_the_run_through(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "add", "type": "posts", "title": "A", "seo.descripton": "d"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--skip-checks")
 
@@ -608,10 +700,13 @@ class TestPreflight:
         assert len(fake_wp[0].created("posts")) == 1
 
     def test_filtered_out_records_are_not_checked(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "add", "type": "posts", "title": "A"},
-            {"_row_num": 3, "action": "update", "type": "pages", "title": "Без id"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "add", "type": "posts", "title": "A"},
+                {"_row_num": 3, "action": "update", "type": "pages", "title": "Без id"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB, "--filter", "type=posts")
 
@@ -638,9 +733,12 @@ class TestSiteTaxonomies:
     """Таксономии берутся с сайта: WP_TAXONOMIES для них не нужен."""
 
     def test_site_taxonomy_column_is_synced_as_taxonomy(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_topic": "Логистика"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
 
@@ -651,9 +749,12 @@ class TestSiteTaxonomies:
         assert client.created("rb_services")[0].get("rb_topic") != "Логистика"
 
     def test_taxonomy_typo_blocks_with_suggestion(self, fake_wp, tmp_path):
-        path = write_json_tab(tmp_path, [
-            {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_servces_cat": "X"},
-        ])
+        path = write_json_tab(
+            tmp_path,
+            [
+                {"_row_num": 2, "action": "add", "type": "rb_services", "title": "A", "rb_servces_cat": "X"},
+            ],
+        )
 
         result = run_sync("--file", str(path), "--sheets", CONTENT_TAB)
 

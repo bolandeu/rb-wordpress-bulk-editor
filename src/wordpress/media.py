@@ -4,7 +4,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 import httpx
 import mimetypes
 from loguru import logger
@@ -99,7 +99,7 @@ class MediaEndpoint:
         file_path: Path,
         title: Optional[str] = None,
         alt_text: Optional[str] = None,
-        caption: Optional[str] = None
+        caption: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Загрузить локальный файл в медиатеку WordPress.
@@ -136,8 +136,7 @@ class MediaEndpoint:
 
             media_id = result["id"]
             logger.info(
-                f"Uploaded media (file only): {file_path.name} -> ID={media_id} "
-                f"URL={result.get('source_url', 'N/A')}"
+                f"Uploaded media (file only): {file_path.name} -> ID={media_id} URL={result.get('source_url', 'N/A')}"
             )
 
             if title or alt_text or caption:
@@ -156,10 +155,7 @@ class MediaEndpoint:
             raise MediaUploadError(f"Ошибка загрузки медиафайла: {e}")
 
     async def upload_from_url(
-        self,
-        url: str,
-        title: Optional[str] = None,
-        alt_text: Optional[str] = None
+        self, url: str, title: Optional[str] = None, alt_text: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Загрузить медиафайл по URL (sideload).
@@ -196,8 +192,7 @@ class MediaEndpoint:
 
             media_id = result["id"]
             logger.info(
-                f"Uploaded media from URL (file only): {url} -> ID={media_id} "
-                f"URL={result.get('source_url', 'N/A')}"
+                f"Uploaded media from URL (file only): {url} -> ID={media_id} URL={result.get('source_url', 'N/A')}"
             )
 
             if title or alt_text:
@@ -233,10 +228,7 @@ class MediaEndpoint:
         return await self.client.get(endpoint)
 
     async def get_all(
-        self,
-        per_page: int = 100,
-        page: int = 1,
-        media_type: Optional[str] = None
+        self, per_page: int = 100, page: int = 1, media_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Получить список всех медиафайлов с пагинацией.
@@ -252,14 +244,14 @@ class MediaEndpoint:
         params = {
             "per_page": per_page,
             "page": page,
-            "status": "inherit"  # Получаем все медиа (включая прикрепленные)
+            "status": "inherit",  # Получаем все медиа (включая прикрепленные)
         }
 
         if media_type:
             params["media_type"] = media_type
 
         logger.debug(f"Fetching media page {page} (per_page={per_page})")
-        return await self.client.get(self.endpoint, params)
+        return cast(List[Dict[str, Any]], await self.client.get(self.endpoint, params))
 
     async def fetch_all_media(self) -> List[Dict[str, Any]]:
         """
@@ -297,8 +289,11 @@ class MediaEndpoint:
             except Exception as e:
                 # Ошибка "превышение страниц" - это нормальная ситуация при пагинации
                 error_msg = str(e)
-                if "превышает количество имеющихся страниц" in error_msg or "exceeds the number of pages" in error_msg.lower():
-                    logger.debug(f"Reached last page at page {page-1} (total {len(all_media)} files)")
+                if (
+                    "превышает количество имеющихся страниц" in error_msg
+                    or "exceeds the number of pages" in error_msg.lower()
+                ):
+                    logger.debug(f"Reached last page at page {page - 1} (total {len(all_media)} files)")
                 else:
                     logger.warning(f"Error fetching media page {page}: {e}")
                 break
@@ -312,7 +307,7 @@ class MediaEndpoint:
         title: Optional[str] = None,
         alt_text: Optional[str] = None,
         caption: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Обновить метаданные медиафайла.
@@ -365,11 +360,7 @@ class MediaEndpoint:
         logger.info(f"Deleted media ID={media_id}")
         return result
 
-    async def download_media(
-        self,
-        media_data: Dict[str, Any],
-        output_folder: Path
-    ) -> Optional[Path]:
+    async def download_media(self, media_data: Dict[str, Any], output_folder: Path) -> Optional[Path]:
         """
         Скачать медиафайл на диск.
 
@@ -447,6 +438,7 @@ class MediaEndpoint:
 
         # Пробуем извлечь из URL
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         path = parsed.path
         extension = Path(path).suffix.lower()

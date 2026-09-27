@@ -30,12 +30,14 @@ def _structurally_valid_records(source: JsonRecordSource) -> List[Record]:
             continue
         taxonomy = raw.get(TAXONOMY_FIELD)
         is_taxonomy = not is_blank(taxonomy)
-        records.append(Record(
-            discriminator=str(taxonomy if is_taxonomy else raw.get(TYPE_FIELD)).strip(),
-            is_taxonomy=is_taxonomy,
-            data={k: v for k, v in raw.items() if k not in SOURCE_META_FIELDS},
-            write_key=_write_key_for(raw, position),
-        ))
+        records.append(
+            Record(
+                discriminator=str(taxonomy if is_taxonomy else raw.get(TYPE_FIELD)).strip(),
+                is_taxonomy=is_taxonomy,
+                data={k: v for k, v in raw.items() if k not in SOURCE_META_FIELDS},
+                write_key=_write_key_for(raw, position),
+            )
+        )
     return records
 
 
@@ -45,7 +47,10 @@ def check_tab(path: Path, tab: str, rules: Optional[FieldRules] = None) -> TabCh
     source = JsonRecordSource(path, tab)
     records = _structurally_valid_records(source)
     result = check_records(
-        tab, records, rules or FieldRules.from_settings(), base_dir=path.parent,
+        tab,
+        records,
+        rules or FieldRules.from_settings(),
+        base_dir=path.parent,
         where=source.where,
     )
     result.records = len(source.raw_records())

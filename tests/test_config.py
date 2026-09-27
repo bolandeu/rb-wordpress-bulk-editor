@@ -11,6 +11,7 @@ from src.constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY
 
 # ── WordPressConfig ─────────────────────────────────────────────────
 
+
 class TestWordPressConfig:
     def test_url_strip_and_trailing_slash(self):
         cfg = WordPressConfig(url="  https://example.com/  ")
@@ -49,6 +50,7 @@ class TestWordPressConfig:
 
 # ── AppConfig ───────────────────────────────────────────────────────
 
+
 class TestAppConfigFromExcel:
     def test_propagates_verify_ssl_from_env(self, monkeypatch, tmp_path):
         """Регрессия: AppConfig.from_excel должен пробрасывать WP_VERIFY_SSL в WordPressConfig."""
@@ -56,12 +58,16 @@ class TestAppConfigFromExcel:
         excel = tmp_path / "f.xlsx"
         excel.touch()
         cfg = AppConfig.from_excel(
-            excel_file=excel, wp_url="https://x.com", wp_username="u", wp_password="p",
+            excel_file=excel,
+            wp_url="https://x.com",
+            wp_username="u",
+            wp_password="p",
         )
         assert cfg.wordpress.verify_ssl is False
 
 
 # ── SyncConfig ──────────────────────────────────────────────────────
+
 
 class TestSyncConfig:
     def test_defaults(self):
@@ -93,6 +99,7 @@ class TestSyncConfig:
 
 # ── LoggingConfig ───────────────────────────────────────────────────
 
+
 class TestLoggingConfig:
     def test_defaults(self):
         cfg = LoggingConfig()
@@ -110,6 +117,7 @@ class TestLoggingConfig:
 
 
 # ── PathsConfig ─────────────────────────────────────────────────────
+
 
 class TestPathsConfig:
     def test_missing_file_raises(self, tmp_path):
@@ -133,6 +141,7 @@ class TestPathsConfig:
 
 
 # ── Settings (переменные окружения WP_*) ─────────────────────────────
+
 
 class TestSettingsParseCsv:
     def test_basic(self):
@@ -174,9 +183,7 @@ class TestSettingsSkipPatterns:
         )
 
     def test_skip_taxonomy_fallback_to_defaults(self):
-        assert Settings(skip_taxonomy_patterns="").get_skip_taxonomy_patterns() == list(
-            DEFAULT_SKIP_TAXONOMY_PATTERNS
-        )
+        assert Settings(skip_taxonomy_patterns="").get_skip_taxonomy_patterns() == list(DEFAULT_SKIP_TAXONOMY_PATTERNS)
 
     def test_override_wins(self):
         s = Settings(skip_post_type_patterns="custom1,custom2")

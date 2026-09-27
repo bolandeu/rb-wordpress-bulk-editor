@@ -45,11 +45,7 @@ class TaxonomySyncBase(BaseSync):
         """Фабричный метод для TaxonomiesEndpoint (можно переопределить в тестах)."""
         return TaxonomiesEndpoint(self.wp_client, taxonomy)
 
-    async def _add_term(
-        self,
-        taxonomy_endpoint: TaxonomiesEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _add_term(self, taxonomy_endpoint: TaxonomiesEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Создать новый термин."""
         # Создаем payload
         payload = self._build_payload(row)
@@ -67,8 +63,7 @@ class TaxonomySyncBase(BaseSync):
                 # Термин с таким slug уже существует - делаем update вместо add
                 term_id = existing_term["id"]
                 logger.warning(
-                    f"Term with slug='{slug}' already exists (ID={term_id}). "
-                    f"Converting action from 'add' to 'update'."
+                    f"Term with slug='{slug}' already exists (ID={term_id}). Converting action from 'add' to 'update'."
                 )
                 result = await taxonomy_endpoint.update(term_id, payload)
                 logger.info(f"Updated existing term ID={term_id} (found by slug='{slug}')")
@@ -79,11 +74,7 @@ class TaxonomySyncBase(BaseSync):
         result = await taxonomy_endpoint.create(payload)
         return result
 
-    async def _update_term(
-        self,
-        taxonomy_endpoint: TaxonomiesEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _update_term(self, taxonomy_endpoint: TaxonomiesEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Обновить существующий термин."""
         term_id = int(row["id"])
 
@@ -102,11 +93,7 @@ class TaxonomySyncBase(BaseSync):
 
         return result
 
-    async def _delete_term(
-        self,
-        taxonomy_endpoint: TaxonomiesEndpoint,
-        row: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+    async def _delete_term(self, taxonomy_endpoint: TaxonomiesEndpoint, row: Mapping[str, Any]) -> Dict[str, Any]:
         """Удалить термин (в корзину)."""
         term_id = int(row["id"])
 
@@ -199,7 +186,7 @@ class TaxonomySyncBase(BaseSync):
 
             # ACF поля - группируем в отдельный объект
             if field_name.startswith(ACF_PREFIX):
-                acf_key = field_name[len(ACF_PREFIX):]  # Убираем префикс acf_
+                acf_key = field_name[len(ACF_PREFIX) :]  # Убираем префикс acf_
                 if not is_missing(value) and str(value).strip() != "":
                     acf_data[acf_key] = str(resolver.resolve(field_name, value)).strip()
                 continue
@@ -215,8 +202,9 @@ class TaxonomySyncBase(BaseSync):
 
         # Добавляем ACF данные если есть (поверх уже разложенных acf.*)
         if acf_data:
-            if isinstance(payload.get("acf"), dict):
-                payload["acf"].update(acf_data)
+            existing_acf = payload.get("acf")
+            if isinstance(existing_acf, dict):
+                existing_acf.update(acf_data)
             else:
                 payload["acf"] = acf_data
             logger.debug(f"ACF fields: {list(acf_data.keys())}")

@@ -61,9 +61,7 @@ def require_json_tabs(path: Path, sheets_filter: Optional[str]) -> List[str]:
     requested = dataset_names(sheets_filter)
     unknown = [tab for tab in requested if tab not in available]
     if unknown:
-        raise ValidationError(
-            f"Таб(ы) не найдены в {path.name}: {', '.join(unknown)}. Доступные: {listed}"
-        )
+        raise ValidationError(f"Таб(ы) не найдены в {path.name}: {', '.join(unknown)}. Доступные: {listed}")
 
     return requested
 

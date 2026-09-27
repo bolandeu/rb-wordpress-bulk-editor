@@ -32,6 +32,7 @@ def _is_tabular(value: Any) -> bool:
     """
     return not (isinstance(value, list) and any(isinstance(item, dict) for item in value))
 
+
 # Поля, которые ResponseMapper добавляет любому типу записи: оставляем их только
 # там, где тип их действительно поддерживает (есть в ответе API).
 OPTIONAL_TAXONOMY_FIELDS = ("categories", "tags")
@@ -59,10 +60,13 @@ def _with_flattened_objects(row: Dict[str, Any], item: Dict[str, Any]) -> Dict[s
     for name in FLATTENED_OBJECTS:
         obj = item.get(name)
         if isinstance(obj, dict):
-            row.update({
-                key: value for key, value in flatten(obj, name).items()
-                if not key.startswith(SKIPPED_PREFIXES) and _is_tabular(value)
-            })
+            row.update(
+                {
+                    key: value
+                    for key, value in flatten(obj, name).items()
+                    if not key.startswith(SKIPPED_PREFIXES) and _is_tabular(value)
+                }
+            )
     return row
 
 

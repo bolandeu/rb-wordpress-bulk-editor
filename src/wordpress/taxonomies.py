@@ -2,7 +2,8 @@
 Работа с таксономиями (categories, tags, custom taxonomies)
 """
 
-from typing import Dict, List, Optional, Any, Sequence, Tuple
+import asyncio
+from typing import Dict, List, Optional, Any, Sequence, Tuple, cast
 from loguru import logger
 
 from .client import WordPressClient
@@ -31,7 +32,7 @@ def normalize_taxonomy_name(taxonomy: str) -> str:
     normalization_map = {
         "category": "categories",
         "tag": "tags",
-        "post_tag": "tags"  # WordPress API использует post_tag, но endpoint - tags
+        "post_tag": "tags",  # WordPress API использует post_tag, но endpoint - tags
     }
 
     return normalization_map.get(taxonomy, taxonomy)
@@ -101,8 +102,7 @@ def parse_term_specs(taxonomy_string: str) -> List[List[str]]:
         names = [part.strip() for part in spec.split(TAXONOMY_HIERARCHY_DELIMITER)]
         if not all(names):
             raise ValidationError(
-                f"Некорректная иерархия термина: '{spec}' "
-                f"(пустой уровень вокруг '{TAXONOMY_HIERARCHY_DELIMITER}')"
+                f"Некорректная иерархия термина: '{spec}' (пустой уровень вокруг '{TAXONOMY_HIERARCHY_DELIMITER}')"
             )
         specs.append(names)
 
@@ -159,23 +159,14 @@ class TaxonomiesEndpoint:
         endpoint = f"{self.endpoint}/{term_id}"
         return await self.client.get(endpoint)
 
-    async def list(
-        self,
-        per_page: int = 100,
-        page: int = 1,
-        **params
-    ) -> List[Dict[str, Any]]:
+    async def list(self, per_page: int = 100, page: int = 1, **params) -> List[Dict[str, Any]]:
         """
         Получить список терминов.
 
         Returns:
             Список терминов
         """
-        query_params = {
-            "per_page": min(per_page, 100),
-            "page": page,
-            **params
-        }
+        query_params = {"per_page": min(per_page, 100), "page": page, **params}
 
         result = await self.client.get(self.endpoint, query_params)
 
@@ -223,7 +214,7 @@ class TaxonomiesEndpoint:
             Термин или None если не найден
         """
         # Поиск по имени через API (для иерархии сужаем выборку по родителю)
-        params = {"search": name}
+        params: Dict[str, Any] = {"search": name}
         if parent is not None:
             params["parent"] = parent
         terms = await self.list(**params)
@@ -261,11 +252,7 @@ class TaxonomiesEndpoint:
         return None
 
     async def get_or_create(
-        self,
-        name: str,
-        parent: Optional[int] = None,
-        dry_run: bool = False,
-        **extra_data
+        self, name: str, parent: Optional[int] = None, dry_run: bool = False, **extra_data
     ) -> Dict[str, Any]:
         """
         Получить термин по имени или создать если не существует.
@@ -300,10 +287,7 @@ class TaxonomiesEndpoint:
         return await self.create(data)
 
     async def resolve_term_spec(
-        self,
-        names: Sequence[str],
-        taxonomy_cache: Optional["TaxonomyCache"] = None,
-        dry_run: bool = False
+        self, names: Sequence[str], taxonomy_cache: Optional["TaxonomyCache"] = None, dry_run: bool = False
     ) -> int:
         """
         Разрешить одну спецификацию термина (возможно, иерархическую) в ID.
@@ -347,9 +331,7 @@ class TaxonomiesEndpoint:
                 # термин тоже будет создан
                 term = {"id": 0, "name": name, "parent": parent or 0}
             elif taxonomy_cache:
-                term = await self.get_or_create_cached(
-                    name, taxonomy_cache, parent=parent, dry_run=dry_run
-                )
+                term = await self.get_or_create_cached(name, taxonomy_cache, parent=parent, dry_run=dry_run)
             else:
                 term = await self.get_or_create(name, parent=parent, dry_run=dry_run)
 
@@ -370,13 +352,10 @@ class TaxonomiesEndpoint:
 
             parent_id = int(term["id"])
 
-        return parent_id
+        return cast(int, parent_id)  # names не пуст: цикл присвоил id хотя бы раз
 
     async def process_taxonomy_string(
-        self,
-        taxonomy_string: str,
-        taxonomy_cache: Optional["TaxonomyCache"] = None,
-        dry_run: bool = False
+        self, taxonomy_string: str, taxonomy_cache: Optional["TaxonomyCache"] = None, dry_run: bool = False
     ) -> Tuple[List[int], Optional[int]]:
         """
         Обработать строку с таксономиями из Excel/JSON.
@@ -437,7 +416,7 @@ class TaxonomiesEndpoint:
         taxonomy_cache: "TaxonomyCache",
         parent: Optional[int] = None,
         dry_run: bool = False,
-        **extra_data
+        **extra_data,
     ) -> Dict[str, Any]:
         """
         Получить термин по имени или создать если не существует.
@@ -490,12 +469,7 @@ class TaxonomiesEndpoint:
             self._cache_term(taxonomy_cache, new_term, parent)
             return new_term
 
-    def _cache_term(
-        self,
-        taxonomy_cache: "TaxonomyCache",
-        term: Dict[str, Any],
-        parent: Optional[int]
-    ) -> None:
+    def _cache_term(self, taxonomy_cache: "TaxonomyCache", term: Dict[str, Any], parent: Optional[int]) -> None:
         """Положить термин в подходящий индекс кэша (плоский или по родителю)."""
         if parent is None:
             taxonomy_cache.add(self.taxonomy, term)
@@ -518,11 +492,10 @@ class TaxonomyCache:
         # Держится отдельно от self.cache, чтобы дочерние термины не перекрывали
         # одноимённые корневые при плоском поиске.
         self.children: Dict[str, Dict[Tuple[int, str], Dict[str, Any]]] = {}
-        self._lock: Optional["asyncio.Lock"] = None
+        self._lock: Optional[asyncio.Lock] = None
 
-    def _get_lock(self) -> "asyncio.Lock":
+    def _get_lock(self) -> asyncio.Lock:
         """Lazy initialization of lock (для поддержки использования вне async контекста)."""
-        import asyncio
         if self._lock is None:
             self._lock = asyncio.Lock()
         return self._lock
@@ -545,16 +518,10 @@ class TaxonomyCache:
 
             # Индексируем по имени (lowercase для быстрого поиска)
             # Сохраняем в кэше под оригинальным именем для обратной совместимости
-            self.cache[taxonomy] = {
-                term["name"].lower(): term
-                for term in terms
-            }
+            self.cache[taxonomy] = {term["name"].lower(): term for term in terms}
 
             # Параллельно индексируем по (parent, имя) — для иерархических спецификаций
-            self.children[taxonomy] = {
-                (int(term.get("parent", 0) or 0), term["name"].lower()): term
-                for term in terms
-            }
+            self.children[taxonomy] = {(int(term.get("parent", 0) or 0), term["name"].lower()): term for term in terms}
 
             logger.info(f"Cached {len(terms)} terms for {taxonomy}")
 
@@ -638,8 +605,5 @@ class TaxonomyCache:
         """
         result = {}
         for taxonomy, terms in self.cache.items():
-            result[taxonomy] = {
-                term_data["id"]: term_data["name"]
-                for term_data in terms.values()
-            }
+            result[taxonomy] = {term_data["id"]: term_data["name"] for term_data in terms.values()}
         return result

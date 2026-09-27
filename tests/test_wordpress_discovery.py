@@ -46,9 +46,15 @@ class TestWordPressDiscovery:
         class SiteWithSystemTaxonomies(FakeClient):
             async def get(self, endpoint, params=None, **kwargs):
                 return {
-                    "category": {}, "post_tag": {}, "rb_services_cat": {},
-                    "nav_menu": {}, "link_category": {}, "post_format": {},
-                    "wp_pattern_category": {}, "wp_theme": {}, "wp_template_part_area": {},
+                    "category": {},
+                    "post_tag": {},
+                    "rb_services_cat": {},
+                    "nav_menu": {},
+                    "link_category": {},
+                    "post_format": {},
+                    "wp_pattern_category": {},
+                    "wp_theme": {},
+                    "wp_template_part_area": {},
                 }
 
         discovery = WordPressDiscovery(SiteWithSystemTaxonomies())

@@ -9,16 +9,32 @@ from src.utils.file_values import FileValueResolver, looks_like_file_ref
 
 
 class TestLooksLikeFileRef:
-    @pytest.mark.parametrize("value", [
-        "content-write/3425.html", "a.htm", "notes.md", "x.TXT", "/abs/path/1.html",
-    ])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "content-write/3425.html",
+            "a.htm",
+            "notes.md",
+            "x.TXT",
+            "/abs/path/1.html",
+        ],
+    )
     def test_file_refs(self, value):
         assert looks_like_file_ref(value)
 
-    @pytest.mark.parametrize("value", [
-        "example.com", "v1.2", "обычный текст", "https://site.ru/page.html",
-        "<p>a</p>\n<p>b.html</p>", "", None, 42,
-    ])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "example.com",
+            "v1.2",
+            "обычный текст",
+            "https://site.ru/page.html",
+            "<p>a</p>\n<p>b.html</p>",
+            "",
+            None,
+            42,
+        ],
+    )
     def test_not_file_refs(self, value):
         assert not looks_like_file_ref(value)
 

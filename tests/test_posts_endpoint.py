@@ -24,13 +24,15 @@ class FakeClient:
 
 class TestPostsEndpoint:
     async def test_get_all_any_fetches_rest_compatible_statuses(self):
-        client = FakeClient({
-            ("publish", 1): [{"id": 1, "status": "publish"}],
-            ("draft", 1): [{"id": 2, "status": "draft"}],
-            ("pending", 1): [],
-            ("private", 1): [{"id": 3, "status": "private"}],
-            ("future", 1): [],
-        })
+        client = FakeClient(
+            {
+                ("publish", 1): [{"id": 1, "status": "publish"}],
+                ("draft", 1): [{"id": 2, "status": "draft"}],
+                ("pending", 1): [],
+                ("private", 1): [{"id": 3, "status": "private"}],
+                ("future", 1): [],
+            }
+        )
         endpoint = PostsEndpoint(client, "posts")
 
         result = await endpoint.get_all(status="any")
@@ -42,10 +44,12 @@ class TestPostsEndpoint:
         assert all(params.get("context") is None for _, params in client.calls)
 
     async def test_get_all_retries_status_with_edit_context_when_needed(self):
-        client = FakeClient({
-            ("publish", None, 1): WordPressError("WordPress API error (400): Неверный параметр: status"),
-            ("publish", "edit", 1): [{"id": 1, "status": "publish"}],
-        })
+        client = FakeClient(
+            {
+                ("publish", None, 1): WordPressError("WordPress API error (400): Неверный параметр: status"),
+                ("publish", "edit", 1): [{"id": 1, "status": "publish"}],
+            }
+        )
         endpoint = PostsEndpoint(client, "rb_review")
 
         result = await endpoint.get_all(status="publish")

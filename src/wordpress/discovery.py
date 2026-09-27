@@ -2,7 +2,7 @@
 Обнаружение типов контента, таксономий и ACF полей через WordPress REST API
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from loguru import logger
 
 from .client import WordPressClient
@@ -50,9 +50,8 @@ class WordPressDiscovery:
                 original_type_key = type_key
 
                 # Пропускаем служебные типы по паттернам, кроме режима явного выбора.
-                should_skip = (
-                    not include_skipped
-                    and any(pattern in type_key for pattern in self.skip_post_type_patterns)
+                should_skip = not include_skipped and any(
+                    pattern in type_key for pattern in self.skip_post_type_patterns
                 )
 
                 if should_skip:
@@ -65,7 +64,9 @@ class WordPressDiscovery:
                         type_key = "pages"
 
                     post_types.append(type_key)
-                    if include_skipped and any(pattern in original_type_key for pattern in self.skip_post_type_patterns):
+                    if include_skipped and any(
+                        pattern in original_type_key for pattern in self.skip_post_type_patterns
+                    ):
                         logger.debug(f"Найден тип записи: {type_key} - {type_data.get('name', 'N/A')} (явно выбран)")
                     else:
                         logger.debug(f"Найден тип записи: {type_key} - {type_data.get('name', 'N/A')}")
@@ -95,10 +96,7 @@ class WordPressDiscovery:
             taxonomies = []
             for tax_key, tax_data in response.items():
                 # Пропускаем служебные таксономии по паттернам, кроме режима явного выбора.
-                should_skip = (
-                    not include_skipped
-                    and any(pattern in tax_key for pattern in self.skip_taxonomy_patterns)
-                )
+                should_skip = not include_skipped and any(pattern in tax_key for pattern in self.skip_taxonomy_patterns)
 
                 if should_skip:
                     logger.debug(f"Пропускаем таксономию: {tax_key} (служебная таксономия)")
@@ -136,7 +134,7 @@ class WordPressDiscovery:
         try:
             # Получаем один пост для анализа структуры ACF полей
             endpoint = PostsEndpoint(self.client, post_type)
-            posts = await endpoint.get_all(per_page=1)
+            posts = await endpoint.list(per_page=1)
 
             if not posts:
                 logger.debug(f"Нет постов типа '{post_type}', ACF поля не обнаружены")
@@ -178,7 +176,7 @@ class WordPressDiscovery:
 
             # Получаем один терм для анализа структуры ACF полей
             endpoint = TaxonomiesEndpoint(self.client, normalized_taxonomy)
-            terms = await endpoint.get_all(per_page=1)
+            terms = await endpoint.list(per_page=1)
 
             if not terms:
                 logger.debug(f"Нет терминов таксономии '{taxonomy}', ACF поля не обнаружены")
@@ -190,7 +188,9 @@ class WordPressDiscovery:
 
             if isinstance(acf_data, dict) and acf_data:
                 acf_fields = list(acf_data.keys())
-                logger.info(f"Обнаружено {len(acf_fields)} ACF полей для таксономии '{taxonomy}': {', '.join(acf_fields)}")
+                logger.info(
+                    f"Обнаружено {len(acf_fields)} ACF полей для таксономии '{taxonomy}': {', '.join(acf_fields)}"
+                )
                 return acf_fields
             else:
                 logger.debug(f"ACF поля не найдены для таксономии '{taxonomy}'")
@@ -234,7 +234,10 @@ class WordPressDiscovery:
             custom_taxonomies = [tax for tax in all_taxonomies if tax not in standard_taxonomies]
 
             if custom_taxonomies:
-                logger.info(f"Обнаружено {len(custom_taxonomies)} кастомных таксономий для '{post_type}': {', '.join(custom_taxonomies)}")
+                logger.info(
+                    f"Обнаружено {len(custom_taxonomies)} кастомных таксономий для '{post_type}': "
+                    f"{', '.join(custom_taxonomies)}"
+                )
             else:
                 logger.debug(f"Кастомные таксономии не найдены для типа '{post_type}'")
 
@@ -280,8 +283,19 @@ class WordPressDiscovery:
                     all_fields.add(key)
 
         # Убираем служебные поля API
-        skip_fields = {"_links", "guid", "author", "comment_status", "ping_status",
-                      "sticky", "template", "format", "meta", "menu_order", "acf"}
+        skip_fields = {
+            "_links",
+            "guid",
+            "author",
+            "comment_status",
+            "ping_status",
+            "sticky",
+            "template",
+            "format",
+            "meta",
+            "menu_order",
+            "acf",
+        }
         all_fields -= skip_fields
 
         # Определяем обязательные поля

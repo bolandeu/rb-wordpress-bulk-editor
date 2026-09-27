@@ -3,15 +3,17 @@
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 import typer
 
 from .project import ProjectContext
 
+
 # Импорт откладываем до вызова функций, чтобы избежать циклических импортов
 def _console():
     from . import console
+
     return console
 
 
@@ -24,7 +26,7 @@ def _note(ctx: typer.Context, message: str):
         output.human.err_console.print(f"[dim]{message}[/dim]")
 
 
-def _fail(ctx: typer.Context, message: str):
+def _fail(ctx: typer.Context, message: str) -> NoReturn:
     """Ошибка аргументов: конверт (human или --json) и exit 2."""
     from .. import output
     from ..exceptions import ValidationError
@@ -74,13 +76,13 @@ def _require_file(ctx: typer.Context, explicit: Optional[Path], finder, label: s
         if explicit.exists():
             return explicit.resolve()
         # Пробуем относительно проекта
-        if proj.active:
+        if proj.active and proj.root is not None:
             project_path = proj.root / explicit
             if project_path.exists():
                 _note(ctx, f"{label}: {project_path.name} (из проекта {proj.name})")
                 return project_path
         # Файл не найден
-        checked = f" Проверены пути: {explicit}, {proj.root / explicit}." if proj.active else ""
+        checked = f" Проверены пути: {explicit}, {proj.root / explicit}." if proj.root is not None else ""
         _fail(ctx, f"Файл не найден: {explicit}.{checked}")
 
     # Авто-поиск в проекте

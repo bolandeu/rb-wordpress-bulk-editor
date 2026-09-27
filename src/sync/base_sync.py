@@ -62,14 +62,7 @@ class BaseSync(ABC):
             - skipped: количество пропущенных записей
             - total: общее количество обработанных строк
         """
-        return {
-            "added": 0,
-            "updated": 0,
-            "deleted": 0,
-            "errors": 0,
-            "skipped": 0,
-            "total": 0
-        }
+        return {"added": 0, "updated": 0, "deleted": 0, "errors": 0, "skipped": 0, "total": 0}
 
     @staticmethod
     async def _tracked(task: Awaitable[Any], record: Record, action: str, progress: Optional[Any]) -> Any:

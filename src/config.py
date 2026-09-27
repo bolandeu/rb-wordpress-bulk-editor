@@ -24,6 +24,7 @@ from .constants import (
 
 class WordPressConfig(BaseModel):
     """Конфигурация WordPress API"""
+
     url: str = Field(..., description="URL сайта WordPress")
     username: Optional[str] = Field(default=None, description="Имя пользователя (опционально)")
     password: Optional[str] = Field(default=None, description="Application Password (опционально)")
@@ -65,87 +66,36 @@ class WordPressConfig(BaseModel):
 
 class SyncConfig(BaseModel):
     """Конфигурация синхронизации"""
-    batch_size: int = Field(
-        default=DEFAULT_BATCH_SIZE,
-        ge=1,
-        le=100,
-        description="Размер батча для обработки"
-    )
-    max_retries: int = Field(
-        default=DEFAULT_MAX_RETRIES,
-        ge=0,
-        le=10,
-        description="Максимум повторных попыток"
-    )
-    timeout: int = Field(
-        default=DEFAULT_TIMEOUT,
-        ge=5,
-        le=300,
-        description="Таймаут HTTP запроса (секунды)"
-    )
-    concurrency: int = Field(
-        default=DEFAULT_CONCURRENCY,
-        ge=1,
-        le=20,
-        description="Количество параллельных запросов"
-    )
-    dry_run: bool = Field(
-        default=False,
-        description="Режим dry-run (без изменений)"
-    )
-    skip_media: bool = Field(
-        default=False,
-        description="Пропустить загрузку медиа"
-    )
-    skip_tax: bool = Field(
-        default=False,
-        description="Пропустить обновление таксономий (категории, теги и т.д.)"
-    )
-    update_excel: bool = Field(
-        default=True,
-        description="Записывать ID обратно в Excel"
-    )
-    delete_featured_media: bool = Field(
-        default=False,
-        description="Удалять featured media при удалении записи"
-    )
+
+    batch_size: int = Field(default=DEFAULT_BATCH_SIZE, ge=1, le=100, description="Размер батча для обработки")
+    max_retries: int = Field(default=DEFAULT_MAX_RETRIES, ge=0, le=10, description="Максимум повторных попыток")
+    timeout: int = Field(default=DEFAULT_TIMEOUT, ge=5, le=300, description="Таймаут HTTP запроса (секунды)")
+    concurrency: int = Field(default=DEFAULT_CONCURRENCY, ge=1, le=20, description="Количество параллельных запросов")
+    dry_run: bool = Field(default=False, description="Режим dry-run (без изменений)")
+    skip_media: bool = Field(default=False, description="Пропустить загрузку медиа")
+    skip_tax: bool = Field(default=False, description="Пропустить обновление таксономий (категории, теги и т.д.)")
+    update_excel: bool = Field(default=True, description="Записывать ID обратно в Excel")
+    delete_featured_media: bool = Field(default=False, description="Удалять featured media при удалении записи")
     skip_existing_media: bool = Field(
-        default=False,
-        description="Не прикреплять существующие featured_media при update (когда img_path пустой)"
+        default=False, description="Не прикреплять существующие featured_media при update (когда img_path пустой)"
     )
     columns_filter: Optional[List[str]] = Field(
-        default=None,
-        description="Фильтр колонок для отправки в API (None = все)"
+        default=None, description="Фильтр колонок для отправки в API (None = все)"
     )
-    skip_checks: bool = Field(
-        default=False,
-        description="Не проверять данные перед отправкой (preflight)"
-    )
+    skip_checks: bool = Field(default=False, description="Не проверять данные перед отправкой (preflight)")
     site_taxonomies: List[str] = Field(
-        default_factory=list,
-        description="Таксономии сайта (slug и REST-имена) — заполняет прогон после подключения"
+        default_factory=list, description="Таксономии сайта (slug и REST-имена) — заполняет прогон после подключения"
     )
 
 
 class PathsConfig(BaseModel):
     """Конфигурация путей"""
+
     excel_file: Path = Field(..., description="Путь к файлу данных (.xlsx или .json)")
-    media_folder: Path = Field(
-        default=Path("data/media"),
-        description="Папка с медиафайлами"
-    )
-    content_folder: Path = Field(
-        default=Path("data/content"),
-        description="Папка с файлами контента"
-    )
-    logs_folder: Path = Field(
-        default=Path("logs"),
-        description="Папка для логов"
-    )
-    project_root: Optional[Path] = Field(
-        default=None,
-        description="Корень проекта (при использовании --project)"
-    )
+    media_folder: Path = Field(default=Path("data/media"), description="Папка с медиафайлами")
+    content_folder: Path = Field(default=Path("data/content"), description="Папка с файлами контента")
+    logs_folder: Path = Field(default=Path("logs"), description="Папка для логов")
+    project_root: Optional[Path] = Field(default=None, description="Корень проекта (при использовании --project)")
 
     @field_validator("excel_file")
     @classmethod
@@ -166,22 +116,15 @@ class PathsConfig(BaseModel):
 
 class LoggingConfig(BaseModel):
     """Конфигурация логирования"""
-    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="INFO",
-        description="Уровень логирования"
-    )
-    rotation: str = Field(
-        default="10 MB",
-        description="Ротация лог-файлов"
-    )
-    retention: str = Field(
-        default="30 days",
-        description="Хранение логов"
-    )
+
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO", description="Уровень логирования")
+    rotation: str = Field(default="10 MB", description="Ротация лог-файлов")
+    retention: str = Field(default="30 days", description="Хранение логов")
 
 
 class AppConfig(BaseModel):
     """Основная конфигурация приложения"""
+
     wordpress: WordPressConfig
     sync: SyncConfig = Field(default_factory=SyncConfig)
     paths: PathsConfig
@@ -195,7 +138,7 @@ class AppConfig(BaseModel):
         wp_username: str,
         wp_password: str,
         project_root: Optional[Path] = None,
-        **kwargs
+        **kwargs,
     ) -> "AppConfig":
         """Создать конфигурацию из данных Excel"""
         paths_kwargs = {"excel_file": excel_file}
@@ -212,18 +155,19 @@ class AppConfig(BaseModel):
                 password=wp_password,
             ),
             paths=PathsConfig(**paths_kwargs),
-            **kwargs
+            **kwargs,
         )
 
 
 class Settings(BaseSettings):
     """Настройки из переменных окружения (опционально)"""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="WP_",
         case_sensitive=False,
-        extra="ignore"  # Игнорировать дополнительные переменные из .env
+        extra="ignore",  # Игнорировать дополнительные переменные из .env
     )
 
     domain: Optional[str] = None
