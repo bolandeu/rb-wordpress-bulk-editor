@@ -4,18 +4,22 @@
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
 import asyncio
 
-import pandas as pd
 from loguru import logger
 
 from . import app, console
 from .. import output
-from ..output import log_stream
-from .common import handle_command_errors, load_and_print_credentials, parse_comma_list, setup_command_logging
-from .helpers import get_project, resolve_env_file, resolve_logs_folder, require_excel_file
-from ..config import LoggingConfig, WordPressConfig, Settings
+from .common import (
+    confirm_tab_rebuild,
+    load_and_print_credentials,
+    parse_comma_list,
+    refuse_project_registry,
+    setup_command_logging,
+    site_host,
+)
+from .helpers import get_project, resolve_env_file, require_excel_file
+from ..config import WordPressConfig, Settings
 from ..constants import is_taxonomy_column
 from ..utils.wp_helpers import wp_rendered
 from ..excel.reader import ExcelReader
@@ -24,39 +28,12 @@ from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.taxonomies import TaxonomiesEndpoint, normalize_taxonomy_name
 from ..mappers.response_mapper import ResponseMapper
-from ..utils.logger import setup_logger
 from ..exceptions import NotFoundError, ValidationError
 from ..records.json_fetch import build_site_tab
-from ..records.json_source import read_tab_if_exists, write_tab
+from ..records.store import open_store
 from ..records.selection import is_json_source
 
 import typer
-
-
-def _site_host(domain: str) -> str:
-    """`https://site.ru:8443/wp` → `site.ru` (имя таба и файла по умолчанию)."""
-    raw = domain.strip()
-    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
-    return parsed.hostname or raw
-
-
-def _refuse_project_registry(proj, file: Path) -> None:
-    """
-    Не писать выгрузку в реестр проекта `<project>/<project>.json`.
-
-    Реестр antagor пересобирается из Google-таблицы: записи, которых нет
-    в таблице, при следующей пересборке молча исчезают. Выгрузка с сайта
-    должна жить в отдельном файле (по умолчанию `wp-fetch/<домен>.json`).
-    """
-    if not (proj.active and proj.root and proj.name):
-        return
-    registry = (proj.root / f"{proj.name}.json").resolve()
-    if Path(file).resolve() == registry:
-        raise ValidationError(
-            f"fetch не пишет в реестр проекта {registry.name}: его пересобирают из "
-            "Google-таблицы, и снятые с сайта записи при пересборке пропадут. "
-            "Укажите другой --file (по умолчанию — wp-fetch/<домен>.json).",
-        )
 
 
 @app.command()
@@ -233,7 +210,7 @@ def _fetch_to_json(
 ) -> None:
     """fetch в JSON: один таб на сайт, таб пересобирается целиком."""
     if file is not None:
-        _refuse_project_registry(proj, file)
+        refuse_project_registry(proj, file)
 
     domain, username, password = load_and_print_credentials(
         env_file=env_file,
@@ -242,21 +219,16 @@ def _fetch_to_json(
         password=password,
         ctx=ctx,
     )
-    host = _site_host(domain)
+    host = site_host(domain)
     if file is None:
         file = (proj.root if proj.active else Path.cwd()) / "wp-fetch" / f"{host}.json"
-        _refuse_project_registry(proj, file)
+        refuse_project_registry(proj, file)
     tab_name = tab or host
 
     # До обращения к сайту: файл должен быть JSON-файлом данных, а пересборка
     # непустого таба — подтверждена (локальные правки в нём пропадут).
-    existing = read_tab_if_exists(file, tab_name)
-    if existing:
-        output.require_confirmation(
-            ctx,
-            f"Таб '{tab_name}' в {file} уже содержит {len(existing)} записей и будет пересобран с нуля. Продолжить?",
-            confirm,
-        )
+    store = open_store(file, project=proj.name if proj.active else None)
+    confirm_tab_rebuild(ctx, store, tab_name, confirm)
 
     log_file = setup_command_logging(ctx, "fetch")
     wp_config = WordPressConfig.from_credentials(domain, username, password)
@@ -269,7 +241,7 @@ def _fetch_to_json(
             exclude,
         )
     )
-    write_tab(file, tab_name, records, project=proj.name if proj.active else None)
+    store.write_tab(tab_name, records)
 
     by_type: Dict[Optional[str], int] = {}
     for record in records:
@@ -571,14 +543,19 @@ async def fetch_and_append(
         logger.info("Excel файл сохранен")
 
 
+# Таб списка медиафайлов: лист `media` в Excel, ключ `media` в JSON
+MEDIA_TAB = "media"
+
+
 @app.command()
+@output.guard
 def fetch_media(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
         None,
         "--file",
         "-f",
-        help="Путь к Excel файлу (авто-определяется из --project)",
+        help="Файл выгрузки: .json или .xlsx (по умолчанию — xlsx из --project)",
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -589,92 +566,97 @@ def fetch_media(
         dir_okay=False,
         resolve_path=True,
     ),
+    confirm: bool = output.ConfirmOption,
+    non_interactive: bool = output.NonInteractiveOption,
+    json_output: bool = output.JsonOption,
+    quiet: bool = output.QuietOption,
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Подробные логи"),
 ):
     """
-    Загрузить список медиафайлов из WordPress в Excel (лист media)
+    Выгрузить список медиафайлов WordPress в таб media файла данных.
 
-    Example: wp-bulk fetch-media --file media.xlsx
+    Формат выбирается по расширению --file: JSON (таб "media" рядом с
+    остальными табами файла) или Excel (лист media). Таб пересобирается
+    целиком, остальные табы не трогаются; непустой таб перезаписывается
+    только после подтверждения. В реестр проекта <проект>/<проект>.json
+    не пишет.
+
+    Поля записи: action (skip), img_path, id, date, modified, title, slug,
+    link, status, guid, caption, alt_text, media_type, mime_type, post,
+    source_url, description.
+
+    Exit-коды: 0 — успех, 1 — отказ в подтверждении, 2 — аргументы/файл,
+    3 — нет credentials, 5 — недоступен WordPress.
+
+    Example: {cli} fetch-media --file wp-fetch/site.ru.json --json
     """
     env_file = resolve_env_file(ctx, env_file)
-    file = require_excel_file(ctx, file)
+    proj = get_project(ctx)
+    if file is None:
+        file = require_excel_file(ctx, file)
+    refuse_project_registry(proj, file)
 
-    console.print("\n[bold blue]WordPress Bulk Editor - Fetch Media[/bold blue]\n")
-    console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
+    store = open_store(file, project=proj.name if proj.active else None)
+    confirm_tab_rebuild(ctx, store, MEDIA_TAB, confirm)
 
-    with handle_command_errors(ctx):
-        domain, username, password = load_and_print_credentials(
-            env_file=env_file,
+    domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
+    log_file = setup_command_logging(ctx, "fetch_media")
+    wp_config = WordPressConfig.from_credentials(domain, username, password)
+
+    records = asyncio.run(_fetch_media_records(wp_config))
+    store.write_tab(MEDIA_TAB, records)
+
+    def _render(payload: dict):
+        console.print(
+            f"\n[bold green]SUCCESS![/bold green] {payload['records']} медиафайлов → "
+            f"{payload['file']} (таб '{payload['tab']}')\n"
         )
 
-        wp_config = WordPressConfig.from_credentials(domain, username, password)
-
-        logging_config = LoggingConfig(level="DEBUG" if verbose else "INFO")
-
-        logs_folder = resolve_logs_folder(ctx)
-        logs_folder.mkdir(parents=True, exist_ok=True)
-        log_file = setup_logger(
-            logs_folder=logs_folder,
-            config=logging_config,
-            command_name="fetch_media",
-            console_stream=log_stream(ctx),
-        )
-
-        asyncio.run(run_fetch_media(wp_config, file))
-
-        console.print("\n[bold green]SUCCESS! Медиафайлы загружены в лист 'media'![/bold green]")
-        console.print(f"Лог-файл: [cyan]{log_file}[/cyan]\n")
+    output.emit_success(
+        ctx,
+        {
+            "file": str(file),
+            "format": store.format,
+            "tab": MEDIA_TAB,
+            "records": len(records),
+            "log_file": str(log_file),
+        },
+        _render,
+    )
 
 
-async def run_fetch_media(wp_config: WordPressConfig, excel_file: Path):
-    """
-    Основная логика fetch media.
-    """
+async def _fetch_media_records(wp_config: WordPressConfig) -> List[Dict[str, Any]]:
+    """Все медиафайлы сайта записями таба media (action=skip — ничего не менять при sync)."""
     from ..wordpress.media import MediaEndpoint
 
     async with WordPressClient(wp_config) as client:
-        media_endpoint = MediaEndpoint(client)
+        all_media = await MediaEndpoint(client).fetch_all_media()
 
-        logger.info("Fetching media from WordPress...")
-        all_media = await media_endpoint.fetch_all_media()
+    logger.info(f"Получено медиафайлов: {len(all_media)}")
+    return _media_records(all_media)
 
-        if not all_media:
-            logger.info("No media files found")
-            console.print("[yellow]Медиафайлы не найдены[/yellow]")
-            return
 
-        media_rows = []
-        for media in all_media:
-            media_rows.append(
-                {
-                    "action": "skip",
-                    "img_path": "",
-                    "id": media.get("id", ""),
-                    "date": media.get("date", ""),
-                    "modified": media.get("modified", ""),
-                    "title": wp_rendered(media.get("title", {})),
-                    "type": media.get("type", ""),
-                    "slug": media.get("slug", ""),
-                    "link": media.get("link", ""),
-                    "status": media.get("status", ""),
-                    "guid": wp_rendered(media.get("guid", {})),
-                    "caption": wp_rendered(media.get("caption", {})),
-                    "alt_text": media.get("alt_text", ""),
-                    "media_type": media.get("media_type", ""),
-                    "mime_type": media.get("mime_type", ""),
-                    "post": media.get("post", ""),
-                    "source_url": media.get("source_url", ""),
-                    "description": wp_rendered(media.get("description", {})),
-                }
-            )
-
-        df = pd.DataFrame(media_rows)
-
-        logger.info(f"Writing {len(df)} media records to Excel...")
-        mode = "a" if excel_file.exists() else "w"
-        kwargs = {"if_sheet_exists": "replace"} if mode == "a" else {}
-        with pd.ExcelWriter(excel_file, engine="openpyxl", mode=mode, **kwargs) as writer:
-            df.to_excel(writer, sheet_name="media", index=False)
-
-        logger.info(f"Successfully written {len(df)} media records to sheet 'media'")
-        console.print(f"[green]Загружено:[/green] {len(df)} медиафайлов")
+def _media_records(all_media: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Ответ /wp/v2/media → записи таба. `type` (всегда attachment) не пишется: в JSON это дискриминатор контента."""
+    return [
+        {
+            "action": "skip",
+            "img_path": "",
+            "id": media.get("id", ""),
+            "date": media.get("date", ""),
+            "modified": media.get("modified", ""),
+            "title": wp_rendered(media.get("title", {})),
+            "slug": media.get("slug", ""),
+            "link": media.get("link", ""),
+            "status": media.get("status", ""),
+            "guid": wp_rendered(media.get("guid", {})),
+            "caption": wp_rendered(media.get("caption", {})),
+            "alt_text": media.get("alt_text", ""),
+            "media_type": media.get("media_type", ""),
+            "mime_type": media.get("mime_type", ""),
+            "post": media.get("post", ""),
+            "source_url": media.get("source_url", ""),
+            "description": wp_rendered(media.get("description", {})),
+        }
+        for media in all_media
+    ]

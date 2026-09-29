@@ -5,6 +5,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, List
+from urllib.parse import urlparse
 
 import typer
 from loguru import logger
@@ -12,7 +13,7 @@ from loguru import logger
 from .helpers import resolve_logs_folder
 from .. import output
 from ..config import LoggingConfig
-from ..exceptions import CliError, WPBulkEditorError
+from ..exceptions import CliError, ValidationError, WPBulkEditorError
 from ..utils.logger import setup_logger
 
 
@@ -99,3 +100,40 @@ def parse_comma_list(value: Optional[str]) -> Optional[List[str]]:
     if not value:
         return None
     return [s.strip() for s in value.split(",") if s.strip()]
+
+
+def site_host(domain: str) -> str:
+    """`https://site.ru:8443/wp` → `site.ru` (имя таба и файла выгрузки по умолчанию)."""
+    raw = domain.strip()
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    return parsed.hostname or raw
+
+
+def refuse_project_registry(proj, file: Path) -> None:
+    """
+    Не писать выгрузку с сайта в реестр проекта `<project>/<project>.json`.
+
+    Реестр antagor пересобирается из Google-таблицы: записи, которых нет
+    в таблице, при следующей пересборке молча исчезают. Выгрузка с сайта
+    должна жить в отдельном файле (по умолчанию `wp-fetch/<домен>.json`).
+    """
+    if not (proj.active and proj.root and proj.name):
+        return
+    registry = (proj.root / f"{proj.name}.json").resolve()
+    if Path(file).resolve() == registry:
+        raise ValidationError(
+            f"Выгрузка с сайта не пишется в реестр проекта {registry.name}: его пересобирают из "
+            "Google-таблицы, и снятые с сайта записи при пересборке пропадут. "
+            "Укажите другой --file (по умолчанию — wp-fetch/<домен>.json).",
+        )
+
+
+def confirm_tab_rebuild(ctx: typer.Context, store, tab: str, confirm: bool) -> None:
+    """Непустой таб пересобирается с нуля только после подтверждения: локальные правки в нём пропадут."""
+    existing = store.read_tab(tab)
+    if existing:
+        output.require_confirmation(
+            ctx,
+            f"Таб '{tab}' в {store.path} уже содержит {len(existing)} записей и будет пересобран с нуля. Продолжить?",
+            confirm,
+        )

@@ -1,14 +1,32 @@
 
  Usage: wp-bulk fetch-media [OPTIONS]
 
- Загрузить список медиафайлов из WordPress в Excel (лист media)
+ Выгрузить список медиафайлов WordPress в таб media файла данных.
 
- Example: wp-bulk fetch-media --file media.xlsx
+ Формат выбирается по расширению --file: JSON (таб "media" рядом с
+ остальными табами файла) или Excel (лист media). Таб пересобирается
+ целиком, остальные табы не трогаются; непустой таб перезаписывается
+ только после подтверждения. В реестр проекта <проект>/<проект>.json
+ не пишет.
+
+ Поля записи: action (skip), img_path, id, date, modified, title, slug,
+ link, status, guid, caption, alt_text, media_type, mime_type, post,
+ source_url, description.
+
+ Exit-коды: 0 — успех, 1 — отказ в подтверждении, 2 — аргументы/файл,
+ 3 — нет credentials, 5 — недоступен WordPress.
+
+ Example: wp-bulk fetch-media --file wp-fetch/site.ru.json --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --file      -f      PATH  Путь к Excel файлу (авто-определяется из --project)                    │
-│ --env-file          FILE  Путь к .env файлу (по умолчанию .env)                                  │
-│ --verbose   -v            Подробные логи                                                         │
-│ --help                    Show this message and exit.                                            │
+│ --file             -f      PATH  Файл выгрузки: .json или .xlsx (по умолчанию — xlsx из          │
+│                                  --project)                                                      │
+│ --env-file                 FILE  Путь к .env файлу (по умолчанию .env)                           │
+│ --confirm                        Подтвердить опасную операцию без вопроса.                       │
+│ --non-interactive                Никогда не спрашивать; вместо вопроса — ошибка.                 │
+│ --json                           Машиночитаемый JSON-вывод.                                      │
+│ --quiet                          Только существенный вывод.                                      │
+│ --verbose          -v            Подробные логи                                                  │
+│ --help                           Show this message and exit.                                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

@@ -43,7 +43,8 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 а не в зависший prompt. Гейт вызывается **после** проверки `--dry-run`, не до.
 
 Что гейтится сейчас: `bulk-delete`; `options` (запись настроек на сайт и
-перезапись xlsx); `fetch` (перезапись существующего xlsx); `sync`/`async` —
+пересборка непустого таба `options`); `fetch-media` (пересборка непустого таба
+`media`); `fetch` (перезапись существующего xlsx / непустого JSON-таба); `sync`/`async` —
 только необратимые пути (`media`-строки с `action=delete` и `--delete-media`:
 там `force=True`, мимо корзины), см. `_confirm_irreversible` в `sync_commands.py`.
 `--delete-media` **не зависит от источника** (featured-изображения удаляются у
@@ -186,10 +187,28 @@ json в корне проекта, внутри формата приорите�
 в папке проекта (service-account Google и т.п.) не становится ни «данными», ни
 поводом объявить форматы неоднозначными.
 
-**Оба формата:** `sync`, `async`, `update`, `validate`, `fetch`.
-**Только Excel** (JSON-эквивалента нет): `fetch-media`, `options`,
-`reshape`, `llm`, `export*`, `vlook`. Медиа-лист
-(`media`) — тоже Excel-специфичная вещь: в JSON-табе типа `media` нет.
+**JSON — транспортный формат, Excel — интерфейс человека.** Новая команда,
+читающая или пишущая данные сайта, умеет JSON сразу.
+
+**Оба формата:** `sync`, `async`, `update`, `validate`, `fetch`, `options`
+(таб `options`, записи `{key, value}`, прочие поля вроде `label` игнорируются),
+`fetch-media` (таб `media`).
+**Только Excel** (JSON-эквивалента пока нет): `reshape`, `llm`, `export*`, `vlook`;
+синхронизация строк `media` (`MediaSync`) — тоже только из листа Excel.
+
+**Хранилище табов — `src/records/store.py`.** Таб = имя + список записей-словарей;
+`open_store(path)` — единственное место, где по расширению выбирается носитель
+(`JsonTabStore`, `ExcelTabStore`). Новый носитель (БД и т.п.) — новый адаптер в
+`_ADAPTERS`, команды не меняются. `write_tab` заменяет таб целиком, остальные
+не трогает; `_row_num` — забота JSON-адаптера (нумерует с 2), в Excel колонкой
+не пишется. На хранилище сейчас: `options`, `fetch-media`, JSON-ветка `fetch`.
+`sync`/`update`/`validate` и Excel-ветка `fetch` пока идут через свои
+`RecordSource`/`ExcelWriter` — переводить на хранилище, не заводя третий путь.
+Запись таба в записи на `media` не содержит `type` (всегда `attachment`): в JSON
+это дискриминатор контента.
+
+Выгрузка с сайта (`fetch`, `options --fetch`, `fetch-media`) не пишет в реестр
+проекта `<проект>/<проект>.json` — `common.refuse_project_registry`.
 
 Выбор источника и табов (`is_json_source`, `require_json_tabs`) — общий модуль
 `src/records/selection.py`; своих проверок `--sheets` в командах не заводить.

@@ -10,7 +10,13 @@ import pandas as pd
 from loguru import logger
 
 from . import app, console
-from .common import handle_command_errors, load_and_print_credentials, setup_command_logging
+from .common import (
+    confirm_tab_rebuild,
+    handle_command_errors,
+    load_and_print_credentials,
+    refuse_project_registry,
+    setup_command_logging,
+)
 from .helpers import (
     get_project,
     require_data_file,
@@ -28,7 +34,9 @@ from ..excel.reader import ExcelReader
 from ..records.excel import ExcelRecordSource
 from ..records.json_validation import check_tab
 from ..records.preflight import FieldRules, check_sources, raise_if_errors
+from ..records.base import is_blank
 from ..records.selection import dataset_names, is_json_source, require_json_tabs
+from ..records.store import open_store
 from ..wordpress.client import WordPressClient
 from ..wordpress.posts import PostsEndpoint
 from ..wordpress.options import OptionsEndpoint
@@ -183,12 +191,23 @@ def _render_checks(tabs: List[dict]) -> None:
     console.print("\n[bold green]SUCCESS! File is valid![/bold green]\n")
 
 
+# Таб настроек сайта (плагин siteoptions): записи {key, value}
+OPTIONS_TAB = "options"
+
+
 @app.command()
 @output.guard
 def options(
     ctx: typer.Context,
     file: Optional[Path] = typer.Option(
-        None, "--file", "-f", help="Путь к Excel файлу", exists=False, file_okay=True, dir_okay=False, resolve_path=True
+        None,
+        "--file",
+        "-f",
+        help="Файл данных .json или .xlsx (таб/лист options)",
+        exists=False,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
     ),
     env_file: Optional[Path] = typer.Option(
         None,
@@ -199,7 +218,7 @@ def options(
         dir_okay=False,
         resolve_path=True,
     ),
-    fetch: bool = typer.Option(False, "--fetch", help="Получить настройки из WordPress в Excel (вместо загрузки)"),
+    fetch: bool = typer.Option(False, "--fetch", help="Выгрузить настройки с сайта в файл (вместо отправки)"),
     dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Показать что будет отправлено, без отправки"),
     confirm: bool = output.ConfirmOption,
     non_interactive: bool = output.NonInteractiveOption,
@@ -207,12 +226,19 @@ def options(
     quiet: bool = output.QuietOption,
 ):
     """
-    Управление настройками сайта WordPress.
+    Настройки сайта WordPress (плагин siteoptions) <-> таб options файла данных.
 
-    Без --fetch: обновление WordPress из Excel
-    С --fetch: выгрузка настроек из WordPress в Excel
+    Формат выбирается по расширению --file: JSON (таб "options") или Excel
+    (лист options). Запись таба — {key, value}; прочие поля (label и т.п.)
+    игнорируются, записи с пустым key или value не отправляются.
 
-    Запись настроек на сайт и перезапись существующего xlsx откатить нельзя:
+    Без --fetch: отправка настроек из таба на сайт. Без --file берётся файл
+    данных проекта (xlsx или json).
+    С --fetch: выгрузка настроек с сайта в таб options; таб пересобирается
+    целиком, остальные табы не трогаются. Без --file — xlsx проекта или
+    ./options.xlsx. В реестр проекта <проект>/<проект>.json не пишет.
+
+    Запись настроек на сайт и пересборку непустого таба откатить нельзя:
     сначала доступен --dry-run, затем спрашивается подтверждение, а под
     --non-interactive требуется явный --confirm.
 
@@ -220,65 +246,42 @@ def options(
     3 — нет credentials,
     5 — недоступен WordPress, 1 — непредвиденная ошибка.
 
-    Example: {cli} options --fetch --dry-run
+    Example: {cli} options --fetch --file wp-fetch/site.ru.json --json
     """
     env_file = resolve_env_file(ctx, env_file)
-    # Если активен --project и --file не указан — берём xlsx из папки проекта.
-    # Без проекта это даёт None, и каждая ветка ниже сама решает что делать.
-    if file is None:
-        file = resolve_excel_file(ctx, file)
+    proj = get_project(ctx)
+    project_name = proj.name if proj.active else None
 
     opts = output.get_options(ctx)
     human_mode = not opts.json and not opts.quiet
 
     if human_mode:
-        console.print(f"\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
+        console.print("\n[bold blue]WordPress Bulk Editor - Options[/bold blue]\n")
 
     command_name = "options_fetch" if fetch else "options"
     setup_command_logging(ctx, command_name)
     logger.info(f"Режим: {'FETCH (выгрузка)' if fetch else 'UPDATE (загрузка)'}")
 
-    # Режим FETCH - выгрузка из WordPress в Excel
     if fetch:
-        # Определяем файл
-        if file is None:
-            file = Path.cwd() / "options.xlsx"
-            if human_mode:
-                console.print(f"[yellow]Auto mode:[/yellow] будет создан файл {file}\n")
+        file = file or resolve_excel_file(ctx, None) or Path.cwd() / "options.xlsx"
+        refuse_project_registry(proj, file)
+        store = open_store(file, project=project_name)
+        confirm_tab_rebuild(ctx, store, OPTIONS_TAB, confirm)
 
-            # Проверяем существование
-            if file.exists():
-                output.require_confirmation(ctx, f"Файл {file} уже существует. Перезаписать?", confirm)
-        elif human_mode:
-            console.print(f"[yellow]Manual mode:[/yellow] используется файл {file}\n")
-
-        if human_mode:
-            console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
-
-        # 1. Загружаем credentials
         domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
-
-        # 2. Получаем настройки из WordPress
         output.vecho(ctx, "Получение настроек из WordPress...")
+        site_options = asyncio.run(_fetch_options(_make_wp_config(domain, username, password)))
 
-        wp_config = _make_wp_config(domain, username, password)
-
-        site_options = asyncio.run(_fetch_options(wp_config))
-
+        base = {"mode": "fetch", "file": str(file), "format": store.format, "tab": OPTIONS_TAB}
         if not site_options:
             output.emit_success(
                 ctx,
-                {"mode": "fetch", "file": str(file), "options": {}, "written": False},
+                {**base, "records": 0, "options": {}, "written": False},
                 lambda _: console.print("[yellow]WARNING: Нет настроек для выгрузки[/yellow]\n"),
             )
             return
 
-        # 3. Записываем в Excel
-        output.vecho(ctx, "Запись настроек в Excel...")
-        from ..excel.options import OptionsWriter
-
-        writer = OptionsWriter(file)
-        writer.write(site_options, mode="replace")
+        store.write_tab(OPTIONS_TAB, [{"key": key, "value": value} for key, value in site_options.items()])
 
         def _render_fetch(payload: dict):
             console.print(f"[green]OK[/green] Получено настроек: {len(payload['options'])}\n")
@@ -287,80 +290,75 @@ def options(
 
         output.emit_success(
             ctx,
-            {"mode": "fetch", "file": str(file), "options": site_options, "written": True},
+            {**base, "records": len(site_options), "options": site_options, "written": True},
             _render_fetch,
         )
+        return
 
-    # Режим UPDATE - загрузка из Excel в WordPress
-    else:
-        if file is None:
-            raise ValidationError("Параметр --file обязателен для загрузки настроек")
+    file = require_data_file(ctx, file)
+    store = open_store(file, project=project_name)
+    records = store.read_tab(OPTIONS_TAB)
+    if records is None:
+        raise ValidationError(f"В файле {file.name} нет таба '{OPTIONS_TAB}'")
+    site_options = options_from_records(records)
 
-        if not file.exists():
-            raise ValidationError(f"Файл не найден: {file}")
-
-        if human_mode:
-            console.print(f"Excel файл: [cyan]{file}[/cyan]\n")
-
-        # 1. Загружаем credentials
-        domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
-
-        # 2. Читаем опции
-        output.vecho(ctx, "Чтение настроек из листа 'options'...")
-        from ..excel.options import OptionsReader
-
-        options_reader = OptionsReader(file)
-        site_options = options_reader.read()
-
-        if not site_options:
-            output.emit_success(
-                ctx,
-                {"mode": "update", "file": str(file), "options": {}, "updated": False, "dry_run": dry_run},
-                lambda _: console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n"),
-            )
-            return
-
-        if dry_run:
-
-            def _render_dry(payload: dict):
-                console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
-                output.human.key_values("Настройки для обновления:", payload["options"])
-                console.print("\n[yellow]DRY-RUN режим: изменения не будут применены[/yellow]")
-                console.print("[bold green]DRY-RUN завершен![/bold green]\n")
-
-            output.emit_success(
-                ctx,
-                {"mode": "update", "file": str(file), "options": site_options, "updated": False, "dry_run": True},
-                _render_dry,
-            )
-            return
-
-        # 3. Перезапись настроек живого сайта — операция без отката:
-        # прежние значения нигде не сохраняются (гейт после проверки --dry-run).
-        output.require_confirmation(
-            ctx,
-            f"Перезаписать {len(site_options)} настроек сайта {domain} "
-            f"значениями из {file.name}? Прежние значения не сохраняются.",
-            confirm,
-        )
-
-        # 4. Подключаемся к WordPress и отправляем
-        output.vecho(ctx, "Отправка настроек в WordPress...")
-
-        wp_config = _make_wp_config(domain, username, password)
-
-        asyncio.run(_update_options(wp_config, site_options))
-
-        def _render_update(payload: dict):
-            console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
-            output.human.key_values("Обновлённые настройки:", payload["options"])
-            console.print(f"\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")  # noqa: F541 — как в HEAD: тело команды не менялось (хук docstring)
-
+    base = {"mode": "update", "file": str(file), "format": store.format, "tab": OPTIONS_TAB}
+    if not site_options:
         output.emit_success(
             ctx,
-            {"mode": "update", "file": str(file), "options": site_options, "updated": True, "dry_run": False},
-            _render_update,
+            {**base, "options": {}, "updated": False, "dry_run": dry_run},
+            lambda _: console.print("[yellow]WARNING: Нет настроек для обновления[/yellow]\n"),
         )
+        return
+
+    if dry_run:
+
+        def _render_dry(payload: dict):
+            console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
+            output.human.key_values("Настройки для обновления:", payload["options"])
+            console.print("\n[yellow]DRY-RUN режим: изменения не будут применены[/yellow]")
+            console.print("[bold green]DRY-RUN завершен![/bold green]\n")
+
+        output.emit_success(ctx, {**base, "options": site_options, "updated": False, "dry_run": True}, _render_dry)
+        return
+
+    domain, username, password = load_and_print_credentials(env_file=env_file, ctx=ctx)
+
+    # Перезапись настроек живого сайта — операция без отката:
+    # прежние значения нигде не сохраняются (гейт после проверки --dry-run).
+    output.require_confirmation(
+        ctx,
+        f"Перезаписать {len(site_options)} настроек сайта {domain} "
+        f"значениями из {file.name}? Прежние значения не сохраняются.",
+        confirm,
+    )
+
+    output.vecho(ctx, "Отправка настроек в WordPress...")
+    asyncio.run(_update_options(_make_wp_config(domain, username, password), site_options))
+
+    def _render_update(payload: dict):
+        console.print(f"[green]OK[/green] Найдено настроек: {len(payload['options'])}\n")
+        output.human.key_values("Обновлённые настройки:", payload["options"])
+        console.print("\n[bold green]SUCCESS! Настройки обновлены![/bold green]\n")
+
+    output.emit_success(ctx, {**base, "options": site_options, "updated": True, "dry_run": False}, _render_update)
+
+
+def options_from_records(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Записи таба options → {key: value} для siteoptions.
+
+    Ключ — поле `key` (старые листы Excel — `option`). Записи с пустым ключом
+    или значением пропускаются: пустая ячейка не должна затирать настройку.
+    """
+    site_options: Dict[str, Any] = {}
+    for record in records:
+        key = record.get("key", record.get("option"))
+        value = record.get("value")
+        if is_blank(key) or is_blank(value):
+            continue
+        site_options[str(key).strip()] = value.strip() if isinstance(value, str) else value
+    return site_options
 
 
 async def _update_options(wp_config: WordPressConfig, site_options: dict):
