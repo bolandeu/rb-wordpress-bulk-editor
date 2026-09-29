@@ -101,10 +101,11 @@ class TestStore:
         store.write_tab("options", [{"key": "c", "value": "y"}])
 
         reread = open_store(tmp_path / name)
-        assert [{k: v for k, v in r.items() if k != "_row_num"} for r in reread.read_tab("options")] == [
-            {"key": "c", "value": "y"}
-        ]
-        assert reread.read_tab("company")[0]["value"] == "МВ"
+        options = reread.read_tab("options")
+        company = reread.read_tab("company")
+        assert options is not None and company is not None
+        assert [{k: v for k, v in r.items() if k != "_row_num"} for r in options] == [{"key": "c", "value": "y"}]
+        assert company[0]["value"] == "МВ"
 
     def test_json_numbers_rows_and_keeps_project(self, tmp_path):
         path = tmp_path / "data.json"
