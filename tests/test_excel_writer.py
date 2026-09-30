@@ -190,16 +190,18 @@ class TestUpdateFromApiResponse:
         assert str(df.at[0, "id"]) == "55"
         assert df.at[0, "action"] == "skip"
 
-    def test_content_path_cleared_after_add(self, excel_file_with_posts):
-        """content_path и img_path должны очищаться после успешной записи."""
+    def test_img_path_cleared_content_path_kept_after_add(self, excel_file_with_posts):
+        """img_path очищается после успешной записи, content_path — нет."""
         writer = ExcelWriter(excel_file_with_posts)
         writer.load()
+        writer.update_row("posts", 0, {"content_path": "news/hello.html", "img_path": "img/hello.jpg"})
 
         api_response = {"id": 55, "slug": "test", "link": "https://x.com"}
         writer.update_from_api_response("posts", 0, api_response, "add")
 
         df = writer._dataframes["posts"]
-        assert df.at[0, "content_path"] == "" or df.at[0, "content_path"] != df.at[0, "content_path"]  # empty or NaN
+        assert df.at[0, "content_path"] == "news/hello.html"
+        assert df.at[0, "img_path"] == ""
 
     def test_update_action_writes_modified(self, excel_file_with_posts):
         writer = ExcelWriter(excel_file_with_posts)

@@ -234,6 +234,20 @@ class TestJsonRecordWriter:
         assert after["tabs"][TAB][0]["id"] == 55
         assert after["tabs"][TAB][0]["link"] == "https://example.ru/portery"
 
+    def test_content_path_kept_after_sync(self, tmp_path):
+        """content_path — ссылка на файл статьи: обратная запись его не зануляет."""
+        document = _document()
+        document["tabs"][TAB][0]["content_path"] = "news/portery.html"
+        path = _write_json(tmp_path / "content_path.json", document)
+
+        writer = JsonRecordWriter(path, TAB)
+        writer.load()
+        writer.update_from_result(2, {"id": 55, "link": "https://example.ru/portery"}, "add")
+        writer.save()
+
+        after = json.loads(path.read_text(encoding="utf-8"))
+        assert after["tabs"][TAB][0]["content_path"] == "news/portery.html"
+
     def test_taxonomy_ids_converted_to_names(self, json_file):
         """С taxonomy_cache кастомная таксономия пишется именами, а не ID."""
         cache = MagicMock()

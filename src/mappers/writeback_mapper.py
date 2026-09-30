@@ -169,9 +169,8 @@ def build_update_data_from_api(
     if "action" in existing_columns:
         update_data["action"] = "skip"
 
-    # Очищаем content_path и img_path если они были заполнены
-    if "content_path" in existing_columns:
-        update_data["content_path"] = ""
+    # img_path очищаем: повтор с тем же путём загрузил бы картинку дублем.
+    # content_path остаётся — это ссылка на исходный файл статьи.
     if "img_path" in existing_columns:
         update_data["img_path"] = ""
 
