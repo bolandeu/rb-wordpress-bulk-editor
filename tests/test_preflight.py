@@ -168,6 +168,14 @@ class TestValues:
 
         assert len(result.errors) == 1 and "published" in result.errors[0]
 
+    def test_invalid_date_is_error(self):
+        result = check(post(action="add", title="A", date="вчера"))
+
+        assert len(result.errors) == 1 and "вчера" in result.errors[0]
+
+    def test_valid_date_passes(self):
+        assert check(post(action="add", title="A", date="15.01.2024 10:30")).errors == []
+
     def test_duplicate_slug_within_type_is_error(self):
         result = check(
             post(2, action="add", title="A", slug="same"),

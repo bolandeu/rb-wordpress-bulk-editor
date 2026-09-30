@@ -5,7 +5,9 @@
 import pandas as pd
 import pytest
 
-from src.mappers.value_converter import parse_bool_default_true
+from datetime import datetime
+
+from src.mappers.value_converter import parse_bool_default_true, to_wp_date
 
 
 class TestParseBoolDefaultTrue:
@@ -41,3 +43,24 @@ class TestParseBoolDefaultTrue:
     def test_whitespace_stripped(self):
         assert parse_bool_default_true("  нет  ") is False
         assert parse_bool_default_true("\ttrue\n") is True
+
+
+class TestToWpDate:
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("2024-01-15T10:30:00", "2024-01-15T10:30:00"),
+            ("2024-01-15 10:30", "2024-01-15T10:30:00"),
+            ("2024-01-15", "2024-01-15T00:00:00"),
+            ("15.01.2024 10:30", "2024-01-15T10:30:00"),
+            ("15.01.2024", "2024-01-15T00:00:00"),
+            (datetime(2024, 1, 15, 10, 30), "2024-01-15T10:30:00"),
+            (pd.Timestamp("2024-01-15 10:30"), "2024-01-15T10:30:00"),
+        ],
+    )
+    def test_parsed(self, value, expected):
+        assert to_wp_date(value) == expected
+
+    @pytest.mark.parametrize("value", ["вчера", "2024-13-01", 42, pd.NaT])
+    def test_unparsed_is_none(self, value):
+        assert to_wp_date(value) is None

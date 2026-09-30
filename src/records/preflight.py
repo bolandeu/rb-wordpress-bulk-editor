@@ -36,7 +36,7 @@ from ..constants import (
     normalize_action,
 )
 from ..exceptions import ValidationError
-from ..mappers.value_converter import FALSY_STRINGS
+from ..mappers.value_converter import FALSY_STRINGS, to_wp_date
 from ..utils.file_values import FileValueResolver
 from .base import Record, is_blank
 
@@ -382,6 +382,9 @@ def _value_problems(record: Record, action: str, rules: FieldRules) -> List[str]
         status = data.get("status")
         if not is_blank(status) and str(status).strip() not in VALID_STATUSES:
             problems.append(f"status {status!r} не из допустимых: {', '.join(sorted(VALID_STATUSES))}")
+        post_date = data.get("date")
+        if not is_blank(post_date) and to_wp_date(post_date) is None:
+            problems.append(f"date {post_date!r}: ожидается ГГГГ-ММ-ДД[ ЧЧ:ММ:СС] или ДД.ММ.ГГГГ[ ЧЧ:ММ:СС]")
 
     for name, value in data.items():
         if is_blank(value):

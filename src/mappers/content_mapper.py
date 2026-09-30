@@ -7,7 +7,7 @@ from loguru import logger
 
 from ..records.base import is_blank, is_missing
 from .field_detector import FieldDetector
-from .value_converter import convert_acf_value, parse_bool_default_true
+from .value_converter import convert_acf_value, parse_bool_default_true, to_wp_date
 from ..utils.file_values import FileValueResolver
 from ..constants import (
     ACF_PREFIX,
@@ -165,7 +165,16 @@ class ContentMapper:
                     payload[taxonomy] = term_ids
             logger.debug(f"Taxonomies: {list(taxonomy_ids.keys())}")
 
-        # 4. Featured media (если есть)
+        # 4. Дата публикации: служебная колонка, но уходит в API, если заполнена.
+        # `modified` WordPress REST не принимает — его ставит сам сайт.
+        if "date" in row and not is_blank(row["date"]):
+            wp_date = to_wp_date(row["date"])
+            if wp_date:
+                payload["date"] = wp_date
+            else:
+                logger.warning(f"Invalid date value: {row['date']!r}")
+
+        # 5. Featured media (если есть)
         if "featured_media" in row and not is_blank(row["featured_media"]):
             value = row["featured_media"]
             if value != "":

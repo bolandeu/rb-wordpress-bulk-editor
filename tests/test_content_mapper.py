@@ -96,6 +96,19 @@ class TestMapRow:
         assert "price" in payload["acf"]
         assert "color" not in payload["acf"]
 
+    def test_date_sent_in_wp_format(self):
+        mapper = ContentMapper(["title", "date", "modified", "id", "action"])
+        row = make_row(title="A", date=pd.Timestamp("2024-01-15 10:30"), modified="2024-02-01", id="", action="add")
+        payload = mapper.map_row(row)
+        assert payload["date"] == "2024-01-15T10:30:00"
+        # modified WordPress REST не принимает
+        assert "modified" not in payload
+
+    def test_empty_or_invalid_date_not_sent(self):
+        mapper = ContentMapper(["date", "id", "action"])
+        assert "date" not in mapper.map_row(make_row(date="", id="1", action="update"))
+        assert "date" not in mapper.map_row(make_row(date="вчера", id="1", action="update"))
+
     def test_float_value_converts_to_int(self):
         mapper = ContentMapper(["menu_order", "id", "action"])
         row = make_row(**{"menu_order": 5.0, "id": "", "action": "add"})

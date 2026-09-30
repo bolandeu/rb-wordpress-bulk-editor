@@ -2,7 +2,8 @@
 Конвертация значений полей для WordPress ACF API
 """
 
-from typing import Any
+from datetime import date, datetime
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -32,6 +33,37 @@ def parse_bool_default_true(value: Any) -> bool:
     if s in FALSY_STRINGS:
         return False
     return True
+
+
+# Форматы строковой даты помимо ISO (`2024-01-15`, `2024-01-15 10:00`, `2024-01-15T10:00:00`)
+_DATE_FORMATS = ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y")
+
+
+def to_wp_date(value: Any) -> Optional[str]:
+    """Дата из записи → `YYYY-MM-DDTHH:MM:SS` для поля `date` WordPress (время сайта).
+
+    Принимает datetime/Timestamp из Excel, ISO-строку или `ДД.ММ.ГГГГ[ ЧЧ:ММ[:СС]]`;
+    часовой пояс отбрасывается. Нераспознанное значение → None.
+    """
+    parsed: Optional[datetime] = None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, date):
+        parsed = datetime(value.year, value.month, value.day)
+    elif isinstance(value, str):
+        text = value.strip()
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            for fmt in _DATE_FORMATS:
+                try:
+                    parsed = datetime.strptime(text, fmt)
+                    break
+                except ValueError:
+                    continue
+    if parsed is None or pd.isna(parsed):
+        return None
+    return parsed.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def convert_acf_value(value: Any) -> Any:
