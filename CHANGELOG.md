@@ -5,6 +5,13 @@
 
 <!-- towncrier release notes start -->
 
+## [3.1.3] - 2026-09-30
+
+### Changed
+
+- Обновлены зависимости: rb-llmkit 0.4.3 (команда `llm decide`, провайдер anymodel, патч litellm) и rb-html-to-gutenberg 0.4.1 (мелкое исправление).
+
+
 ## [3.1.2] - 2026-09-30
 
 ### Fixed
