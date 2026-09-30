@@ -6,7 +6,7 @@ _add_item, _update_item, _delete_item, _process_taxonomies, _upload_media
 """
 
 from abc import abstractmethod
-from typing import Any, Dict, Mapping, Optional, Sequence, cast
+from typing import Any, Dict, Mapping, Optional, Sequence, Set, cast
 from loguru import logger
 
 from ..wordpress.client import WordPressClient
@@ -54,6 +54,40 @@ class ContentSyncBase(BaseSync):
         """Фабричный метод для MediaEndpoint (можно переопределить в тестах)."""
         return MediaEndpoint(self.wp_client)
 
+    @staticmethod
+    def _apply_content_file(
+        payload: Dict[str, Any],
+        row: Mapping[str, Any],
+        content_processor: ContentProcessor,
+        columns_filter: Optional[Set[str]] = None,
+    ) -> None:
+        """Подставить в payload контент из файла `content_path`.
+
+        Пустой `content_path` — контент не трогается. Файла нет или он не
+        прочитался — `content` не уходит вовсе (даже пустое поле `content`
+        записи), чтобы пропавший файл не стёр контент на сайте.
+        Пропускается, если columns_filter активен и content не в фильтре.
+        """
+        if columns_filter and "content" not in columns_filter:
+            return
+        if not has_value(row, "content_path"):
+            return
+        content_filename = str(row["content_path"]).strip()
+
+        if not content_processor.validate_file_exists(content_filename):
+            payload.pop("content", None)
+            logger.warning(f"Content file not found, content left as is: {content_filename}")
+            return
+
+        logger.debug(f"Processing content from file: {content_filename}")
+        gutenberg_content = content_processor.process_file(content_filename)
+        if gutenberg_content:
+            payload["content"] = gutenberg_content
+            logger.debug(f"Content loaded from file: {content_filename}")
+        else:
+            payload.pop("content", None)
+            logger.warning(f"Failed to process content file, content left as is: {content_filename}")
+
     async def _add_item(
         self,
         posts_endpoint: PostsEndpoint,
@@ -81,21 +115,8 @@ class ContentSyncBase(BaseSync):
         if self.config.sync.skip_media:
             payload.pop("featured_media", None)
 
-        # 4. Обрабатываем content_path если заполнен
-        # Пропускаем если columns_filter активен и content не в фильтре
-        if (not _cf or "content" in _cf) and has_value(row, "content_path"):
-            content_filename = str(row["content_path"]).strip()
-
-            if content_processor.validate_file_exists(content_filename):
-                logger.debug(f"Processing content from file: {content_filename}")
-                gutenberg_content = content_processor.process_file(content_filename)
-                if gutenberg_content:
-                    payload["content"] = gutenberg_content
-                    logger.debug(f"Content loaded from file: {content_filename}")
-                else:
-                    logger.warning(f"Failed to process content file: {content_filename}")
-            else:
-                logger.warning(f"Content file not found: {content_filename}")
+        # 4. Контент из файла content_path (если заполнен)
+        self._apply_content_file(payload, row, content_processor, _cf)
 
         # 5. Логируем что отправляем
         has_content = "content" in payload
@@ -190,21 +211,8 @@ class ContentSyncBase(BaseSync):
         if self.config.sync.skip_media:
             payload.pop("featured_media", None)
 
-        # 4. Обрабатываем content_path если заполнен
-        # Пропускаем если columns_filter активен и content не в фильтре
-        if (not _cf or "content" in _cf) and has_value(row, "content_path"):
-            content_filename = str(row["content_path"]).strip()
-
-            if content_processor.validate_file_exists(content_filename):
-                logger.debug(f"Processing content from file: {content_filename}")
-                gutenberg_content = content_processor.process_file(content_filename)
-                if gutenberg_content:
-                    payload["content"] = gutenberg_content
-                    logger.debug(f"Content loaded from file: {content_filename}")
-                else:
-                    logger.warning(f"Failed to process content file: {content_filename}")
-            else:
-                logger.warning(f"Content file not found: {content_filename}")
+        # 4. Контент из файла content_path (если заполнен)
+        self._apply_content_file(payload, row, content_processor, _cf)
 
         # 5. Загружаем медиа или прикрепляем существующую картинку
         saved_media_result = None

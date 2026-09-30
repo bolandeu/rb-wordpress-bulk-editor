@@ -474,3 +474,39 @@ class TestSyncReportFromStats:
         report = SyncReport.from_stats(stats, [err])
         assert len(report.errors) == 1
         assert report.errors[0].error == "fail"
+
+
+# ── content_path → content ───────────────────────────────────────────
+
+
+class TestApplyContentFile:
+    @staticmethod
+    def _processor(content_folder: Path):
+        from src.utils.content_processor import ContentProcessor
+
+        return ContentProcessor(content_folder)
+
+    def test_empty_content_path_leaves_content_untouched(self, tmp_path):
+        payload = {"title": "A"}
+        ContentSync._apply_content_file(payload, {"content_path": ""}, self._processor(tmp_path))
+        assert "content" not in payload
+
+    def test_missing_file_drops_empty_content(self, tmp_path):
+        """Пропавший файл не должен стирать контент на сайте пустым полем content."""
+        payload = {"title": "A", "content": ""}
+        row = {"content_path": "news/gone.html", "content": ""}
+        ContentSync._apply_content_file(payload, row, self._processor(tmp_path))
+        assert "content" not in payload
+
+    def test_existing_file_sets_content(self, tmp_path):
+        (tmp_path / "news").mkdir()
+        (tmp_path / "news" / "a.html").write_text("<p>Текст</p>", encoding="utf-8")
+        payload = {"title": "A", "content": ""}
+        ContentSync._apply_content_file(payload, {"content_path": "news/a.html"}, self._processor(tmp_path))
+        assert "Текст" in payload["content"]
+
+    def test_columns_filter_without_content_skips(self, tmp_path):
+        (tmp_path / "a.html").write_text("<p>Текст</p>", encoding="utf-8")
+        payload = {"title": "A"}
+        ContentSync._apply_content_file(payload, {"content_path": "a.html"}, self._processor(tmp_path), {"title"})
+        assert "content" not in payload
