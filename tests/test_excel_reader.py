@@ -125,6 +125,20 @@ class TestReadSheet:
         assert "junk-mid" not in df.values
         assert "junk-tail" not in df.values
 
+    def test_numeric_headers_become_strings(self, tmp_path):
+        """Числовой заголовок (например, 301 на листе редиректов) — строка: имена полей всегда str."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "posts"
+        ws.append(["id", "action", "title", 301])
+        ws.append(["1", "skip", "Hello", "/new"])
+        path = tmp_path / "numeric_header.xlsx"
+        wb.save(path)
+
+        with ExcelReader(path) as r:
+            df = r.read_sheet("posts")
+        assert list(df.columns) == ["id", "action", "title", "301"]
+
     def test_drops_fully_empty_rows(self, tmp_path):
         """Полностью пустые строки в середине/конце листа отбрасываются."""
         wb = Workbook()

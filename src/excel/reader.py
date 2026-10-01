@@ -120,6 +120,9 @@ class ExcelReader:
             else:
                 df = pd.read_excel(self.excel_file, sheet_name=sheet_name, dtype=dtype_arg)
 
+            # Имена полей — всегда строки: числовой заголовок (301) Excel отдаёт как int
+            df.columns = [str(c) for c in df.columns]
+
             # Игнорируем колонки без заголовка (pandas: "Unnamed: N") и служебные `__*`
             df = self._drop_ignored_columns(df, sheet_name)
 
