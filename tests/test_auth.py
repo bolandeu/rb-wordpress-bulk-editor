@@ -120,14 +120,14 @@ class TestAntagorAliases:
     def test_site_vars_resolve_credentials(self, tmp_path, keychain):
         env_file = write_env(
             tmp_path,
-            SITE_DOMAIN="mwlogistics.local",
+            SITE_DOMAIN="example.local",
             SITE_CMS="wordpress",
             SITE_REST_API_USER="site-user",
             SITE_REST_API_PASSWORD="site-pass",
         )
 
         assert load_credentials_from_env(env_file=env_file) == (
-            "mwlogistics.local",
+            "example.local",
             "site-user",
             "site-pass",
         )
@@ -152,7 +152,7 @@ class TestAntagorAliases:
         """
         env_file = write_env(
             tmp_path,
-            SITE_PROD="mwlogistics.ru",
+            SITE_PROD="example.ru",
             SITE_REST_API_USER="site-user",
             SITE_REST_API_PASSWORD="site-pass",
         )
@@ -165,14 +165,14 @@ class TestAntagorAliases:
     def test_site_domain_wins_over_site_prod(self, tmp_path, keychain):
         env_file = write_env(
             tmp_path,
-            SITE_PROD="mwlogistics.ru",
-            SITE_DOMAIN="mwlogistics.local",
+            SITE_PROD="example.ru",
+            SITE_DOMAIN="example.local",
             SITE_REST_API_USER="site-user",
             SITE_REST_API_PASSWORD="site-pass",
         )
 
         domain, _, _ = load_credentials_from_env(env_file=env_file)
-        assert domain == "mwlogistics.local"
+        assert domain == "example.local"
 
     def test_aliases_ignored_for_other_cms(self, tmp_path, keychain):
         env_file = write_env(

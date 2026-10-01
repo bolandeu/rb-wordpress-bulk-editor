@@ -17,7 +17,7 @@ from src.exceptions import AuthenticationError
 
 runner = CliRunner()
 
-SITE_TAB = "mwlogistics.ru"
+SITE_TAB = "example.ru"
 
 
 # ── Фейковый WordPress ───────────────────────────────────────────────
@@ -123,7 +123,7 @@ class FakeClient:
 
 
 def _credentials(**kwargs):
-    return ("https://mwlogistics.ru", "admin", "secret")
+    return ("https://example.ru", "admin", "secret")
 
 
 def _no_credentials(**kwargs):
@@ -349,10 +349,10 @@ class TestFetchJson:
     def test_tab_override(self, fake_wp, tmp_path):
         out = tmp_path / "site.json"
 
-        result = run("fetch", "--file", str(out), "--tab", "mwlogistics.local")
+        result = run("fetch", "--file", str(out), "--tab", "example.local")
 
         assert result.exit_code == 0, result.stdout
-        assert len(read_tab(out, "mwlogistics.local")) == 3
+        assert len(read_tab(out, "example.local")) == 3
 
     def test_fetched_tab_passes_validate(self, fake_wp, tmp_path):
         out = tmp_path / "site.json"

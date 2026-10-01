@@ -1,5 +1,5 @@
 """
-Tests for src/cli/project.py — resolve_project(): путь / legacy-имя / cwd-walk.
+Tests for src/cli/project.py — resolve_project(): путь / cwd-walk.
 """
 
 from pathlib import Path
@@ -35,31 +35,10 @@ class TestResolveExplicitPath:
         assert ctx.active
         assert ctx.root == project_dir.resolve()
 
-    def test_explicit_path_wins_even_if_legacy_name_would_match(self, tmp_path, monkeypatch):
-        """Явный путь безусловно побеждает — двусмысленность не разруливается."""
-        project_dir = tmp_path / "tzm"
-        project_dir.mkdir()
-        (project_dir / ".env").write_text("WP_DOMAIN=https://tmp.example\n", encoding="utf-8")
+    def test_missing_directory_raises(self, tmp_path, monkeypatch):
+        """Имя без директории в cwd — ошибка: проекты внутри инструмента не ищутся."""
         monkeypatch.chdir(tmp_path)
 
-        # "tzm" совпадает и с реальной projects/tzm внутри репозитория, и с
-        # директорией tmp_path/tzm — должна победить директория tmp_path/tzm.
-        ctx = resolve_project("tzm")
-
-        assert ctx.root == project_dir.resolve()
-
-
-class TestResolveLegacyName:
-    def test_bare_name_resolves_inside_repo_projects(self):
-        """Имя, не совпадающее ни с одним путём на диске, — legacy-фолбэк в projects/<name>."""
-        ctx = resolve_project("tzm")
-
-        assert ctx.active
-        assert ctx.name == "tzm"
-        assert ctx.root.name == "tzm"
-        assert (ctx.root / "tzm.xlsx").exists()
-
-    def test_unknown_name_raises(self):
         with pytest.raises(FileNotFoundError):
             resolve_project("no-such-project-xyz")
 

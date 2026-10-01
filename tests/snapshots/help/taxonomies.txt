@@ -8,7 +8,7 @@
  проверки без сайта (validate --offline).
 
  Пример:
-     wp-bulk --project mysite taxonomies
+     wp-bulk --project ~/sites/mysite taxonomies
      → WP_TAXONOMIES=product_cat,brand,regions
 
  Exit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,
@@ -17,7 +17,7 @@
  Example: wp-bulk taxonomies --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --env-file              FILE  Путь к .env (по умолчанию projects/<name>/.env)                    │
+│ --env-file              FILE  Путь к .env (по умолчанию .env проекта)                            │
 │ --include-system              Включать служебные таксономии (nav_menu, post_format,              │
 │                               wp_pattern_category и т.п.)                                        │
 │ --json                        Машиночитаемый JSON-вывод.                                         │

@@ -36,8 +36,8 @@ def find_repo_root() -> Path:
     Найти корень репозитория wp-bulk-editor (где лежит его pyproject.toml).
 
     Это НЕ про расположение проекта пользователя (--project) — только про то,
-    где на диске лежит сам этот инструмент. Используется исключительно для
-    legacy-фолбэка (см. resolve_project) и для templates/ в tool_commands.py.
+    где на диске лежит сам этот инструмент. Используется для templates/ в
+    tool_commands.py.
     """
     current = Path(__file__).resolve().parent
     while current != current.parent:
@@ -199,11 +199,8 @@ def resolve_project(project_value: Optional[str]) -> ProjectContext:
     Порядок разрешения:
     1. Значение указывает на существующую директорию на диске (абсолютный
        путь или путь относительно cwd) — используется как есть, `name` для
-       отображения — basename директории. Явный путь побеждает безусловно,
-       даже если ниже могло бы совпасть legacy-имя.
-    2. Иначе — legacy-фолбэк: `<repo_root>/projects/<value>/` внутри
-       репозитория wp-bulk-editor (для проектов, всё ещё физически там
-       лежащих).
+       отображения — basename директории.
+    2. Значение передано, но такой директории нет — FileNotFoundError.
     3. Значение не передано вовсе — cwd-walk (см. _discover_project_by_cwd_walk).
     4. Ничего не найдено — неактивный ProjectContext() (глобальный режим).
     """
@@ -216,16 +213,10 @@ def resolve_project(project_value: Optional[str]) -> ProjectContext:
     explicit_path = Path(project_value).expanduser()
     if not explicit_path.is_absolute():
         explicit_path = Path.cwd() / explicit_path
-    if explicit_path.is_dir():
-        return ProjectContext(name=explicit_path.name, root=explicit_path.resolve())
+    if not explicit_path.is_dir():
+        raise FileNotFoundError(f"Папка проекта не найдена: {explicit_path}")
 
-    repo_root = find_repo_root()
-    project_dir = repo_root / "projects" / project_value
-
-    if not project_dir.exists():
-        raise FileNotFoundError(f"Папка проекта не найдена: {project_dir}\nСоздайте: mkdir projects/{project_value}")
-
-    return ProjectContext(name=project_value, root=project_dir.resolve())
+    return ProjectContext(name=explicit_path.name, root=explicit_path.resolve())
 
 
 def _version_key(value: str) -> Tuple[int, ...]:

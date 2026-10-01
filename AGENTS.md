@@ -493,11 +493,9 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 `resolve_project()` в `src/cli/project.py`, порядок разрешения:
 
 1. **Явный путь** — `--project /path/to/project` (абсолютный или относительно cwd)
-   указывает на существующую директорию → используется как есть. Побеждает
-   безусловно, даже если ниже совпало бы legacy-имя.
-2. **Legacy-имя** — `--project mysite`, не являющееся путём к существующей
-   директории, резолвится в `<repo_root>/projects/mysite/` (для проектов, всё ещё
-   физически лежащих внутри этого репозитория).
+   указывает на существующую директорию → используется как есть.
+2. **Нет такой директории** — ошибка `ConfigurationError`. Внутри репозитория
+   инструмента проекты не ищутся: данным сайтов здесь не место.
 3. **cwd-walk** — `--project` не передан вовсе: подъём от текущей директории вверх
    в поисках `.env` (тот же маркер, что `ProjectContext.env_file`), не выше домашней
    директории пользователя и не глубже ~15 уровней.
@@ -511,7 +509,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 только xlsx (`find_excel()`). Явный `--file` всегда в приоритете и обязателен,
 когда в папке лежат оба формата.
 
-**Авто-обнаружение output** — `export` → `projects/<name>/exported_content/`, `export-media` → `projects/<name>/export_media/`.
+**Авто-обнаружение output** — `export` → `<проект>/exported_content/`, `export-media` → `<проект>/export_media/`.
 
 **Минимальная версия CLI.** Проект объявляет её в своём `.env`:
 `WP_BULK_MIN_VERSION=1.2.0`. Читает `ProjectContext.min_version`, проверяет

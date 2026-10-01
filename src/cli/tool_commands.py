@@ -1392,7 +1392,7 @@ def taxonomies(
     env_file: Optional[Path] = typer.Option(
         None,
         "--env-file",
-        help="Путь к .env (по умолчанию projects/<name>/.env)",
+        help="Путь к .env (по умолчанию .env проекта)",
         exists=True,
         file_okay=True,
         dir_okay=False,
@@ -1414,7 +1414,7 @@ def taxonomies(
     проверки без сайта (validate --offline).
 
     Пример:
-        wp-bulk --project mysite taxonomies
+        wp-bulk --project ~/sites/mysite taxonomies
         → WP_TAXONOMIES=product_cat,brand,regions
 
     Exit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,
