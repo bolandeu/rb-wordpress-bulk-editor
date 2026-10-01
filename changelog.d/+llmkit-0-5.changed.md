@@ -1,1 +1,0 @@
-rb-llmkit 0.4 → 0.5: журнал расходов LLM — таблица `llmkit_calls` (была `calls`) в общем `usage.sqlite`, либо PostgreSQL через `LLMKIT_DATABASE_URL`. llmkit во всех инструментах одной машины поднимать одновременно.

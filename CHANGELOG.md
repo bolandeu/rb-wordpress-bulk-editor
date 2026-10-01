@@ -5,6 +5,13 @@
 
 <!-- towncrier release notes start -->
 
+## [4.1.0] - 2026-10-01
+
+### Changed
+
+- rb-llmkit 0.4 → 0.5: журнал расходов LLM — таблица `llmkit_calls` (была `calls`) в общем `usage.sqlite`, либо PostgreSQL через `LLMKIT_DATABASE_URL`. llmkit во всех инструментах одной машины поднимать одновременно.
+
+
 ## [4.0.0] - 2026-10-01
 
 ### Removed
