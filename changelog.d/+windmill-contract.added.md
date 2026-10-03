@@ -1,1 +1,0 @@
-Гейт релиза проверяет контракт потребителя windmill → wp-bulk (`tests/contracts/windmill/wp-bulk.yaml`: `post upsert/get`, `media attach`, `describe`) офлайн на фальшивом WordPress; скрипты гейта синхронизированы с шаблоном cli-generator v1.8.1.
