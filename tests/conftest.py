@@ -2,6 +2,8 @@
 Shared fixtures for WordPress Bulk Editor tests.
 """
 
+from pathlib import Path
+
 import pytest
 
 
@@ -51,3 +53,47 @@ def taxonomy_cache():
         10: "python",
         11: "django",
     }
+
+
+# ── Контракты потребителей (tests/test_contracts.py, tests/contracts/fixtures.yaml) ──
+
+CONTRACT_DATA = Path(__file__).parent / "contracts" / "data"
+
+
+def _contract_site(monkeypatch):
+    """Фальшивый WordPress для `run`-кейсов вместо сети; data/ — рабочая папка."""
+    import httpx
+
+    from src.cli import post_commands
+    from src.wordpress.client import WordPressClient
+    from tests.fake_wp import FakeWordPress
+
+    site = FakeWordPress(seo_types={"posts"})
+    site.add_post("existing-post", status="draft")  # 101 — fixture_post_id
+    site.add_post("existing-draft", status="draft")  # 102
+    site.add_post("published-post", status="publish")  # 103
+    site.add_media("old.jpg")  # 104 — fixture_media_id
+    monkeypatch.setattr(
+        post_commands,
+        "WordPressClient",
+        lambda config: WordPressClient(config, transport=httpx.MockTransport(site.handler)),
+    )
+    monkeypatch.chdir(CONTRACT_DATA)
+    return site
+
+
+@pytest.fixture
+def contract_offline(monkeypatch):
+    """Офлайн-данные без доступов: кейсы, которые обязаны упасть до сайта."""
+    return _contract_site(monkeypatch)
+
+
+@pytest.fixture
+def contract_wordpress(monkeypatch):
+    """Офлайн-данные и фальшивые доступы WP_API_USER / WP_API_TOKEN."""
+    from tests.fake_wp import ENV_TOKEN, ENV_USER, TOKEN, USER
+
+    site = _contract_site(monkeypatch)
+    monkeypatch.setenv(ENV_USER, USER)
+    monkeypatch.setenv(ENV_TOKEN, TOKEN)
+    return site

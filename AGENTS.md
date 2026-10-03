@@ -661,6 +661,15 @@ ty, pytest (покрытие, контракт справки, форма `auth 
 ty в `tests/` для утиных дублёров только предупреждает (`[tool.ty.overrides]`),
 `src/` — на полной строгости.
 
+**Контракты потребителей** — `tests/contracts/<потребитель>/wp-bulk.yaml`
+(сейчас `windmill/`: дословная копия из репо windmill), формат `contract: 1`
+(`tests/contracts/schema.json`), прогон — `tests/test_contracts.py`, отдельный шаг
+гейта `contracts`. `run`-кейсы офлайн: фальшивый WordPress и входы —
+`tests/contracts/fixtures.yaml` + фикстуры `contract_wordpress`/`contract_offline`
+в `tests/conftest.py`, данные в `tests/contracts/data/`. **Контракт не править**
+(несоответствие — tools/dev); правится только своя сторона: плейсхолдеры и фикстуры.
+`test_contracts.py`, `schema.json` и скрипты гейта — копии шаблона cli-generator.
+
 **Релиз:** `uv run scripts/release.py patch|minor|major` на чистом `main` —
 гейт, `towncrier build`, коммит `Release vX.Y.Z` и annotated-тег; пушит пользователь
 (`git push --follow-tags`). Строки `version =` нет, `CHANGELOG.md` руками не правится:

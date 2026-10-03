@@ -1,0 +1,35 @@
+# This repo's side of the consumers' `run` cases (tests/test_contracts.py, format:
+# schema.json $defs/fixtures). Every run is offline anyway: no network, no real keys.
+#
+# placeholders: values for {name} in a case's argv, chosen to match the offline data.
+# offline_cache: the pytest fixture (tests/conftest.py) that puts that data in place —
+#   recorded responses, a filled cache, fake keys — for every case unless it says
+#   `offline_cache: false`; those get `no_cache` (if set) and must fail before
+#   reaching the provider.
+#
+# wp-bulk: офлайн-данные — фальшивый WordPress (tests/fake_wp.py) с записями ниже и
+# входы upsert в tests/contracts/data/; `contract_wordpress` подставляет его вместо
+# сети, задаёт фальшивые WP_API_USER / WP_API_TOKEN и делает data/ рабочей папкой —
+# поэтому плейсхолдеры-файлы — просто имена (`contract_offline` — то же без
+# доступов: для кейсов `offline_cache: false`). Записи фальшивого сайта:
+#   101 — черновик slug existing-post (fixture_post_id)
+#   102 — черновик slug existing-draft
+#   103 — опубликован slug published-post
+#   104 — медиа (fixture_media_id)
+# rb-seo включён у posts, выключен у pages.
+placeholders:
+  fixture_site: example.com
+  fixture_post_id: 101
+  fixture_media_id: 104
+  fixture_missing_id: 9999
+  fixture_image: cover.jpg
+  fixture_post_new: post-new.json
+  fixture_post_update: post-update.json
+  fixture_post_existing_draft_slug: post-existing-draft-slug.json
+  fixture_post_published_slug: post-published-slug.json
+  fixture_post_with_seo: post-with-seo.json
+  fixture_post_seo_unsupported_type: post-seo-unsupported-type.json
+  fixture_post_invalid_json: post-invalid.json
+  fixture_post_with_featured: post-with-featured.json
+offline_cache: contract_wordpress
+no_cache: contract_offline

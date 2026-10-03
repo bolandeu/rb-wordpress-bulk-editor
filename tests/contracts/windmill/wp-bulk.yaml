@@ -1,0 +1,143 @@
+# Контракт потребителя: windmill → wp-bulk (адаптер WordPress, T104), формат contract: 1 (static / run / view).
+# Источник — репо windmill; поставщик держит копию tests/contracts/windmill/wp-bulk.yaml и гоняет в гейте релиза.
+# Проверяется только то, на что опирается флоу публикации (f/content/publish): post upsert / get, media attach, describe.
+# run — офлайн: фейковый WordPress поставщика (respx / фикстуры), сеть и настоящие креды не нужны.
+# Вход upsert — JSON-файл {fixture_*} через --input (см. вопрос в шапке: формат contract: 1 не умеет stdin).
+contract: 1
+consumer: windmill
+provider: wp-bulk
+provider_range: ">=4.2,<5.0"
+contact: "агент windmill через dev"
+
+static:
+  commands:
+    - path: [post, upsert]
+      options: [--site, --id, --input, --json]
+    - path: [post, get]
+      options: [--site, --id, --json]
+    - path: [media, attach]
+      options: [--site, --post, --path, --media-id, --alt, --json]
+    - path: [describe]
+      options: [--json]
+  root_options: [--version]
+  exit_codes: [0, 1, 2, 3]       # 0 ок, 1 ошибка данных (NOT_FOUND, CONFLICT, SEO_NOT_SUPPORTED), 2 аргументы, 3 авторизация
+  env:                           # одна пара на вызов (один сайт): Windmill подставляет из секрета сайта (роль editor)
+    - WP_API_USER
+    - WP_API_TOKEN
+
+run:
+  - name: upsert_creates_draft
+    description: поста со slug нет → создан черновик, created=true, хэш сохранённого контента
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_new}", --json]
+    exit: 0
+    stdout_json_schema: &upserted
+      type: object
+      required: [id, url, status, modified, content_hash, created]
+      properties:
+        id: {type: integer}
+        url: {type: string}
+        status: {type: string}
+        content_hash: {type: string, pattern: "^[0-9a-f]{64}$"}
+        created: {type: boolean}
+        featured_media: {type: [integer, "null"]}
+
+  - name: upsert_by_id_updates
+    argv: [post, upsert, --site, "{fixture_site}", --id, "{fixture_post_id}", --input, "{fixture_post_update}", --json]
+    exit: 0
+    stdout_json_schema:
+      allOf: [*upserted, {properties: {created: {const: false}}}]
+
+  - name: upsert_by_slug_updates_existing_draft
+    description: черновик со slug уже есть, id не передан → обновлён тот же, дубля нет
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_existing_draft_slug}", --json]
+    exit: 0
+    stdout_json_schema:
+      allOf: [*upserted, {properties: {created: {const: false}}}]
+
+  - name: upsert_slug_of_published_is_conflict
+    description: опубликованный пост с этим slug, id не передан → conflict с id найденного, ничего не меняется
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_published_slug}", --json]
+    exit: 1
+    stdout_json_schema: &error
+      type: object
+      required: [ok, error]
+      properties:
+        ok: {const: false}
+        error: {type: object, required: [code, message]}
+
+  - name: upsert_with_rb_seo
+    description: тип с rb-seo, seo {title, description, h1} → сохранено (get отдаёт те же)
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_with_seo}", --json]
+    exit: 0
+    stdout_json_schema: *upserted
+
+  - name: upsert_seo_on_type_without_rb_seo_fails
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_seo_unsupported_type}", --json]
+    exit: 1
+    stdout_json_schema:
+      allOf: [*error, {properties: {error: {properties: {code: {const: SEO_NOT_SUPPORTED}}}}}]
+
+  - name: upsert_unknown_id_is_not_found
+    argv: [post, upsert, --site, "{fixture_site}", --id, "{fixture_missing_id}", --input, "{fixture_post_update}", --json]
+    exit: 1
+    stdout_json_schema:
+      allOf: [*error, {properties: {error: {properties: {code: {const: NOT_FOUND}}}}}]
+
+  - name: upsert_without_credentials_is_auth_missing
+    description: нет env WP_API_USER / WP_API_TOKEN → ошибка до сетевого запроса
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_new}", --json]
+    env_unset: [WP_API_USER, WP_API_TOKEN]
+    exit: 3
+    offline_cache: false
+    stdout_json_schema:
+      allOf: [*error, {properties: {error: {properties: {code: {const: AUTH_MISSING}}}}}]
+
+  - name: upsert_invalid_input_is_usage
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_invalid_json}", --json]
+    exit: 2
+    offline_cache: false
+
+  - name: upsert_with_featured_image
+    argv: [post, upsert, --site, "{fixture_site}", --input, "{fixture_post_with_featured}", --json]
+    exit: 0
+    stdout_json_schema:
+      allOf: [*upserted, {required: [featured_media], properties: {featured_media: {type: integer}}}]
+
+  - name: post_get
+    argv: [post, get, --site, "{fixture_site}", --id, "{fixture_post_id}", --json]
+    exit: 0
+    stdout_json_schema:
+      type: object
+      required: [id, slug, title, content, status, url, modified, content_hash]
+      properties:
+        content_hash: {type: string, pattern: "^[0-9a-f]{64}$"}   # тот же, что вернул upsert (P2: ручная правка)
+        seo: {type: [object, "null"]}
+        featured_media: {type: [integer, "null"]}
+
+  - name: post_get_unknown_is_not_found
+    argv: [post, get, --site, "{fixture_site}", --id, "{fixture_missing_id}", --json]
+    exit: 1
+    stdout_json_schema:
+      allOf: [*error, {properties: {error: {properties: {code: {const: NOT_FOUND}}}}}]
+
+  - name: media_attach_uploads_and_sets_featured
+    argv: [media, attach, --site, "{fixture_site}", --post, "{fixture_post_id}", --path, "{fixture_image}", --json]
+    exit: 0
+    stdout_json_schema: &attached
+      type: object
+      required: [media_id, source_url, post_id]
+      properties: {media_id: {type: integer}, post_id: {type: integer}}
+
+  - name: media_attach_existing_media
+    argv: [media, attach, --site, "{fixture_site}", --post, "{fixture_post_id}", --media-id, "{fixture_media_id}", --json]
+    exit: 0
+    stdout_json_schema: *attached
+
+  - name: describe_json
+    argv: [describe, --json]
+    exit: 0
+    stdout_json_schema:
+      type: object
+      required: [opencli, info, command]
+
+view: []
