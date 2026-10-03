@@ -5,9 +5,8 @@ CLI интерфейс для WordPress Bulk Editor
 - sync_commands.py    - sync, async (синхронизация Excel -> WordPress)
 - fetch_commands.py   - fetch, fetch-media (загрузка WordPress -> Excel)
 - export_commands.py  - export, export-media (экспорт контента/медиа в файлы)
-- tool_commands.py    - validate, options, bulk-delete, counter, llm, reshape, taxonomies
+- tool_commands.py    - validate, options, bulk-delete, taxonomies
 - doctor_commands.py  - doctor (диагностика окружения)
-- image_commands.py   - image-crop, image-compress, image-convert
 - media_commands.py   - media-upload (файлы с диска → медиатека, id вложений)
 - auth_commands.py    - auth status|login|logout (здоровье и хранение доступов)
 - post_commands.py    - post upsert|get, media attach (WP-адаптер Windmill: одна запись за вызов)
@@ -129,8 +128,6 @@ from . import update_commands  # noqa: E402, F401
 from . import export_commands  # noqa: E402, F401
 from . import tool_commands  # noqa: E402, F401
 from . import doctor_commands  # noqa: E402, F401
-from . import image_commands  # noqa: E402, F401
-from . import vlook_commands  # noqa: E402, F401
 from . import media_commands  # noqa: E402, F401
 from . import auth_commands  # noqa: E402, F401
 from . import post_commands  # noqa: E402, F401

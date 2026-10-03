@@ -13,8 +13,6 @@
   Сохранённая цель обязательна (`required: true`): раз её сохранили, ею
   пользуются. Целей нет — одна запись `wp`, `missing`, необязательная:
   чтение публичного контента работает и анонимно.
-- `llmkit:<провайдер>` — ключи LLM из отчёта llmkit (команда `llm`);
-  все необязательные, как и в самом llmkit.
 """
 
 import os
@@ -28,7 +26,6 @@ from ..exceptions import CredentialsUnhealthy, ValidationError, WPBulkEditorErro
 from . import manager
 
 WP_KIND = "wp"
-LLM_KIND = "llmkit"
 ALWAYS_PROBLEMS = frozenset({"invalid", "expired"})
 HEALTHY = frozenset({"ok", "unchecked"})
 # Кто побеждает, когда поля пришли из разных мест (как в цепочке разрешения).
@@ -191,27 +188,6 @@ def wordpress_entries(
     ]
 
 
-# --- LLM (llmkit) ------------------------------------------------------------
-
-
-def llm_entries(*, check: bool, only: Optional[str]) -> List[Dict[str, Any]]:
-    """Ключи LLM — отчётом llmkit, с именами `llmkit:<провайдер>`."""
-    prefix = f"{LLM_KIND}:"
-    wanted = only.removeprefix(prefix) if only is not None and only.startswith(prefix) else None
-    try:
-        from llmkit import health as llm_health
-        from llmkit import load_config
-
-        entries = llm_health.report(load_config(), check=check, only=wanted)["credentials"]
-    except Exception as e:  # конфиг llmkit не читается — это факт отчёта, а не падение команды
-        entry = _blank(LLM_KIND, False, [], "llmkit config (`llm config path`)")
-        entry["message"] = f"конфиг llmkit не прочитан: {type(e).__name__}: {e}"
-        return [entry]
-    for entry in entries:
-        entry["provider"] = f"{prefix}{entry['provider']}"
-    return entries
-
-
 # --- отчёт -------------------------------------------------------------------
 
 
@@ -224,12 +200,9 @@ def is_problem(entry: Dict[str, Any]) -> bool:
 def _kind(only: Optional[str]) -> Optional[str]:
     if only is None:
         return None
-    for kind in (WP_KIND, LLM_KIND):
-        if only == kind or only.startswith(f"{kind}:"):
-            return kind
-    raise ValidationError(
-        f"Неизвестный провайдер '{only}' (известны: {WP_KIND}, {WP_KIND}:<домен>, {LLM_KIND}, {LLM_KIND}:<провайдер>)."
-    )
+    if only == WP_KIND or only.startswith(f"{WP_KIND}:"):
+        return WP_KIND
+    raise ValidationError(f"Неизвестный провайдер '{only}' (известны: {WP_KIND}, {WP_KIND}:<домен>).")
 
 
 def status(
@@ -248,8 +221,6 @@ def status(
         credentials += wordpress_entries(
             check=check, only=only, project_env_file=project_env_file, project_active=project_active
         )
-    if kind in (None, LLM_KIND):
-        credentials += llm_entries(check=check, only=only)
     payload = {"tool": tool, "version": version, "checked_at": _now_iso(), "credentials": credentials}
     problems = {e["provider"]: e["status"] for e in credentials if is_problem(e)}
     return payload, CredentialsUnhealthy(problems) if problems else None

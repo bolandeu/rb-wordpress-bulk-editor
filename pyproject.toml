@@ -20,11 +20,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "keyring>=25.0.0",
     "PyYAML>=6.0",
-    "Pillow>=10.0.0",
-    "python-slugify>=8.0.0",
     "markdown>=3.5.0",
     "beautifulsoup4>=4.12.0",
-    "rb-llmkit>=0.5,<0.6",
     "rb-html-to-gutenberg>=0.4,<0.5",
     "platformdirs>=4.2",
 ]
@@ -112,7 +109,6 @@ ignore_missing_imports = true
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 [tool.uv.sources]
-rb-llmkit = { git = "https://github.com/bolandeu/llmkit", tag = "v0.5.0" }
 rb-html-to-gutenberg = { git = "https://github.com/bolandeu/html-to-gutenberg", tag = "v0.4.1" }
 
 [dependency-groups]

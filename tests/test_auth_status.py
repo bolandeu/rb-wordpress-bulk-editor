@@ -43,13 +43,12 @@ def fake_keyring(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path, fake_keyring):
-    """Ни настоящего окружения, ни .env рядом, ни конфига llmkit пользователя."""
+    """Ни настоящего окружения, ни .env рядом."""
     saved = dict(os.environ)  # load_dotenv пишет в окружение мимо monkeypatch
     for name in list(os.environ):
         if name.startswith(("WP_", "SITE_")):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(health, "llm_entries", lambda *, check, only: [])
     yield
     os.environ.clear()
     os.environ.update(saved)
@@ -127,12 +126,6 @@ class TestCheck:
         code, _ = _run("--check")
         assert code == 3
 
-    def test_optional_llm_missing_does_not_fail(self, monkeypatch):
-        entry = {**dict.fromkeys(ENTRY_KEYS), "provider": "llmkit:x", "required": False, "status": "missing"}
-        monkeypatch.setattr(health, "llm_entries", lambda *, check, only: [entry])
-        code, payload = _run()
-        assert code == 0 and payload["credentials"][-1]["provider"] == "llmkit:x"
-
 
 class TestProviderFilter:
     def test_unknown_provider_is_exit_2(self):
@@ -200,15 +193,3 @@ class TestWordPressCheck:
             raise httpx.ConnectError("refused")
 
         assert check_credentials(self._config(), transport=httpx.MockTransport(handler)).status == "unreachable"
-
-
-def test_llm_config_failure_is_a_report_entry(monkeypatch):
-    monkeypatch.undo()  # вернуть настоящую llm_entries
-    import llmkit
-
-    def broken(**kwargs):
-        raise ValueError("bad config")
-
-    monkeypatch.setattr(llmkit, "load_config", broken)
-    [entry] = health.llm_entries(check=False, only=None)
-    assert entry["provider"] == "llmkit" and entry["required"] is False and "bad config" in entry["message"]

@@ -35,22 +35,6 @@ LOG_APPNAME = "wp-bulk"
 DATA_SUFFIXES = (".xlsx", ".json")
 
 
-def find_repo_root() -> Path:
-    """
-    Найти корень репозитория wp-bulk-editor (где лежит его pyproject.toml).
-
-    Это НЕ про расположение проекта пользователя (--project) — только про то,
-    где на диске лежит сам этот инструмент. Используется для templates/ в
-    tool_commands.py.
-    """
-    current = Path(__file__).resolve().parent
-    while current != current.parent:
-        if (current / "pyproject.toml").exists():
-            return current
-        current = current.parent
-    return Path.cwd()
-
-
 @dataclass
 class ProjectContext:
     """Контекст проекта. Хранится в typer.Context.obj."""

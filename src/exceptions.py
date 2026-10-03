@@ -172,12 +172,6 @@ class MediaUploadError(WordPressError):
     pass
 
 
-class ImageProcessingError(WPBulkEditorError):
-    """Ошибка обработки изображения"""
-
-    pass
-
-
 class Aborted(WPBulkEditorError):
     """Пользователь отказался подтверждать опасную операцию"""
 

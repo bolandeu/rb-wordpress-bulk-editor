@@ -1,6 +1,6 @@
 # WordPress Bulk Editor
 
-Python CLI-инструмент для синхронизации данных между Excel/JSON и WordPress через REST API.
+Python CLI-инструмент для импорта и экспорта данных между Excel/JSON и WordPress через REST API.
 
 ## Установка
 
@@ -28,4 +28,3 @@ SSH-форма `git+ssh://git@github.com/bolandeu/worppress-bulk-editor.git`).
 - ✅ Множественные листы Excel
 - ✅ Умная работа с таксономиями (автосоздание)
 - ✅ Обратная запись ID в Excel
-- ✅ VLOOKUP файлов по ID (привязка content/media к строкам Excel)

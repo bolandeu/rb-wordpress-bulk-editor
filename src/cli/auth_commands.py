@@ -40,7 +40,7 @@ def auth_status(
     provider: Optional[str] = typer.Option(
         None,
         "--provider",
-        help="Только этот провайдер: wp, wp:<домен>, llmkit или llmkit:<провайдер> (по умолчанию — все).",
+        help="Только этот провайдер: wp или wp:<домен> (по умолчанию — все).",
     ),
     json_output: bool = output.JsonOption,
     quiet: bool = output.QuietOption,
@@ -49,8 +49,7 @@ def auth_status(
 
     Сайты WordPress — по записи `wp:<домен>` на каждую цель: сохранённые в
     keychain (`auth login`), сайт активного проекта (та же цепочка, что у sync:
-    окружение → keychain → .env проекта) и цель из --provider. Ключи LLM —
-    записи `llmkit:<провайдер>` из отчёта llmkit, необязательные.
+    окружение → keychain → .env проекта) и цель из --provider.
 
     Без --check — только наличие (`unchecked` / `missing`). С --check у сайта
     `GET /wp-json/wp/v2/users/me`: 401/403 — `invalid`, сеть/таймаут/5xx/429 —

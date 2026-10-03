@@ -16,7 +16,6 @@ from src.exceptions import (
     NetworkError,
     ValidationError,
     MediaUploadError,
-    ImageProcessingError,
 )
 
 
@@ -35,7 +34,6 @@ class TestExceptionHierarchy:
             NetworkError,
             ValidationError,
             MediaUploadError,
-            ImageProcessingError,
         ]
         for cls in subclasses:
             assert issubclass(cls, WPBulkEditorError), f"{cls.__name__} not subclass of WPBulkEditorError"
