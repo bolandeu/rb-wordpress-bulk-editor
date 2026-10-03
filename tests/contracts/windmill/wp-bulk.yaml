@@ -20,7 +20,8 @@ static:
     - path: [describe]
       options: [--json]
   root_options: [--version]
-  exit_codes: [0, 1, 2, 3]       # 0 ок, 1 ошибка данных (NOT_FOUND, CONFLICT, SEO_NOT_SUPPORTED), 2 аргументы, 3 авторизация
+  exit_codes: [0, 1, 2, 3, 5]    # 0 ок, 1 ошибка данных (NOT_FOUND, CONFLICT, SEO_NOT_SUPPORTED), 2 аргументы, 3 авторизация,
+                                 # 5 PROVIDER_ERROR (сеть / TLS до WordPress) — Windmill повторяет публикацию
   env:                           # одна пара на вызов (один сайт): Windmill подставляет из секрета сайта (роль editor)
     - WP_API_USER
     - WP_API_TOKEN
@@ -39,6 +40,7 @@ run:
         status: {type: string}
         content_hash: {type: string, pattern: "^[0-9a-f]{64}$"}
         created: {type: boolean}
+        slug_kept: {type: boolean}           # true — slug опубликованной записи не меняли (в отчёт публикации)
         featured_media: {type: [integer, "null"]}
 
   - name: upsert_by_id_updates
@@ -64,6 +66,20 @@ run:
       properties:
         ok: {const: false}
         error: {type: object, required: [code, message]}
+
+  - name: upsert_by_id_published_keeps_slug
+    description: опубликованный пост по id, во входе другой slug → контент обновлён, slug не меняется, slug_kept=true
+    argv: [post, upsert, --site, "{fixture_site}", --id, "{fixture_published_post_id}", --input, "{fixture_post_new_slug}", --json]
+    exit: 0
+    stdout_json_schema:
+      allOf: [*upserted, {required: [slug_kept], properties: {created: {const: false}, slug_kept: {const: true}}}]
+
+  - name: upsert_network_error_is_provider_error
+    description: WordPress недоступен (сеть / TLS) → код 5, PROVIDER_ERROR — повторяемая ошибка
+    argv: [post, upsert, --site, "{fixture_site_unreachable}", --input, "{fixture_post_new}", --json]
+    exit: 5
+    stdout_json_schema:
+      allOf: [*error, {properties: {error: {properties: {code: {const: PROVIDER_ERROR}}}}}]
 
   - name: upsert_with_rb_seo
     description: тип с rb-seo, seo {title, description, h1} → сохранено (get отдаёт те же)
