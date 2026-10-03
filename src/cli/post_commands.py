@@ -113,14 +113,17 @@ def post_upsert(
     без конвертации; seo — объект поля rb-seo ({title, description, …});
     featured — изображение записи {path|url|id, alt?}.
 
-    С id (во входе или --id) — обновление этой записи, статус не меняется.
+    С id (во входе или --id) — обновление этой записи, статус не меняется;
+    slug не-черновика тоже: живой URL сохраняется, slug из входа отброшен
+    (slug_kept: true в ответе). У черновика slug обновляется.
     Без id — поиск по тип+slug: черновик обновляется, не-черновик — CONFLICT
     (ничего не меняется), нет записи — создаётся черновик (только draft).
     У типа нет поля seo (rb-seo выключен) — SEO_NOT_SUPPORTED до записи.
 
     Доступы — только окружение WP_API_USER / WP_API_TOKEN.
-    Ответ: {id, url, status, modified, content_hash, created, featured_media?};
-    content_hash — sha256 от content.raw, который сохранил WordPress.
+    Ответ: {id, url, status, modified, content_hash, created, slug, slug_kept,
+    featured_media?}; content_hash — sha256 от content.raw, который сохранил
+    WordPress; slug — текущий slug записи на сайте.
 
     Exit-коды: 0 — готово; 1 — NOT_FOUND (id, медиа или файл изображения),
     CONFLICT, SEO_NOT_SUPPORTED; 2 — неверный вход или флаги; 3 — AUTH_MISSING,

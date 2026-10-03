@@ -270,13 +270,18 @@ async def upsert(client: WordPressClient, spec: UpsertInput) -> Dict[str, Any]:
     if "seo" in spec.fields:
         await require_seo_field(client, spec.post_type, base)
 
+    payload = dict(spec.fields)
+    slug_kept = False
     target_id = spec.post_id
     if target_id is not None:
-        await _get_item(client, base, target_id)
+        current = await _get_item(client, base, target_id)
+        # Slug не-черновика — живой URL: из входа не применяется (WP иначе дал бы ему slug-2 и т.п.)
+        if current.get("status") != DRAFT and payload.get("slug", current.get("slug")) != current.get("slug"):
+            del payload["slug"]
+            slug_kept = True
     else:
         target_id = _choose_target(spec.post_type, str(spec.slug), await _find_by_slug(client, base, str(spec.slug)))
 
-    payload = dict(spec.fields)
     if spec.featured is not None:
         media = await resolve_featured(client, spec.featured)
         payload["featured_media"] = media["id"]
@@ -297,6 +302,8 @@ async def upsert(client: WordPressClient, spec: UpsertInput) -> Dict[str, Any]:
         "modified": item.get("modified"),
         "content_hash": content_hash(_raw(item, "content") or ""),
         "created": created,
+        "slug": item.get("slug"),
+        "slug_kept": slug_kept,
     }
     if spec.featured is not None:
         result["featured_media"] = item.get("featured_media")
