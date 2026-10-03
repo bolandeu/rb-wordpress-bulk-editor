@@ -1,0 +1,35 @@
+
+ Usage: wp-bulk post upsert [OPTIONS]
+
+ Создать черновик или обновить запись WordPress (одна запись за вызов).
+
+ Вход — JSON-объект {type?, id?, slug, title, content, seo?, featured?}:
+ type — тип записи (по умолчанию post); content — готовый HTML/Gutenberg,
+ без конвертации; seo — объект поля rb-seo ({title, description, …});
+ featured — изображение записи {path|url|id, alt?}.
+
+ С id (во входе или --id) — обновление этой записи, статус не меняется.
+ Без id — поиск по тип+slug: черновик обновляется, не-черновик — CONFLICT
+ (ничего не меняется), нет записи — создаётся черновик (только draft).
+ У типа нет поля seo (rb-seo выключен) — SEO_NOT_SUPPORTED до записи.
+
+ Доступы — только окружение WP_API_USER / WP_API_TOKEN.
+ Ответ: {id, url, status, modified, content_hash, created, featured_media?};
+ content_hash — sha256 от content.raw, который сохранил WordPress.
+
+ Exit-коды: 0 — готово; 1 — NOT_FOUND (id, медиа или файл изображения),
+ CONFLICT, SEO_NOT_SUPPORTED; 2 — неверный вход или флаги; 3 — AUTH_MISSING,
+ AUTH_FAILED; 5 — недоступен WordPress.
+
+ Example: wp-bulk post upsert --site example.com --input post.json --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --input        TEXT                  JSON {type?, id?, slug, title, content, seo?, featured?}:   │
+│                                      путь к файлу или - (stdin)                                  │
+│ --id           INTEGER RANGE [x>=1]  ID записи для обновления (иначе — поиск по slug)            │
+│ --site         TEXT                  Домен сайта (example.com или https://example.com)           │
+│ --json                               Машиночитаемый JSON-вывод.                                  │
+│ --quiet                              Только существенный вывод.                                  │
+│ --help                               Show this message and exit.                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

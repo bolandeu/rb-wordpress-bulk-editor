@@ -1,0 +1,4791 @@
+{
+  "opencli": "0.1",
+  "info": {
+    "title": "wp-bulk",
+    "version": "<version>",
+    "summary": "WordPress Bulk Editor - Excel <-> WordPress sync"
+  },
+  "command": {
+    "name": "wp-bulk",
+    "options": [
+      {
+        "name": "--project",
+        "aliases": [
+          "-P"
+        ],
+        "arguments": [
+          {
+            "name": "PROJECT",
+            "required": true
+          }
+        ],
+        "description": "Путь к директории проекта (по умолчанию — автопоиск .env вверх от текущей директории)",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "text"
+          }
+        ]
+      },
+      {
+        "name": "--json",
+        "description": "Машиночитаемый JSON-вывод.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--quiet",
+        "description": "Только существенный вывод.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--verbose",
+        "description": "Подробная диагностика.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--non-interactive",
+        "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--ai",
+        "description": "Напечатать бандленный SKILL.md (соглашения CLI) и выйти.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--version",
+        "description": "Напечатать версию и выйти.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": false
+          }
+        ]
+      },
+      {
+        "name": "--install-completion",
+        "description": "Install completion for the current shell.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          }
+        ]
+      },
+      {
+        "name": "--show-completion",
+        "description": "Show completion for the current shell, to copy it or customize the installation.",
+        "metadata": [
+          {
+            "name": "x-rb-type",
+            "value": "boolean"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "name": "sync",
+        "description": "Синхронизация файла данных -> WordPress.\n\nИсточник выбирается по расширению --file: .xlsx — листы Excel, .json —\nтабы JSON. Для JSON --sheets обязателен: в файле рядом с контентом лежат\nслужебные табы (options, company), синхронизировать «всё» небезопасно.\n\nЧто делать с записью, задаёт поле `action`:\n  add    — создать (нужен title, полученный id пишется обратно в файл)\n  update — обновить (нужен id)\n  delete — удалить (нужен id)\n  skip   — не трогать запись\n\nОбрабатываются наборы типов контента (posts, pages, CPT), таксономий\n(categories, tags, кастомные) и медиа (media, только Excel).\n\n`--filter field=value` (повторяемый, по И) сужает выборку до синхронизации:\nсравнение точное строковое по сырому значению поля, dot-нотация работает\nкак обычное имя поля (--filter acf.f1=value).\n\nПеред отправкой данные проверяются так же, как в `validate` (имена полей\nи таксономий, id/status/slug, файлы в значениях): при ошибках прогон\nостанавливается до подключения к сайту, включая --dry-run. Отключается\n--skip-checks.\n\nExit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед\nотправкой, 3 — нет credentials, 5 — недоступен WordPress,\n1 — непредвиденная ошибка.\n\nExample: wp-bulk sync --file site.json --sheets site.ru --dry-run",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к файлу данных .xlsx или .json (авто-определяется из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain (например, https://example.com)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Листы Excel / табы JSON через запятую (posts,pages). Для JSON обязателен",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--filter",
+            "arguments": [
+              {
+                "name": "FILTERS",
+                "required": true
+              }
+            ],
+            "description": "Фильтр записей field=value (повторяемый, условия по И): --filter type=rb_services",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-multiple",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Режим dry-run (без изменений)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных запросов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 5
+              }
+            ]
+          },
+          {
+            "name": "--skip-media",
+            "description": "Пропустить загрузку медиа",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--skip-tax",
+            "description": "Пропустить обновление таксономий (категории, теги)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--no-update-excel",
+            "description": "Не записывать ID обратно в файл данных (Excel или JSON)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--delete-media",
+            "description": "Удалять featured media при удалении записей (action=delete)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--skip-existing-media",
+            "description": "Не прикреплять существующие featured_media при update",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--test-mode",
+            "description": "Тестовый режим: обрабатывает только первые 3 строки из одного листа",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--columns",
+            "arguments": [
+              {
+                "name": "COLUMNS",
+                "required": true
+              }
+            ],
+            "description": "Колонки для обновления через запятую (excerpt,seo_title)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--skip-checks",
+            "description": "Не проверять данные перед отправкой (имена полей, таксономий, значения)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "async",
+        "description": "Асинхронная синхронизация файла данных -> WordPress\n\nИсточник (.xlsx или .json), --sheets, --filter и проверка перед\nотправкой (--skip-checks) — как у sync. Результат — тот же конверт,\nчто у sync (--json: статистика по наборам, log_file, cli_version).\n\nОтличия от sync:\n- Параллельная обработка строк (Semaphore)\n- Retry с exponential backoff\n- Circuit breaker для устойчивости\n- Настраиваемые таймауты\n\nExit-коды: 0 — успех, 2 — аргументы/структура файла/проверка перед\nотправкой, 3 — нет credentials, 5 — недоступен WordPress,\n1 — непредвиденная ошибка.\n\nExample: wp-bulk async --file site.json --sheets site.ru --json",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к файлу данных .xlsx или .json (авто-определяется из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain (например, https://example.com)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Листы Excel / табы JSON через запятую (posts,pages). Для JSON обязателен",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--filter",
+            "arguments": [
+              {
+                "name": "FILTERS",
+                "required": true
+              }
+            ],
+            "description": "Фильтр записей field=value (повторяемый, условия по И): --filter type=rb_services",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-multiple",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Режим dry-run (без изменений)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных запросов (default: 5)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--api-timeout",
+            "arguments": [
+              {
+                "name": "API_TIMEOUT",
+                "required": true
+              }
+            ],
+            "description": "API timeout в секундах (default: 30)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--max-retries",
+            "arguments": [
+              {
+                "name": "MAX_RETRIES",
+                "required": true
+              }
+            ],
+            "description": "Максимум повторных попыток (default: 3)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--circuit-breaker",
+            "aliases": [
+              "--no-circuit-breaker"
+            ],
+            "description": "Включить circuit breaker",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--skip-media",
+            "description": "Пропустить загрузку медиа",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--skip-tax",
+            "description": "Пропустить обновление таксономий (категории, теги)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--no-update-excel",
+            "description": "Не записывать ID обратно в файл данных (Excel или JSON)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--delete-media",
+            "description": "Удалять featured media при удалении записей (action=delete)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--skip-existing-media",
+            "description": "Не прикреплять существующие featured_media при update",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--test-mode",
+            "description": "Тестовый режим: обрабатывает только первые 3 строки",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--columns",
+            "arguments": [
+              {
+                "name": "COLUMNS",
+                "required": true
+              }
+            ],
+            "description": "Колонки для обновления через запятую (excerpt,seo_title)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--skip-checks",
+            "description": "Не проверять данные перед отправкой (имена полей, таксономий, значения)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "fetch",
+        "description": "Получение данных из WordPress -> Excel или JSON.\n\nExcel (по умолчанию): лист на каждый тип записи и таксономию.\n\nJSON (--file *.json или --to-json): один таб на сайт — имя таба = домен\n(или --tab). Термины и контент лежат в одном табе и различаются полями:\nу термина заполнен taxonomy (имя в name, текст в description), у контента —\ntype. ACF/SEO пишутся dot-нотацией (acf.f1, seo.title). Таб пересобирается\nцеликом, _row_num нумеруется с 2; остальные табы файла не трогаются.\nСуществующий непустой таб перезаписывается только после подтверждения.\nВ реестр проекта <проект>/<проект>.json fetch не пишет.\n\nExit-коды: 0 — успех, 1 — отказ в подтверждении, 2 — аргументы/файл,\n3 — нет credentials, 5 — недоступен WordPress.\n\nExample: wp-bulk fetch --to-json --tab site.ru --json",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Файл выгрузки: .xlsx (по умолчанию fetch.xlsx) или .json (один таб на сайт)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain (например, https://example.com)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Типы записей и таксономии через запятую (posts,pages,category)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--status",
+            "arguments": [
+              {
+                "name": "STATUS",
+                "required": true
+              }
+            ],
+            "description": "Фильтр по статусу (publish, draft, any)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "any"
+              }
+            ]
+          },
+          {
+            "name": "--limit",
+            "arguments": [
+              {
+                "name": "LIMIT",
+                "required": true
+              }
+            ],
+            "description": "Максимум записей на лист (в JSON — на тип записи/таксономию)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--exclude",
+            "arguments": [
+              {
+                "name": "EXCLUDE",
+                "required": true
+              }
+            ],
+            "description": "Список типов для исключения через запятую (posts,category)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--to-json",
+            "description": "Выгрузить в JSON без --file: <проект>/wp-fetch/<домен>.json",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--tab",
+            "arguments": [
+              {
+                "name": "TAB",
+                "required": true
+              }
+            ],
+            "description": "Имя таба JSON (по умолчанию — домен сайта)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "fetch-media",
+        "description": "Выгрузить список медиафайлов WordPress в таб media файла данных.\n\nФормат выбирается по расширению --file: JSON (таб \"media\" рядом с\nостальными табами файла) или Excel (лист media). Таб пересобирается\nцеликом, остальные табы не трогаются; непустой таб перезаписывается\nтолько после подтверждения. В реестр проекта <проект>/<проект>.json\nне пишет.\n\nПоля записи: action (skip), img_path, id, date, modified, title, slug,\nlink, status, guid, caption, alt_text, media_type, mime_type, post,\nsource_url, description.\n\nExit-коды: 0 — успех, 1 — отказ в подтверждении, 2 — аргументы/файл,\n3 — нет credentials, 5 — недоступен WordPress.\n\nExample: wp-bulk fetch-media --file wp-fetch/site.ru.json --json",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Файл выгрузки: .json или .xlsx (по умолчанию — xlsx из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "update",
+        "description": "Подтянуть указанные поля из WordPress в файл данных по ID.\n\nИсточник выбирается по расширению --file: .xlsx — листы Excel, .json —\nтабы JSON (для JSON --sheets обязателен: рядом с контентом лежат служебные\nтабы). Без --id обновляются все записи с заполненным id. Контент и термины\nтаксономий в одном табе различаются полями type/taxonomy.\n\nWordPress не изменяется — только чтение. Dot-нотация в --columns\n(seo.title, acf.f1) работает как обычное имя поля. В Excel пишутся только\nсуществующие колонки, в JSON недостающие поля записи добавляются.\n--dry-run не открывает файл на запись.\n\nExit-коды: 0 — успех, 2 — аргументы/структура файла, 3 — нет credentials,\n5 — недоступен WordPress, 1 — непредвиденная ошибка.\n\nExample: wp-bulk update --file site.json --sheets site.ru --columns slug,link --dry-run",
+        "options": [
+          {
+            "name": "--id",
+            "arguments": [
+              {
+                "name": "IDS",
+                "required": true
+              }
+            ],
+            "description": "ID записей через запятую: 123,456,789. Без --id — все записи с id.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--columns",
+            "aliases": [
+              "-c"
+            ],
+            "required": true,
+            "arguments": [
+              {
+                "name": "COLUMNS",
+                "required": true
+              }
+            ],
+            "description": "Поля для обновления из WordPress: title,excerpt,seo.title,acf.f1",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Файл данных .xlsx или .json (авто-определяется из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Листы Excel / табы JSON через запятую. Для JSON обязателен",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать изменения без записи в файл",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--test-mode",
+            "description": "Только первые 3 записи каждого набора",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "export",
+        "description": "Экспорт всего контента сайта в файлы.\n\nНаходит все типы контента и экспортирует их в отдельные HTML файлы.\nСоздает CSV индекс.\n\nExample: wp-bulk export --output ./exported_content",
+        "options": [
+          {
+            "name": "--domain",
+            "aliases": [
+              "-d"
+            ],
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "aliases": [
+              "-u"
+            ],
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "aliases": [
+              "-p"
+            ],
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT",
+                "required": true
+              }
+            ],
+            "description": "Папка для экспорта контента",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "exported_content"
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "aliases": [
+              "-c"
+            ],
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных загрузок",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "name": "--include-media",
+            "description": "Включить экспорт метаданных медиа",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "export-media",
+        "description": "Экспортировать медиафайлы из WordPress в CSV (с файлами или без)\n\nExample: wp-bulk export-media --download-files",
+        "options": [
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "URL WordPress сайта",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "Имя пользователя WordPress",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT",
+                "required": true
+              }
+            ],
+            "description": "Папка для экспорта",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "export_media"
+              }
+            ]
+          },
+          {
+            "name": "--download-files",
+            "aliases": [
+              "--no-download-files"
+            ],
+            "description": "Скачивать файлы или только метаданные",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных загрузок",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "validate",
+        "description": "Проверка файла данных перед отправкой — без синхронизации.\n\nТа же проверка автоматически идёт перед sync/async (отключается\n--skip-checks). Сообщаются все проблемы сразу:\n\n- имена полей: всё, кроме acf.* / acf_* / meta.*, — известное поле\n  WordPress, SEO-поле или своё поле из WP_EXTRA_FIELDS; к опечатке\n  подсказывается похожее имя (seo.descripton → seo.description);\n- таксономии и типы — по сайту (только чтение): колонка-таксономия\n  есть на сайте и привязана к типу записи, type / taxonomy записей\n  существуют; к опечатке — похожее имя с сайта;\n- значения записей add/update/delete: id у update/delete, status,\n  дубли slug, разделитель терминов \"; \", да/нет в seo.robots.*,\n  существование файлов в значениях-путях (acf.more = \"content/1.html\").\n\nЗаписи skip / без action на сайт не уходят: их проблемы — предупреждения.\n\nСайт используется, если есть доступы. Без них или с --offline\nтаксономии узнаются по соглашению (cat/tax/term/tag через _ или -),\nWP_TAXONOMIES и самому файлу (записи-термины, листы таксономий);\nв ответе site_checked=false.\n\nExit-коды: 0 — файл валиден, 2 — ошибки в файле/аргументах,\n3 — сайт отверг доступы, 5 — сайт недоступен (повторите с --offline),\n1 — непредвиденная ошибка.\n\nExample: wp-bulk validate --file site.json --sheets site.ru --json",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Файл данных .xlsx или .json (авто-определяется из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Листы Excel / табы JSON через запятую (для JSON обязателен)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--offline",
+            "description": "Не обращаться к сайту: таксономии — по соглашению, WP_TAXONOMIES и самому файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "options",
+        "description": "Настройки сайта WordPress (плагин siteoptions) <-> таб options файла данных.\n\nФормат выбирается по расширению --file: JSON (таб \"options\") или Excel\n(лист options). Запись таба — {key, value}; прочие поля (label и т.п.)\nигнорируются, записи с пустым key или value не отправляются.\n\nБез --fetch: отправка настроек из таба на сайт. Без --file берётся файл\nданных проекта (xlsx или json).\nС --fetch: выгрузка настроек с сайта в таб options; таб пересобирается\nцеликом, остальные табы не трогаются. Без --file — xlsx проекта или\n./options.xlsx. В реестр проекта <проект>/<проект>.json не пишет.\n\nЗапись настроек на сайт и пересборку непустого таба откатить нельзя:\nсначала доступен --dry-run, затем спрашивается подтверждение, а под\n--non-interactive требуется явный --confirm.\n\nExit-коды: 0 — успех, 2 — аргументы/файл или отсутствующий --confirm,\n3 — нет credentials,\n5 — недоступен WordPress, 1 — непредвиденная ошибка.\n\nExample: wp-bulk options --fetch --file wp-fetch/site.ru.json --json",
+        "options": [
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Файл данных .json или .xlsx (таб/лист options)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--fetch",
+            "description": "Выгрузить настройки с сайта в файл (вместо отправки)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать что будет отправлено, без отправки",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bulk-delete",
+        "description": "Массовое удаление всех записей указанного типа\n\nОПАСНО: удаление необратимо. Сначала --dry-run (ничего не удаляет),\nзатем — подтверждение: человеку задаётся вопрос, а под --non-interactive\n(и в --json, и когда stdin не терминал) нужен явный --confirm.\n\nПримеры:\n    # Посмотреть что будет удалено, ничего не трогая\n    wp-bulk bulk-delete --post-type posts --dry-run\n\n    # Удалить все черновики постов в корзину (спросит подтверждение)\n    wp-bulk bulk-delete --post-type posts --status draft\n\n    # Неинтерактивно: подтверждение обязательно флагом\n    wp-bulk bulk-delete --post-type service --force --delete-media             --non-interactive --confirm\n\nExit-коды: 0 — успех, 1 — отменено пользователем/непредвиденная ошибка,\n2 — аргументы или отсутствующий --confirm, 3 — нет credentials,\n5 — недоступен WordPress.\n\nExample: wp-bulk bulk-delete --post-type posts --dry-run",
+        "options": [
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain (например, https://example.com)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--post-type",
+            "aliases": [
+              "-t"
+            ],
+            "required": true,
+            "arguments": [
+              {
+                "name": "POST_TYPE",
+                "required": true
+              }
+            ],
+            "description": "Тип контента для удаления (posts, pages, service, и т.д.)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--status",
+            "arguments": [
+              {
+                "name": "STATUS",
+                "required": true
+              }
+            ],
+            "description": "Статус записей для удаления (any, publish, draft, etc.)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "any"
+              }
+            ]
+          },
+          {
+            "name": "--force",
+            "description": "Удалить полностью (минуя корзину)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--delete-media",
+            "description": "Удалять связанные featured media",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать что будет удалено, без удаления",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--confirm",
+            "description": "Подтвердить опасную операцию без вопроса.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--non-interactive",
+            "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "counter",
+        "description": "Подсчет количества слов и символов в контенте записей WordPress.\n\nВыводит результаты в CSV файл с полями:\nid, slug, link, title, words, chars\n\nПример:\n    wp-bulk counter --domain https://example.com --type posts --output stats.csv\n\nExample: wp-bulk counter --type posts --output stats.csv",
+        "options": [
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain (например, https://example.com)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--type",
+            "aliases": [
+              "-t"
+            ],
+            "arguments": [
+              {
+                "name": "POST_TYPE",
+                "required": true
+              }
+            ],
+            "description": "Тип контента (posts, pages, или custom post type)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "posts"
+              }
+            ]
+          },
+          {
+            "name": "--status",
+            "aliases": [
+              "-s"
+            ],
+            "arguments": [
+              {
+                "name": "STATUS",
+                "required": true
+              }
+            ],
+            "description": "Статус записей (publish, draft, any)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "publish"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT",
+                "required": true
+              }
+            ],
+            "description": "Путь к выходному CSV файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "counter_output.csv"
+              }
+            ]
+          },
+          {
+            "name": "--limit",
+            "aliases": [
+              "-l"
+            ],
+            "arguments": [
+              {
+                "name": "LIMIT",
+                "required": true
+              }
+            ],
+            "description": "Максимум записей для обработки",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "aliases": [
+              "-c"
+            ],
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных запросов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "llm",
+        "description": "Массовая генерация контента через LLM.\n\nОбрабатывает строки где action=update и генерирует контент в указанную колонку.\nПоддерживает подстановку значений из других колонок через [column_name].\n\nТЕКСТ идёт через общую библиотеку llmkit: цепочки моделей с фолбэком, ретраи,\nкэш и учёт стоимости. Ключи провайдеров llmkit берёт из своего конфига\n(~/Library/Application Support/llmkit/config.toml) или связки ключей ОС —\nНЕ из .env проекта. Нужен свой OpenAI-совместимый сервер для текста — заведите\nего там провайдером kind = \"openai_compatible\"; флаги --endpoint/--token\nна текст больше не влияют.\n\nКАРТИНКИ (--column img_path) llmkit не умеет — они по-прежнему идут своим\nвызовом, и только для них нужны --endpoint/--token (LLM_ENDPOINT/LLM_TOKEN)\nи модели LLM_IMG_MODELS.\n\nПримеры:\n    # Генерация excerpt уровнем llmkit\n    llm --column excerpt --level cheap --prompt \"Напиши короткий lead абзац к услуге [title]\"\n\n    # Явная цепочка моделей с fallback (формат llmkit: провайдер/модель)\n    llm --column description --prompt \"Опиши [title]\"             --model \"ollama/gpt-oss:120b,openrouter/openai/gpt-4o-mini\"\n\n    # С конвертацией Markdown в HTML, уровень llmkit по умолчанию\n    llm --column content --prompt \"Напиши статью про [title]\" --md-to-html\n\n    # Картинка: нужен endpoint + token\n    llm --column img_path --model \"some-image-model\"             --endpoint https://api.example/v1/chat/completions --token ...\n\nExample: wp-bulk llm --column excerpt --level cheap --prompt \"Кратко о [title]\" --dry-run",
+        "options": [
+          {
+            "name": "--column",
+            "aliases": [
+              "-c"
+            ],
+            "required": true,
+            "arguments": [
+              {
+                "name": "COLUMN",
+                "required": true
+              }
+            ],
+            "description": "Колонка для генерации контента",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к Excel файлу (авто-определяется из --project)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--sheets",
+            "arguments": [
+              {
+                "name": "SHEETS",
+                "required": true
+              }
+            ],
+            "description": "Список листов через запятую (posts,pages)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--model",
+            "aliases": [
+              "-m"
+            ],
+            "arguments": [
+              {
+                "name": "MODEL",
+                "required": true
+              }
+            ],
+            "description": "Модели через запятую. Текст: цепочка llmkit ('провайдер/модель'), по умолчанию LLM_MODELS из .env. Картинки (--column img_path): модели endpoint'а, по умолчанию LLM_IMG_MODELS/LLM_MODELS",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--level",
+            "arguments": [
+              {
+                "name": "LEVEL",
+                "required": true
+              }
+            ],
+            "description": "Уровень llmkit (cheap/judge/strong — что настроено в его конфиге). Только для текста, по умолчанию LLM_LEVEL из .env. Если не задан ни --level, ни --model — llmkit берёт свой уровень по умолчанию",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--prompt",
+            "aliases": [
+              "-p"
+            ],
+            "arguments": [
+              {
+                "name": "PROMPT",
+                "required": true
+              }
+            ],
+            "description": "Промпт для генерации (используйте [column] для подстановки значений)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--endpoint",
+            "arguments": [
+              {
+                "name": "ENDPOINT",
+                "required": true
+              }
+            ],
+            "description": "LLM API endpoint — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_ENDPOINT",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--token",
+            "arguments": [
+              {
+                "name": "TOKEN",
+                "required": true
+              }
+            ],
+            "description": "LLM API token — ТОЛЬКО для картинок (--column img_path), по умолчанию .env: LLM_TOKEN",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--overwrite",
+            "description": "Перезаписывать существующие значения в колонке",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Режим тестирования без записи в Excel",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--strip-tags",
+            "description": "Удалить HTML теги из результата",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--md-to-html",
+            "description": "Конвертировать Markdown в HTML",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--html-to-md",
+            "description": "Конвертировать HTML в Markdown",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "reshape",
+        "description": "Перенос данных из fetch-файла в структуру шаблона.\n\nБерёт Excel-источник (результат fetch), Excel-шаблон (из templates/),\nи создаёт результирующий Excel, где данные из источника перенесены\nв структуру шаблона (листы, колонки, порядок).\n\nПо умолчанию колонки из источника, которых нет в шаблоне, дописываются\nв конец. --extra none отключает это, --extra \"col1,col2\" добавляет только указанные.\n\nПримеры:\n    wp-bulk reshape\n    wp-bulk reshape --extra none\n    wp-bulk reshape --extra \"acf_price,acf_address\"\n    wp-bulk reshape --src custom.xlsx --tpl my_template.xlsx -o result.xlsx\n\nExample: wp-bulk reshape --extra none",
+        "options": [
+          {
+            "name": "--source",
+            "aliases": [
+              "--src",
+              "-s"
+            ],
+            "arguments": [
+              {
+                "name": "SOURCE",
+                "required": true
+              }
+            ],
+            "description": "Excel-источник (по умолчанию fetch.xlsx)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--template",
+            "aliases": [
+              "--tpl",
+              "-t"
+            ],
+            "arguments": [
+              {
+                "name": "TEMPLATE",
+                "required": true
+              }
+            ],
+            "description": "Шаблон: имя в templates/ или полный путь (по умолчанию default.xlsx)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT",
+                "required": true
+              }
+            ],
+            "description": "Результирующий файл (по умолчанию export.xlsx)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--extra",
+            "aliases": [
+              "-e"
+            ],
+            "arguments": [
+              {
+                "name": "EXTRA_COLUMNS",
+                "required": true
+              }
+            ],
+            "description": "Доп. колонки из источника: список через запятую или 'none' чтобы не добавлять",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "taxonomies",
+        "description": "Вывести список таксономий сайта (справка).\n\nsync/async/validate берут таксономии с сайта сами — вписывать их в\nWP_TAXONOMIES не нужно. env_line — для ручного исключения или для\nпроверки без сайта (validate --offline).\n\nПример:\n    wp-bulk --project ~/sites/mysite taxonomies\n    → WP_TAXONOMIES=product_cat,brand,regions\n\nExit-коды: 0 — успех, 3 — нет credentials, 5 — недоступен WordPress,\n1 — непредвиденная ошибка.\n\nExample: wp-bulk taxonomies --json",
+        "options": [
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env (по умолчанию .env проекта)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--include-system",
+            "description": "Включать служебные таксономии (nav_menu, post_format, wp_pattern_category и т.п.)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "doctor",
+        "description": "Диагностика окружения: проект, версия, конфиг, credentials.\n\nПроверки: project, cli_compat, config, credentials, credential_store\n(и connection — только с --check-connection).\n\nБез --check-connection живой сайт не нужен: команда быстрая и офлайн.\nРезультат проверок — в payload (`status` каждой проверки и общий `status`),\nсам запуск диагностики успешен.\n\nExit-коды: 0 — диагностика выполнена, 1 — непредвиденная ошибка.\n\nExample: wp-bulk doctor --check-connection --json",
+        "options": [
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу (по умолчанию .env проекта)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--check-connection",
+            "description": "Дополнительно проверить, отвечает ли сайт (сетевой запрос).",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "image-crop",
+        "description": "Обрезка изображений под размер или соотношение сторон.\n\nПоддерживает градиентный overlay и водяной знак (текст или картинка).\n\nПримеры:\n\n    wp-bulk image-crop -P ost --aspect-ratio 16:9\n\n    wp-bulk image-crop --input ./photos --width 800 --height 600\n\n    wp-bulk image-crop -P ost -a 1:1 --strategy top\n\n    wp-bulk image-crop -P ost -a 16:9 --gradient 0.5\n\n    wp-bulk image-crop -P ost -a 16:9 --wt \"© MySite\" --wp center\n\nExample: wp-bulk image-crop --input ./photos --aspect-ratio 16:9",
+        "options": [
+          {
+            "name": "--input",
+            "aliases": [
+              "-i"
+            ],
+            "arguments": [
+              {
+                "name": "INPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка с изображениями",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка для результатов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--width",
+            "aliases": [
+              "-W"
+            ],
+            "arguments": [
+              {
+                "name": "WIDTH",
+                "required": true
+              }
+            ],
+            "description": "Ширина в пикселях",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--height",
+            "aliases": [
+              "-H"
+            ],
+            "arguments": [
+              {
+                "name": "HEIGHT",
+                "required": true
+              }
+            ],
+            "description": "Высота в пикселях",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--aspect-ratio",
+            "aliases": [
+              "-a"
+            ],
+            "arguments": [
+              {
+                "name": "ASPECT_RATIO",
+                "required": true
+              }
+            ],
+            "description": "Соотношение сторон (16:9, 4:3, 1:1)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--strategy",
+            "aliases": [
+              "-s"
+            ],
+            "arguments": [
+              {
+                "name": "STRATEGY",
+                "required": true
+              }
+            ],
+            "description": "Стратегия обрезки: center, top, bottom, left, right",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "name": "--glob",
+            "aliases": [
+              "-g"
+            ],
+            "arguments": [
+              {
+                "name": "GLOB_PATTERN",
+                "required": true
+              }
+            ],
+            "description": "Паттерн файлов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "*.{jpg,jpeg,png,webp}"
+              }
+            ]
+          },
+          {
+            "name": "--recursive",
+            "aliases": [
+              "-r"
+            ],
+            "description": "Искать в подпапках",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--overwrite",
+            "description": "Перезаписать существующие",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--gradient",
+            "arguments": [
+              {
+                "name": "GRADIENT",
+                "required": true
+              }
+            ],
+            "description": "Затемняющий градиент снизу (opacity 0.0-1.0)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "float"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "--gradient-height",
+            "arguments": [
+              {
+                "name": "GRADIENT_HEIGHT",
+                "required": true
+              }
+            ],
+            "description": "Высота градиента (доля 0.0-1.0)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "float"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 0.5
+              }
+            ]
+          },
+          {
+            "name": "--watermark-text",
+            "aliases": [
+              "--wt"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_TEXT",
+                "required": true
+              }
+            ],
+            "description": "Текст водяного знака",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--watermark-image",
+            "aliases": [
+              "--wi"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_IMAGE",
+                "required": true
+              }
+            ],
+            "description": "Картинка водяного знака",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--watermark-position",
+            "aliases": [
+              "--wp"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_POSITION",
+                "required": true
+              }
+            ],
+            "description": "Позиция: center, bottom-right, bottom-left, top-right, top-left, bottom-center",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "bottom-right"
+              }
+            ]
+          },
+          {
+            "name": "--watermark-opacity",
+            "aliases": [
+              "--wo"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_OPACITY",
+                "required": true
+              }
+            ],
+            "description": "Прозрачность водяного знака (0.0-1.0)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "float"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 0.3
+              }
+            ]
+          },
+          {
+            "name": "--watermark-size",
+            "aliases": [
+              "--ws"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_SIZE",
+                "required": true
+              }
+            ],
+            "description": "Размер шрифта (авто если не указан)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--watermark-color",
+            "aliases": [
+              "--wc"
+            ],
+            "arguments": [
+              {
+                "name": "WATERMARK_COLOR",
+                "required": true
+              }
+            ],
+            "description": "Цвет текста (#RRGGBB)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "#FFFFFF"
+              }
+            ]
+          },
+          {
+            "name": "--watermark-scale",
+            "arguments": [
+              {
+                "name": "WATERMARK_SCALE",
+                "required": true
+              }
+            ],
+            "description": "Масштаб картинки-водяного знака (доля от ширины)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "float"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 0.2
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать что будет сделано",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробный вывод",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "image-compress",
+        "description": "Сжатие изображений для веба.\n\nПримеры:\n\n    wp-bulk image-compress -P ost --quality 80\n\n    wp-bulk image-compress --input ./photos -q 75 --max-width 1920\n\nExample: wp-bulk image-compress --input ./photos --quality 80",
+        "options": [
+          {
+            "name": "--input",
+            "aliases": [
+              "-i"
+            ],
+            "arguments": [
+              {
+                "name": "INPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка с изображениями",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка для результатов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--quality",
+            "aliases": [
+              "-q"
+            ],
+            "arguments": [
+              {
+                "name": "QUALITY",
+                "required": true
+              }
+            ],
+            "description": "Качество JPEG/WebP (1-100)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer range"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "name": "--max-width",
+            "arguments": [
+              {
+                "name": "MAX_WIDTH",
+                "required": true
+              }
+            ],
+            "description": "Максимальная ширина (пропорционально)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--max-height",
+            "arguments": [
+              {
+                "name": "MAX_HEIGHT",
+                "required": true
+              }
+            ],
+            "description": "Максимальная высота (пропорционально)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer"
+              }
+            ]
+          },
+          {
+            "name": "--strip-metadata",
+            "aliases": [
+              "--keep-metadata"
+            ],
+            "description": "Удалить EXIF метаданные",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--glob",
+            "aliases": [
+              "-g"
+            ],
+            "arguments": [
+              {
+                "name": "GLOB_PATTERN",
+                "required": true
+              }
+            ],
+            "description": "Паттерн файлов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "*.{jpg,jpeg,png,webp}"
+              }
+            ]
+          },
+          {
+            "name": "--recursive",
+            "aliases": [
+              "-r"
+            ],
+            "description": "Искать в подпапках",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--overwrite",
+            "description": "Перезаписать существующие",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать что будет сделано",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробный вывод",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "image-convert",
+        "description": "Конвертация изображений в другой формат (по умолчанию WebP).\n\nПримеры:\n\n    wp-bulk image-convert -P ost --format webp\n\n    wp-bulk image-convert --input ./photos -f webp -q 85\n\nExample: wp-bulk image-convert --input ./photos --format webp",
+        "options": [
+          {
+            "name": "--input",
+            "aliases": [
+              "-i"
+            ],
+            "arguments": [
+              {
+                "name": "INPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка с изображениями",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--output",
+            "aliases": [
+              "-o"
+            ],
+            "arguments": [
+              {
+                "name": "OUTPUT_FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка для результатов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--format",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "TARGET_FORMAT",
+                "required": true
+              }
+            ],
+            "description": "Целевой формат: webp, jpg, png",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "webp"
+              }
+            ]
+          },
+          {
+            "name": "--quality",
+            "aliases": [
+              "-q"
+            ],
+            "arguments": [
+              {
+                "name": "QUALITY",
+                "required": true
+              }
+            ],
+            "description": "Качество для lossy форматов (1-100)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer range"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "name": "--strip-metadata",
+            "aliases": [
+              "--keep-metadata"
+            ],
+            "description": "Удалить EXIF метаданные",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": true
+              }
+            ]
+          },
+          {
+            "name": "--glob",
+            "aliases": [
+              "-g"
+            ],
+            "arguments": [
+              {
+                "name": "GLOB_PATTERN",
+                "required": true
+              }
+            ],
+            "description": "Паттерн файлов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "*.{jpg,jpeg,png,gif,bmp,tiff}"
+              }
+            ]
+          },
+          {
+            "name": "--recursive",
+            "aliases": [
+              "-r"
+            ],
+            "description": "Искать в подпапках",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--overwrite",
+            "description": "Перезаписать существующие",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "aliases": [
+              "-d"
+            ],
+            "description": "Показать что будет сделано",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробный вывод",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "vlook",
+        "description": "Привязка файлов к строкам Excel по ID (VLOOKUP по файловой системе).\n\nИщет файлы {id}.ext в папке и записывает имя файла в колонку Excel.\n\n\b\nРежимы:\n  content - {id}.html в content/ -> content_path (по умолчанию)\n  media   - {id}.<картинка> в media/ -> img_path\n  both    - content + media одновременно\n  custom  - --folder + --column, любые файлы\n\nExample: wp-bulk vlook --mode media",
+        "options": [
+          {
+            "name": "--mode",
+            "aliases": [
+              "-m"
+            ],
+            "arguments": [
+              {
+                "name": "MODE",
+                "required": true
+              }
+            ],
+            "description": "Режим: content, media, both, custom",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-default",
+                "value": "content"
+              }
+            ]
+          },
+          {
+            "name": "--file",
+            "aliases": [
+              "-f"
+            ],
+            "arguments": [
+              {
+                "name": "FILE",
+                "required": true
+              }
+            ],
+            "description": "Excel файл (по умолчанию export.xlsx)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--sheet",
+            "aliases": [
+              "-s"
+            ],
+            "arguments": [
+              {
+                "name": "SHEET",
+                "required": true
+              }
+            ],
+            "description": "Конкретный лист (по умолчанию все контентные)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--folder",
+            "arguments": [
+              {
+                "name": "FOLDER",
+                "required": true
+              }
+            ],
+            "description": "Папка для поиска (режим custom)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "path"
+              }
+            ]
+          },
+          {
+            "name": "--column",
+            "arguments": [
+              {
+                "name": "COLUMN",
+                "required": true
+              }
+            ],
+            "description": "Колонка для записи (режим custom)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--verbose",
+            "aliases": [
+              "-v"
+            ],
+            "description": "Подробные логи",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "media-upload",
+        "description": "Загрузка файлов с диска в медиатеку WordPress -> id вложений.\n\nПути — аргументами (--alt/--title/--caption применяются ко всем) или\nманифестом --manifest. Файлы данных проекта команда не читает и не пишет:\nсвязать id с записями (featured_media) — дело вызывающего. Дубли не\nищутся — грузится ровно то, что передано; alt/title/caption ставятся\nтолько присланные.\n\nОтвет: uploaded [{path, id, source_url, meta_error?}] и failed\n[{path, error, code}]; path — дословно как передан. meta_error —\nвложение создано, но alt/title/caption не проставились.\nЧастичный успех — успех (exit 0). По ходу — строки [n/total] в лог.\n\nExit-коды: 0 — загружен хотя бы один файл, 2 — аргументы/манифест или\nни одного файла нет на диске, 3 — нет credentials, 5 — недоступен WordPress.\n\nExample: wp-bulk media-upload media/1.jpg media/2.jpg --alt \"Фото\" --json",
+        "options": [
+          {
+            "name": "--manifest",
+            "arguments": [
+              {
+                "name": "MANIFEST",
+                "required": true
+              }
+            ],
+            "description": "JSON-массив [{\"path\", \"alt\"?, \"title\"?, \"caption\"?}] — пакетная загрузка",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--alt",
+            "arguments": [
+              {
+                "name": "ALT",
+                "required": true
+              }
+            ],
+            "description": "Alt-текст для всех путей-аргументов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--title",
+            "arguments": [
+              {
+                "name": "TITLE",
+                "required": true
+              }
+            ],
+            "description": "Заголовок вложения для всех путей-аргументов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--caption",
+            "arguments": [
+              {
+                "name": "CAPTION",
+                "required": true
+              }
+            ],
+            "description": "Подпись для всех путей-аргументов",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--concurrency",
+            "arguments": [
+              {
+                "name": "CONCURRENCY",
+                "required": true
+              }
+            ],
+            "description": "Количество параллельных загрузок",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "integer range"
+              },
+              {
+                "name": "x-rb-default",
+                "value": 5
+              }
+            ]
+          },
+          {
+            "name": "--dry-run",
+            "description": "Проверить манифест и наличие файлов, к сайту не обращаться (id: null)",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--domain",
+            "arguments": [
+              {
+                "name": "DOMAIN",
+                "required": true
+              }
+            ],
+            "description": "WordPress domain",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--username",
+            "arguments": [
+              {
+                "name": "USERNAME",
+                "required": true
+              }
+            ],
+            "description": "WordPress username",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--password",
+            "arguments": [
+              {
+                "name": "PASSWORD",
+                "required": true
+              }
+            ],
+            "description": "WordPress Application Password",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              }
+            ]
+          },
+          {
+            "name": "--env-file",
+            "arguments": [
+              {
+                "name": "ENV_FILE",
+                "required": true
+              }
+            ],
+            "description": "Путь к .env файлу",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "file"
+              }
+            ]
+          },
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "name": "paths",
+            "required": false,
+            "arity": {
+              "minimum": 0
+            },
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "text"
+              },
+              {
+                "name": "x-rb-multiple",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "describe",
+        "description": "Машиночитаемый контракт этого CLI: документ OpenCLI (opencli.org).\n\nКоманды, опции, аргументы, коды выхода и метаданные x-rb-*: переменные\nокружения, файлы инструмента, имя дистрибутива. С --json — документ одной\nстрокой (без конверта {\"ok\": …}); без него — тот же документ с отступами.\n\nExit-коды: 0 — всегда.\n\nExample: wp-bulk describe --json",
+        "options": [
+          {
+            "name": "--json",
+            "description": "Машиночитаемый JSON-вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          },
+          {
+            "name": "--quiet",
+            "description": "Только существенный вывод.",
+            "metadata": [
+              {
+                "name": "x-rb-type",
+                "value": "boolean"
+              },
+              {
+                "name": "x-rb-default",
+                "value": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "description": "Доступы: отчёт об их здоровье и хранение доступов сайтов в OS keychain.",
+        "commands": [
+          {
+            "name": "status",
+            "description": "Отчёт о каждом доступе: откуда он берётся и работает ли. Значений не печатает.\n\nСайты WordPress — по записи `wp:<домен>` на каждую цель: сохранённые в\nkeychain (`auth login`), сайт активного проекта (та же цепочка, что у sync:\nокружение → keychain → .env проекта) и цель из --provider. Ключи LLM —\nзаписи `llmkit:<провайдер>` из отчёта llmkit, необязательные.\n\nБез --check — только наличие (`unchecked` / `missing`). С --check у сайта\n`GET /wp-json/wp/v2/users/me`: 401/403 — `invalid`, сеть/таймаут/5xx/429 —\n`unreachable`. Exit 0 — все обязательные ok/unchecked; 3 — у обязательного\nпроблема или любой доступ invalid/expired (конверт ok:false +\nCREDENTIALS_UNHEALTHY и весь отчёт); 2 — неизвестный --provider.\nФорма --json — общий контракт: `tool`, `version`, `checked_at`,\n`credentials[]` c `provider`, `required`, `fields`, `source`, `source_ref`,\n`status`, `expires_at`, `quota`, `message`.\n\nExample: wp-bulk auth status --check --json",
+            "options": [
+              {
+                "name": "--check",
+                "description": "Проверить каждый доступ одним дешёвым read-only запросом (предел 10 с).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--provider",
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true
+                  }
+                ],
+                "description": "Только этот провайдер: wp, wp:<домен>, llmkit или llmkit:<провайдер> (по умолчанию — все).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "login",
+            "description": "Сохранить логин и пароль приложения сайта в OS keychain.\n\nПароль берётся из WP_<DOMAIN>_API_TOKEN / WP_API_TOKEN, иначе спрашивается\nскрытым вводом; флага для пароля нет, чтобы он не попал в историю shell.\nБез терминала (или с --non-interactive) недостающее поле — ошибка, exit 2.\nСохранённый сайт появляется в `auth status`.\n\nExample: wp-bulk auth login --provider wp:example.com --username editor",
+            "options": [
+              {
+                "name": "--provider",
+                "required": true,
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true
+                  }
+                ],
+                "description": "Сайт: wp:<домен>, например wp:example.com.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--username",
+                "arguments": [
+                  {
+                    "name": "USERNAME",
+                    "required": true
+                  }
+                ],
+                "description": "Логин WordPress (иначе WP_<DOMAIN>_API_USER / WP_API_USER или вопрос).",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--non-interactive",
+                "description": "Никогда не спрашивать; вместо вопроса — ошибка.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "logout",
+            "description": "Удалить доступ сайта из OS keychain. Отсутствующий доступ — не ошибка.\n\nExample: wp-bulk auth logout --provider wp:example.com",
+            "options": [
+              {
+                "name": "--provider",
+                "required": true,
+                "arguments": [
+                  {
+                    "name": "PROVIDER",
+                    "required": true
+                  }
+                ],
+                "description": "Сайт: wp:<домен>.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "post",
+        "description": "Одна запись WordPress за вызов (адаптер Windmill): черновик/обновление, чтение.",
+        "commands": [
+          {
+            "name": "upsert",
+            "description": "Создать черновик или обновить запись WordPress (одна запись за вызов).\n\nВход — JSON-объект {type?, id?, slug, title, content, seo?, featured?}:\ntype — тип записи (по умолчанию post); content — готовый HTML/Gutenberg,\nбез конвертации; seo — объект поля rb-seo ({title, description, …});\nfeatured — изображение записи {path|url|id, alt?}.\n\nС id (во входе или --id) — обновление этой записи, статус не меняется.\nБез id — поиск по тип+slug: черновик обновляется, не-черновик — CONFLICT\n(ничего не меняется), нет записи — создаётся черновик (только draft).\nУ типа нет поля seo (rb-seo выключен) — SEO_NOT_SUPPORTED до записи.\n\nДоступы — только окружение WP_API_USER / WP_API_TOKEN.\nОтвет: {id, url, status, modified, content_hash, created, featured_media?};\ncontent_hash — sha256 от content.raw, который сохранил WordPress.\n\nExit-коды: 0 — готово; 1 — NOT_FOUND (id, медиа или файл изображения),\nCONFLICT, SEO_NOT_SUPPORTED; 2 — неверный вход или флаги; 3 — AUTH_MISSING,\nAUTH_FAILED; 5 — недоступен WordPress.\n\nExample: wp-bulk post upsert --site example.com --input post.json --json",
+            "options": [
+              {
+                "name": "--input",
+                "arguments": [
+                  {
+                    "name": "INPUT_PATH",
+                    "required": true
+                  }
+                ],
+                "description": "JSON {type?, id?, slug, title, content, seo?, featured?}: путь к файлу или - (stdin)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--id",
+                "arguments": [
+                  {
+                    "name": "POST_ID",
+                    "required": true
+                  }
+                ],
+                "description": "ID записи для обновления (иначе — поиск по slug)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "integer range"
+                  }
+                ]
+              },
+              {
+                "name": "--site",
+                "arguments": [
+                  {
+                    "name": "SITE",
+                    "required": true
+                  }
+                ],
+                "description": "Домен сайта (example.com или https://example.com)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--username",
+                "arguments": [
+                  {
+                    "name": "USERNAME",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: логин только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--password",
+                "arguments": [
+                  {
+                    "name": "PASSWORD",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: пароль только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "get",
+            "description": "Прочитать запись WordPress по ID (context=edit, сырые поля).\n\nОтвет: {id, type, slug, title, content, status, url, modified, seo,\nfeatured_media, content_hash}; title и content — raw, как в редакторе;\nseo — null, если у типа нет поля rb-seo; content_hash — тот же, что\nвернул post upsert для этого контента.\n\nДоступы — только окружение WP_API_USER / WP_API_TOKEN.\n\nExit-коды: 0 — готово; 1 — NOT_FOUND; 2 — неверные флаги или тип;\n3 — AUTH_MISSING, AUTH_FAILED; 5 — недоступен WordPress.\n\nExample: wp-bulk post get --id 42 --site example.com --json",
+            "options": [
+              {
+                "name": "--id",
+                "arguments": [
+                  {
+                    "name": "POST_ID",
+                    "required": true
+                  }
+                ],
+                "description": "ID записи",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "integer range"
+                  }
+                ]
+              },
+              {
+                "name": "--type",
+                "arguments": [
+                  {
+                    "name": "POST_TYPE",
+                    "required": true
+                  }
+                ],
+                "description": "Тип записи WordPress (post, page, rb_services…)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": "post"
+                  }
+                ]
+              },
+              {
+                "name": "--site",
+                "arguments": [
+                  {
+                    "name": "SITE",
+                    "required": true
+                  }
+                ],
+                "description": "Домен сайта (example.com или https://example.com)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--username",
+                "arguments": [
+                  {
+                    "name": "USERNAME",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: логин только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--password",
+                "arguments": [
+                  {
+                    "name": "PASSWORD",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: пароль только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "media",
+        "description": "Медиа записи: изображение (featured) для существующей записи.",
+        "commands": [
+          {
+            "name": "attach",
+            "description": "Сделать медиа изображением (featured) существующей записи.\n\nИсточник — ровно один из --path, --url, --media-id. Запись проверяется до\nзагрузки файла; статус записи не меняется. Доступы — только окружение\nWP_API_USER / WP_API_TOKEN.\n\nОтвет: {media_id, source_url, post_id}.\n\nExit-коды: 0 — готово; 1 — NOT_FOUND (запись, медиа или файл); 2 — неверные\nфлаги; 3 — AUTH_MISSING, AUTH_FAILED; 5 — недоступен WordPress.\n\nExample: wp-bulk media attach --post 42 --path cover.jpg --alt \"Обложка\" --site example.com --json",
+            "options": [
+              {
+                "name": "--post",
+                "arguments": [
+                  {
+                    "name": "POST_ID",
+                    "required": true
+                  }
+                ],
+                "description": "ID записи, которой ставится изображение",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "integer range"
+                  }
+                ]
+              },
+              {
+                "name": "--path",
+                "arguments": [
+                  {
+                    "name": "PATH",
+                    "required": true
+                  }
+                ],
+                "description": "Локальный файл: загрузить и привязать",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--url",
+                "arguments": [
+                  {
+                    "name": "URL",
+                    "required": true
+                  }
+                ],
+                "description": "URL файла: загрузить на сайт и привязать",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--media-id",
+                "arguments": [
+                  {
+                    "name": "MEDIA_ID",
+                    "required": true
+                  }
+                ],
+                "description": "ID уже загруженного медиа: привязать без загрузки",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "integer range"
+                  }
+                ]
+              },
+              {
+                "name": "--alt",
+                "arguments": [
+                  {
+                    "name": "ALT",
+                    "required": true
+                  }
+                ],
+                "description": "Alt-текст медиа",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--type",
+                "arguments": [
+                  {
+                    "name": "POST_TYPE",
+                    "required": true
+                  }
+                ],
+                "description": "Тип записи WordPress (post, page, rb_services…)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": "post"
+                  }
+                ]
+              },
+              {
+                "name": "--site",
+                "arguments": [
+                  {
+                    "name": "SITE",
+                    "required": true
+                  }
+                ],
+                "description": "Домен сайта (example.com или https://example.com)",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--username",
+                "arguments": [
+                  {
+                    "name": "USERNAME",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: логин только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--password",
+                "arguments": [
+                  {
+                    "name": "PASSWORD",
+                    "required": true
+                  }
+                ],
+                "description": "Не поддерживается: пароль только из WP_API_USER / WP_API_TOKEN",
+                "hidden": true,
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "text"
+                  }
+                ]
+              },
+              {
+                "name": "--json",
+                "description": "Машиночитаемый JSON-вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "name": "--quiet",
+                "description": "Только существенный вывод.",
+                "metadata": [
+                  {
+                    "name": "x-rb-type",
+                    "value": "boolean"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "exitCodes": [
+      {
+        "code": 0,
+        "description": "Успех"
+      },
+      {
+        "code": 1,
+        "description": "Общая ошибка или ошибка данных (UNEXPECTED, ABORTED, NOT_FOUND, CONFLICT, SEO_NOT_SUPPORTED)"
+      },
+      {
+        "code": 2,
+        "description": "Неверные аргументы или вход (INVALID_ARGUMENTS)"
+      },
+      {
+        "code": 3,
+        "description": "Доступы: нет, неверны или недостаточно прав (AUTH_REQUIRED, AUTH_MISSING, AUTH_FAILED)"
+      },
+      {
+        "code": 4,
+        "description": "Проект не инициализирован"
+      },
+      {
+        "code": 5,
+        "description": "Ошибка сайта WordPress: сеть, таймаут, 5xx, 429, неразбираемый ответ (PROVIDER_ERROR)"
+      },
+      {
+        "code": 6,
+        "description": "CLI старее, чем требует проект (CLI_TOO_OLD)"
+      }
+    ],
+    "metadata": [
+      {
+        "name": "x-rb-tool",
+        "value": {
+          "tool": "wp_bulk",
+          "dist": "rb-wordpress-bulk-editor",
+          "package": "src"
+        }
+      },
+      {
+        "name": "x-rb-env",
+        "value": [
+          {
+            "name": "WP_API_USER",
+            "purpose": "credential",
+            "provider": "wordpress",
+            "field": "username",
+            "required": true,
+            "description": "Логин WordPress. Единственный источник для post upsert/get и media attach; для остальных команд — после WP_<DOMAIN>_API_USER",
+            "fallbacks": [
+              "SITE_REST_API_USER"
+            ]
+          },
+          {
+            "name": "WP_API_TOKEN",
+            "purpose": "credential",
+            "provider": "wordpress",
+            "field": "password",
+            "required": true,
+            "description": "Application Password WordPress. Единственный источник для post upsert/get и media attach; для остальных команд — после WP_<DOMAIN>_API_TOKEN",
+            "fallbacks": [
+              "SITE_REST_API_PASSWORD"
+            ]
+          },
+          {
+            "name": "WP_<DOMAIN>_API_USER",
+            "purpose": "credential",
+            "provider": "wordpress",
+            "field": "username",
+            "required": false,
+            "description": "Логин для сайта <DOMAIN> (домен в верхнем регистре, не-буквы → _); кроме post/media attach"
+          },
+          {
+            "name": "WP_<DOMAIN>_API_TOKEN",
+            "purpose": "credential",
+            "provider": "wordpress",
+            "field": "password",
+            "required": false,
+            "description": "Application Password для сайта <DOMAIN>; кроме post/media attach"
+          },
+          {
+            "name": "WP_DOMAIN",
+            "purpose": "config",
+            "required": false,
+            "description": "Сайт для команд с файлом данных (у post/media attach — флаг --site)",
+            "fallbacks": [
+              "SITE_DOMAIN"
+            ]
+          },
+          {
+            "name": "WP_PROJECT",
+            "purpose": "config",
+            "required": false,
+            "description": "Папка проекта (как --project)"
+          },
+          {
+            "name": "WP_VERIFY_SSL",
+            "purpose": "config",
+            "required": false,
+            "description": "false — не проверять сертификат сайта (локальный WordPress)"
+          }
+        ]
+      },
+      {
+        "name": "x-rb-data",
+        "value": {
+          "user_log_dir": {
+            "appname": "wp-bulk",
+            "files": [
+              {
+                "path": "<команда>_<время>.log",
+                "kind": "log",
+                "description": "Лог команды, запущенной без проекта (с проектом — <проект>/logs); post upsert/get и media attach файлов не пишут — только stderr"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

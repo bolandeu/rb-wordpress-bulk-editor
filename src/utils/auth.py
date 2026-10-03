@@ -10,11 +10,11 @@ OS keychain. Файл `.env` остаётся последним, legacy-сло�
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Mapping, Tuple, Optional
 from dotenv import find_dotenv, load_dotenv
 from loguru import logger
 
-from ..exceptions import AuthenticationError, ConfigurationError
+from ..exceptions import AuthMissing, AuthenticationError, ConfigurationError
 from ..credentials.manager import CREDENTIAL_FIELDS, get_credential, read_fields_from_env
 
 # Legacy-имена переменных в .env проекта (последний слой цепочки).
@@ -278,3 +278,25 @@ def load_async_config_from_env(
     )
 
     return concurrency, retry_config, circuit_breaker
+
+
+# Доступы WP-адаптера (`post`, `media attach`): одна пара на вызов — сайт
+# называет `--site`, логин и пароль подставляет вызывающий (Windmill из секрета
+# сайта). Нарочно не цепочка `resolve_credentials`: на сервере нет keychain, а
+# флаг `--password` оставил бы пароль в argv и истории процессов.
+ADAPTER_ENV_VARS = (_LEGACY_ENV_VARS["username"], _LEGACY_ENV_VARS["password"])
+
+
+def adapter_credentials(environ: Optional[Mapping[str, str]] = None) -> Tuple[str, str]:
+    """
+    (username, password) только из окружения `WP_API_USER` / `WP_API_TOKEN`.
+
+    Raises:
+        AuthMissing: Не задана хотя бы одна переменная (сеть не трогается).
+    """
+    source = os.environ if environ is None else environ
+    values = [(source.get(name) or "").strip() for name in ADAPTER_ENV_VARS]
+    missing = [name for name, value in zip(ADAPTER_ENV_VARS, values) if not value]
+    if missing:
+        raise AuthMissing(missing, list(ADAPTER_ENV_VARS))
+    return values[0], values[1]

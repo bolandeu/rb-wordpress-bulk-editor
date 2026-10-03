@@ -10,6 +10,8 @@ CLI интерфейс для WordPress Bulk Editor
 - image_commands.py   - image-crop, image-compress, image-convert
 - media_commands.py   - media-upload (файлы с диска → медиатека, id вложений)
 - auth_commands.py    - auth status|login|logout (здоровье и хранение доступов)
+- post_commands.py    - post upsert|get, media attach (WP-адаптер Windmill: одна запись за вызов)
+- describe_commands.py - describe (машиночитаемый контракт CLI, OpenCLI)
 """
 
 import sys
@@ -131,6 +133,8 @@ from . import image_commands  # noqa: E402, F401
 from . import vlook_commands  # noqa: E402, F401
 from . import media_commands  # noqa: E402, F401
 from . import auth_commands  # noqa: E402, F401
+from . import post_commands  # noqa: E402, F401
+from . import describe_commands  # noqa: E402, F401
 
 
 def main():

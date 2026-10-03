@@ -10,14 +10,27 @@
 | code                         | exit |
 |------------------------------|------|
 | UNEXPECTED / ABORTED / CREDENTIAL_STORE_UNAVAILABLE | 1 |
+| NOT_FOUND / CONFLICT / SEO_NOT_SUPPORTED (команды `post`, `media attach`) | 1 |
 | INVALID_ARGUMENTS            | 2    |
-| AUTH_REQUIRED                | 3    |
+| AUTH_REQUIRED / AUTH_MISSING / AUTH_FAILED | 3 |
 | PROJECT_NOT_INITIALIZED      | 4    |
 | PROVIDER_ERROR               | 5    |
 | CLI_TOO_OLD                  | 6    |
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+# Все exit-коды CLI и их смысл — `exitCodes` в `describe --json`.
+# tests/test_describe.py падает, если исключение ниже использует код не отсюда.
+EXIT_CODES: Dict[int, str] = {
+    0: "Успех",
+    1: "Общая ошибка или ошибка данных (UNEXPECTED, ABORTED, NOT_FOUND, CONFLICT, SEO_NOT_SUPPORTED)",
+    2: "Неверные аргументы или вход (INVALID_ARGUMENTS)",
+    3: "Доступы: нет, неверны или недостаточно прав (AUTH_REQUIRED, AUTH_MISSING, AUTH_FAILED)",
+    4: "Проект не инициализирован",
+    5: "Ошибка сайта WordPress: сеть, таймаут, 5xx, 429, неразбираемый ответ (PROVIDER_ERROR)",
+    6: "CLI старее, чем требует проект (CLI_TOO_OLD)",
+}
 
 
 class WPBulkEditorError(Exception):
@@ -201,3 +214,58 @@ class CredentialsUnhealthy(WPBulkEditorError):
             action="Смотрите `message` каждой записи; сохранить доступ сайта — "
             "'wp-bulk auth login --provider wp:<домен>'.",
         )
+
+
+# ── Команды WP-адаптера (`post upsert/get`, `media attach`) ────────────────
+
+
+class AuthMissing(WPBulkEditorError):
+    """Нет доступов в окружении: адаптер берёт их только из переменных окружения"""
+
+    code = "AUTH_MISSING"
+    exit_code = 3
+
+    def __init__(self, missing: List[str], names: List[str]) -> None:
+        super().__init__(
+            f"Не заданы переменные окружения: {', '.join(missing)}.",
+            action=f"Задайте {' и '.join(names)} (логин и Application Password сайта). "
+            "Флаги, keychain и .env эти команды не читают.",
+        )
+
+
+class AuthFailed(AuthenticationError):
+    """Сайт отверг доступы (401/403): неверный пароль или не хватает прав"""
+
+    code = "AUTH_FAILED"
+    exit_code = 3
+    default_action = (
+        "Проверьте WP_API_USER / WP_API_TOKEN: Application Password действующий, у пользователя роль не ниже editor."
+    )
+
+
+class RecordNotFound(WPBulkEditorError):
+    """Запись, медиа или локальный файл, названные во входе, не существуют"""
+
+    code = "NOT_FOUND"
+    exit_code = 1
+
+
+class Conflict(WPBulkEditorError):
+    """Запись с таким slug уже есть и не черновик: адаптер её не трогает"""
+
+    code = "CONFLICT"
+    exit_code = 1
+
+    def __init__(self, *args: Any, post_id: int, action: Optional[str] = None) -> None:
+        super().__init__(*args, action=action)
+        self.post_id = post_id
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {**super().to_dict(), "post_id": self.post_id}
+
+
+class SeoNotSupported(WPBulkEditorError):
+    """У типа записи нет REST-поля `seo` (rb-seo выключен для типа): WordPress молча проигнорировал бы его"""
+
+    code = "SEO_NOT_SUPPORTED"
+    exit_code = 1

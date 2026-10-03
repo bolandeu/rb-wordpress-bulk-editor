@@ -1,0 +1,27 @@
+
+ Usage: wp-bulk post get [OPTIONS]
+
+ Прочитать запись WordPress по ID (context=edit, сырые поля).
+
+ Ответ: {id, type, slug, title, content, status, url, modified, seo,
+ featured_media, content_hash}; title и content — raw, как в редакторе;
+ seo — null, если у типа нет поля rb-seo; content_hash — тот же, что
+ вернул post upsert для этого контента.
+
+ Доступы — только окружение WP_API_USER / WP_API_TOKEN.
+
+ Exit-коды: 0 — готово; 1 — NOT_FOUND; 2 — неверные флаги или тип;
+ 3 — AUTH_MISSING, AUTH_FAILED; 5 — недоступен WordPress.
+
+ Example: wp-bulk post get --id 42 --site example.com --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --id           INTEGER RANGE [x>=1]  ID записи                                                   │
+│ --type         TEXT                  Тип записи WordPress (post, page, rb_services…)             │
+│                                      [default: post]                                             │
+│ --site         TEXT                  Домен сайта (example.com или https://example.com)           │
+│ --json                               Машиночитаемый JSON-вывод.                                  │
+│ --quiet                              Только существенный вывод.                                  │
+│ --help                               Show this message and exit.                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

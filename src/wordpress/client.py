@@ -110,6 +110,10 @@ class WordPressClient:
         """DELETE запрос с retry и circuit breaker."""
         return await self.provider.delete(endpoint, params)
 
+    async def options(self, endpoint: str) -> Dict[str, Any]:
+        """OPTIONS запрос: схема маршрута REST."""
+        return await self.provider.options(endpoint)
+
     async def test_connection(self, authenticated: bool = False) -> bool:
         """
         Проверка подключения к WordPress API.

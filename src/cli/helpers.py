@@ -133,7 +133,7 @@ def require_data_file(ctx: typer.Context, explicit: Optional[Path]) -> Path:
 
 
 def resolve_logs_folder(ctx: typer.Context) -> Path:
-    """Разрешить папку логов: проект > CWD/logs."""
+    """Разрешить папку логов: <проект>/logs, без проекта — каталог логов пользователя (platformdirs)."""
     return get_project(ctx).logs_folder
 
 

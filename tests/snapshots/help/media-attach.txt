@@ -1,0 +1,30 @@
+
+ Usage: wp-bulk media attach [OPTIONS]
+
+ Сделать медиа изображением (featured) существующей записи.
+
+ Источник — ровно один из --path, --url, --media-id. Запись проверяется до
+ загрузки файла; статус записи не меняется. Доступы — только окружение
+ WP_API_USER / WP_API_TOKEN.
+
+ Ответ: {media_id, source_url, post_id}.
+
+ Exit-коды: 0 — готово; 1 — NOT_FOUND (запись, медиа или файл); 2 — неверные
+ флаги; 3 — AUTH_MISSING, AUTH_FAILED; 5 — недоступен WordPress.
+
+ Example: wp-bulk media attach --post 42 --path cover.jpg --alt "Обложка" --site example.com --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
+│ --post            INTEGER RANGE [x>=1]  ID записи, которой ставится изображение                  │
+│ --path            TEXT                  Локальный файл: загрузить и привязать                    │
+│ --url             TEXT                  URL файла: загрузить на сайт и привязать                 │
+│ --media-id        INTEGER RANGE [x>=1]  ID уже загруженного медиа: привязать без загрузки        │
+│ --alt             TEXT                  Alt-текст медиа                                          │
+│ --type            TEXT                  Тип записи WordPress (post, page, rb_services…)          │
+│                                         [default: post]                                          │
+│ --site            TEXT                  Домен сайта (example.com или https://example.com)        │
+│ --json                                  Машиночитаемый JSON-вывод.                               │
+│ --quiet                                 Только существенный вывод.                               │
+│ --help                                  Show this message and exit.                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+

@@ -143,6 +143,11 @@ class WordPressHttpProvider(HttpProvider):
         logger.debug(f"DELETE {endpoint} params={params}")
         return await self.request_json("DELETE", endpoint, params=params)
 
+    async def options(self, endpoint: str) -> Dict[str, Any]:
+        """OPTIONS запрос: схема маршрута REST (поля записи, в т.ч. добавленные плагинами)."""
+        logger.debug(f"OPTIONS {endpoint}")
+        return await self.request_json("OPTIONS", endpoint)
+
     async def upload_binary(
         self,
         endpoint: str,

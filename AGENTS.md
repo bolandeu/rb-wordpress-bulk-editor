@@ -360,6 +360,39 @@ create-запрос — нет; отсутствующий термин возв
 
 ---
 
+### WP-адаптер Windmill: `post upsert/get`, `media attach`, `describe`
+
+`src/cli/post_commands.py` + логика `src/wordpress/post_adapter.py` (T104,
+сценарии — `~/Work/tools/docs/t104-wp-adapter.md`). Одна запись за вызов, вход
+JSON (`--input <файл|->`), выход — JSON-конверт; файла данных проекта не знают.
+
+- **Доступы — только `WP_API_USER` / `WP_API_TOKEN` из окружения**
+  (`utils/auth.adapter_credentials`), сайт — `--site`. Нарочно мимо цепочки
+  `resolve_credentials`: на сервере нет keychain, `.env` проекта не при чём,
+  а `--password` оставил бы пароль в argv. Скрытые `--password`/`--username`
+  есть только чтобы отказать конвертом (exit 2). Нет переменной — `AUTH_MISSING`
+  до сети; 401/403 — `AUTH_FAILED` (не `AUTH_REQUIRED`: старый код у старых команд
+  не меняется, antagor на него завязан).
+- **Идемпотентность:** `id` → обновление; без id — поиск тип+slug по всем
+  статусам: один черновик → обновление, не-черновик или несколько кандидатов →
+  `CONFLICT` (с `post_id`), ничего → создание. Создаётся только `draft`, `status`
+  во входе — ошибка; статус существующей записи не отправляется.
+- **Всё, что может отказать без изменений, — до первой записи:** вход (exit 2),
+  файл изображения (`NOT_FOUND`, exit 1), доступы, тип (`/types/<type>`),
+  поле `seo` (`OPTIONS /wp/v2/<rest_base>` → `schema.properties.seo`, иначе
+  `SEO_NOT_SUPPORTED`), существование id, конфликт slug. Медиа грузится после
+  выбора цели, запись — последней.
+- **content** — как пришёл, без конвертации; `content_hash` = sha256 от
+  `content.raw` ответа WordPress (context=edit), не от отправленного.
+- **Логи** — только stderr, файлов не пишут. Без проекта остальные команды
+  пишут логи в `platformdirs.user_log_path("wp-bulk")`, не в cwd.
+- **`describe --json`** — документ OpenCLI (`src/opencli.py`, порт шаблона
+  cli-generator): коды выхода — `exceptions.EXIT_CODES`, переменные окружения —
+  `opencli.ENV_VARS` (новая переменная — строка туда). Снапшот
+  `tests/snapshots/describe.json` — контракт для Windmill: его изменение ломающее.
+
+---
+
 ## Обнаружение полей (FieldDetector)
 
 Колонки Excel делятся на категории в таком порядке приоритета:
@@ -584,6 +617,11 @@ WPBulkEditorError                       UNEXPECTED (1)
 │   ├── NetworkError          ← ретраить
 │   └── MediaUploadError
 ├── ValidationError                     INVALID_ARGUMENTS (2)
+├── AuthMissing        ← нет WP_API_USER/TOKEN (post, media attach)   AUTH_MISSING (3)
+│   (AuthFailed — подкласс AuthenticationError: 401/403 у адаптера)   AUTH_FAILED (3)
+├── RecordNotFound     ← id/медиа/файл из входа адаптера   NOT_FOUND (1)
+├── Conflict           ← slug занят не-черновиком          CONFLICT (1)
+├── SeoNotSupported    ← у типа нет REST-поля seo          SEO_NOT_SUPPORTED (1)
 ├── Aborted            ← отказ в confirm-гейте   ABORTED (1)
 ├── CliTooOld          ← WP_BULK_MIN_VERSION     CLI_TOO_OLD (6)
 ├── CredentialStoreUnavailable          CREDENTIAL_STORE_UNAVAILABLE (1)

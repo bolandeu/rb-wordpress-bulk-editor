@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
+import platformdirs
 from dotenv import dotenv_values
 
 from ..exceptions import CliTooOld, ValidationError
@@ -26,6 +27,9 @@ MIN_VERSION_KEY = "WP_BULK_MIN_VERSION"
 # уровней даже если домашняя директория не достигнута — защита от случайного
 # .env где-нибудь совсем не по теме (например, смонтированная сетевая ФС).
 _CWD_WALK_MAX_DEPTH = 15
+
+# Имя приложения для platformdirs: каталог логов вне проекта.
+LOG_APPNAME = "wp-bulk"
 
 # Расширения файлов данных проекта: источник записей выбирается по ним.
 DATA_SUFFIXES = (".xlsx", ".json")
@@ -69,7 +73,9 @@ class ProjectContext:
     def logs_folder(self) -> Path:
         if self.root:
             return self.root / "logs"
-        return Path.cwd() / "logs"
+        # Без проекта — каталог логов пользователя, не cwd: на сервере (rb-run)
+        # текущая папка чужая или только для чтения.
+        return platformdirs.user_log_path(LOG_APPNAME)
 
     @property
     def media_folder(self) -> Path:

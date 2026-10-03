@@ -26,6 +26,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "rb-llmkit>=0.5,<0.6",
     "rb-html-to-gutenberg>=0.4,<0.5",
+    "platformdirs>=4.2",
 ]
 
 [project.scripts]

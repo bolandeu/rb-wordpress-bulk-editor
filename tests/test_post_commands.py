@@ -404,7 +404,7 @@ class TestGet:
 
         get_post(post_id)
 
-        [request] = wp.requests
+        [request] = [r for r in wp.requests if r.url.path.endswith(f"/posts/{post_id}")]
         assert "context=edit" in str(request.url)
 
     def test_missing_id_is_not_found(self, wp):
