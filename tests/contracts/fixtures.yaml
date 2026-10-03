@@ -14,17 +14,22 @@
 # доступов: для кейсов `offline_cache: false`). Записи фальшивого сайта:
 #   101 — черновик slug existing-post (fixture_post_id)
 #   102 — черновик slug existing-draft
-#   103 — опубликован slug published-post
+#   103 — опубликован slug published-post (fixture_published_post_id)
 #   104 — медиа (fixture_media_id)
+# Хост unreachable.example.com — «сайт лежит»: транспорт отвечает ConnectError
+# без сети (fixture_site_unreachable).
 # rb-seo включён у posts, выключен у pages.
 placeholders:
   fixture_site: example.com
+  fixture_site_unreachable: unreachable.example.com
   fixture_post_id: 101
+  fixture_published_post_id: 103
   fixture_media_id: 104
   fixture_missing_id: 9999
   fixture_image: cover.jpg
   fixture_post_new: post-new.json
   fixture_post_update: post-update.json
+  fixture_post_new_slug: post-new-slug.json
   fixture_post_existing_draft_slug: post-existing-draft-slug.json
   fixture_post_published_slug: post-published-slug.json
   fixture_post_with_seo: post-with-seo.json

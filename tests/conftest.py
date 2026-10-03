@@ -60,8 +60,17 @@ def taxonomy_cache():
 CONTRACT_DATA = Path(__file__).parent / "contracts" / "data"
 
 
+UNREACHABLE_SITE = "unreachable.example.com"  # fixture_site_unreachable
+
+
 def _contract_site(monkeypatch):
-    """Фальшивый WordPress для `run`-кейсов вместо сети; data/ — рабочая папка."""
+    """Фальшивый WordPress для `run`-кейсов вместо сети; data/ — рабочая папка.
+
+    Хост UNREACHABLE_SITE — «сайт лежит»: транспорт бросает httpx.ConnectError
+    (как при отказе сети / TLS), паузы ретраев обнулены — без реальной сети.
+    """
+    import asyncio
+
     import httpx
 
     from src.cli import post_commands
@@ -73,10 +82,22 @@ def _contract_site(monkeypatch):
     site.add_post("existing-draft", status="draft")  # 102
     site.add_post("published-post", status="publish")  # 103
     site.add_media("old.jpg")  # 104 — fixture_media_id
+
+    def handler(request):
+        if request.url.host == UNREACHABLE_SITE:
+            raise httpx.ConnectError(f"[Errno 61] Connection refused ({UNREACHABLE_SITE})", request=request)
+        return site.handler(request)
+
+    real_sleep = asyncio.sleep
+
+    async def no_wait(delay, *args, **kwargs):
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, "sleep", no_wait)
     monkeypatch.setattr(
         post_commands,
         "WordPressClient",
-        lambda config: WordPressClient(config, transport=httpx.MockTransport(site.handler)),
+        lambda config: WordPressClient(config, transport=httpx.MockTransport(handler)),
     )
     monkeypatch.chdir(CONTRACT_DATA)
     return site
