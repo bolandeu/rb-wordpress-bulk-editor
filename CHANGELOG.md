@@ -5,6 +5,17 @@
 
 <!-- towncrier release notes start -->
 
+## [5.0.0] - 2026-10-03
+
+### Changed
+
+- `bulk-delete` удаляет только с подтверждением: интерактивный вопрос или `--confirm`; под `--non-interactive` (а также в `--json` и без терминала) без `--confirm` — ошибка `INVALID_ARGUMENTS` (exit 2), к сайту не отправляется ни одного DELETE. `--dry-run` — превью без вопроса.
+
+### Removed
+
+- wp-bulk сужен до импорта и экспорта через REST API WordPress. Удалены команды `llm`, `counter`, `image-crop`, `image-compress`, `image-convert`, `reshape`, `vlook` — теперь «нет такой команды» (exit 2); из `describe --json` их тоже нет. `auth status` больше не показывает ключи LLM (`llmkit:<провайдер>`), `--provider llmkit` — неизвестный провайдер (exit 2); переменные `LLM_*` не читаются. Зависимости `rb-llmkit`, `Pillow`, `python-slugify` убраны.
+
+
 ## [4.2.2] - 2026-10-03
 
 ### Changed
