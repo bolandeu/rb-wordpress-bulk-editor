@@ -1,1 +1,0 @@
-`post upsert` по id не меняет slug не-черновика (публикация, pending, future, private): живой URL сохраняется, slug из входа отбрасывается, ответ — `slug_kept: true` и текущий `slug`. У черновика slug обновляется. В ответе upsert всегда есть `slug` и `slug_kept`.
