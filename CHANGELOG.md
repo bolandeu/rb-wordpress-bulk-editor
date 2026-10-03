@@ -5,6 +5,17 @@
 
 <!-- towncrier release notes start -->
 
+## [4.2.0] - 2026-10-03
+
+### Added
+
+- Команды WP-адаптера для Windmill: `post upsert` (JSON `--input <файл|->`: черновик по slug или обновление по id; seo через rb-seo, `featured`; ответ с `content_hash`), `post get --id`, `media attach --post` (`--path|--url|--media-id`), `describe --json` (контракт OpenCLI). Доступы — только окружение `WP_API_USER` / `WP_API_TOKEN`, флаги доступов отклоняются; коды ошибок `NOT_FOUND`, `CONFLICT`, `SEO_NOT_SUPPORTED` (exit 1), `AUTH_MISSING`, `AUTH_FAILED` (exit 3).
+
+### Changed
+
+- Без проекта логи команд пишутся в каталог логов пользователя (`platformdirs`, например `~/Library/Logs/wp-bulk`, `~/.local/state/wp-bulk/log`), а не в `./logs` текущей папки. С проектом — по-прежнему `<проект>/logs`.
+
+
 ## [4.1.0] - 2026-10-01
 
 ### Changed
