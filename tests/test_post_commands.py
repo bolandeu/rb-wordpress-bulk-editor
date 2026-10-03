@@ -7,6 +7,7 @@ Windmill (T104, сценарии ~/Work/tools/docs/t104-wp-adapter.md).
 `.env` новые команды не читают.
 """
 
+import asyncio
 import hashlib
 import json
 from pathlib import Path
@@ -194,6 +195,52 @@ class TestUpsertUpdate:
         sent = json.loads(wp.writes[-1].content)
         assert "status" not in sent
 
+    @pytest.mark.parametrize("status", ["publish", "pending", "future", "private"])
+    def test_non_draft_by_id_keeps_slug(self, wp, status):
+        # T141: slug из входа не применяется к не-черновику — живой URL не меняется
+        # (вживую WP дописал -2 к slug опубликованного поста)
+        post_id = wp.add_post("live", status=status)
+
+        result, payload = upsert({"slug": "new", "title": "T", "content": "<p>правка</p>"}, "--id", str(post_id))
+
+        assert result.exit_code == 0, result.output
+        assert payload["slug_kept"] is True and payload["slug"] == "live"
+        assert wp.posts[post_id]["slug"] == "live"
+        assert wp.posts[post_id]["content"] == "<p>правка</p>"
+        assert "slug" not in json.loads(wp.writes[-1].content)
+
+    def test_non_draft_by_id_slug_only_writes_nothing(self, wp):
+        post_id = wp.add_post("live", status="publish")
+
+        result, payload = upsert({"id": post_id, "slug": "new"})
+
+        assert result.exit_code == 0, result.output
+        assert payload["slug_kept"] is True and payload["slug"] == "live"
+        assert wp.writes == []
+
+    def test_non_draft_by_id_same_slug_is_not_kept(self, wp):
+        post_id = wp.add_post("live", status="publish")
+
+        result, payload = upsert({"id": post_id, "slug": "live", "title": "T"})
+
+        assert result.exit_code == 0, result.output
+        assert payload["slug_kept"] is False and payload["slug"] == "live"
+
+    def test_draft_by_id_slug_is_updated(self, wp):
+        post_id = wp.add_post("old", status="draft")
+
+        result, payload = upsert({"slug": "new", "title": "T"}, "--id", str(post_id))
+
+        assert result.exit_code == 0, result.output
+        assert payload["slug_kept"] is False and payload["slug"] == "new"
+        assert wp.posts[post_id]["slug"] == "new"
+
+    def test_created_reports_slug(self, wp):
+        result, payload = upsert({"slug": "x", "title": "T", "content": "c"})
+
+        assert result.exit_code == 0, result.output
+        assert payload["slug_kept"] is False and payload["slug"] == "x"
+
     def test_missing_id_is_not_found_and_nothing_created(self, wp):
         result, payload = upsert({"id": 9999, "title": "T"})
 
@@ -379,6 +426,33 @@ class TestAuth:
         assert "WP_API_TOKEN" in json.dumps(payload["error"], ensure_ascii=False)
         assert "secret" not in result.output.replace(flag, "")
         assert wp.requests == []
+
+
+class TestNetwork:
+    @pytest.mark.parametrize(
+        "error",
+        [httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed"), httpx.ConnectTimeout("t")],
+    )
+    def test_network_or_tls_failure_is_provider_error(self, wp, monkeypatch, error):
+        # T141: сеть/TLS — PROVIDER_ERROR с exit 5, и код 5 описан в EXIT_CODES (а значит в describe)
+        from src.exceptions import EXIT_CODES
+
+        real_sleep = asyncio.sleep
+
+        async def _no_wait(delay, *args, **kwargs):
+            await real_sleep(0)
+
+        def _down(request):
+            raise error
+
+        monkeypatch.setattr(asyncio, "sleep", _no_wait)
+        monkeypatch.setattr(wp, "handler", _down)
+
+        result, payload = upsert({"slug": "x", "title": "T", "content": "c"})
+
+        assert result.exit_code == 5
+        assert payload["error"]["code"] == "PROVIDER_ERROR"
+        assert "PROVIDER_ERROR" in EXIT_CODES[5]
 
 
 class TestGet:
