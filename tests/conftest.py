@@ -5,6 +5,25 @@ Shared fixtures for WordPress Bulk Editor tests.
 from pathlib import Path
 
 import pytest
+import typer.rich_utils
+
+from src.output import human
+
+
+@pytest.fixture(autouse=True)
+def _plain_output(monkeypatch):
+    """Вывод без цвета и в одну ширину, как бы ни был настроен CI.
+
+    Typer читает GITHUB_ACTIONS / FORCE_COLOR / PY_COLORS один раз, при импорте, и включает вывод как в терминале;
+    rich читает FORCE_COLOR при создании консоли — её ANSI-коды ломают проверки подстрок.
+    """
+    monkeypatch.setattr(typer.rich_utils, "FORCE_TERMINAL", False)
+    for name in ("FORCE_COLOR", "PY_COLORS", "GITHUB_ACTIONS"):
+        monkeypatch.delenv(name, raising=False)
+    # Консоли созданы при импорте — уже с цветом, если CI его форсировал.
+    for console in (human.console, human.err_console):
+        monkeypatch.setattr(console, "_force_terminal", None)
+        monkeypatch.setattr(console, "_color_system", None)
 
 
 @pytest.fixture
