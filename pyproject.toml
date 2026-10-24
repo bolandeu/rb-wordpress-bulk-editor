@@ -125,48 +125,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.16.8",
     "syrupy>=4.8",
-    "towncrier>=24.8",
     "ty>=0.0.80",
 ]
-
-# Changelog из фрагментов: каждое изменение — файл changelog.d/+<slug>.<type>.md
-# (`uv run towncrier create +<slug>.<type>.md -c "..."`); собирает scripts/release.py.
-[tool.towncrier]
-filename = "CHANGELOG.md"
-directory = "changelog.d"
-start_string = "<!-- towncrier release notes start -->\n"
-title_format = "## [{version}] - {project_date}"
-issue_format = "#{issue}"
-
-[[tool.towncrier.type]]
-directory = "added"
-name = "Added"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "changed"
-name = "Changed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "deprecated"
-name = "Deprecated"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "removed"
-name = "Removed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "fixed"
-name = "Fixed"
-showcontent = true
-
-[[tool.towncrier.type]]
-directory = "security"
-name = "Security"
-showcontent = true
 
 [tool.cli-generator]
 # Где scripts/check_command_docstrings.py (git pre-commit + хуки Claude Code)

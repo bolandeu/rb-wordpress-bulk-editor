@@ -1,9 +1,7 @@
 # Changelog
 
-Собирается из фрагментов `changelog.d/` командой `scripts/release.py` — руками не править.
+Пишется при `antagor publish` — руками не править (записи до v5.0.0 собраны из фрагментов towncrier).
 Что с какой версии — ориентир для `WP_BULK_MIN_VERSION` вызывающего.
-
-<!-- towncrier release notes start -->
 
 ## [5.0.0] - 2026-10-03
 

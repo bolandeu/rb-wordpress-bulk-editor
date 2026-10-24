@@ -533,10 +533,8 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 результат. Версию читает `src/version.py` из метаданных пакета — у editable-установки
 они фиксируются при установке, поэтому после нового тега переустановить tool. Что с какой версии (для `WP_BULK_MIN_VERSION` вызывающего) — в `CHANGELOG.md`.
 
-Версия — это git-тег `vX.Y.Z` (строки `version =` в `pyproject.toml` нет), журнал
-собирается из фрагментов `changelog.d/`. Поменялось поведение — фрагмент в том же
-коммите (`uv run towncrier create +<slug>.<type>.md -c "…"`), релиз —
-`uv run scripts/release.py patch|minor|major` (см. «Тесты и качество»).
+Версия — это git-тег `vX.Y.Z` (строки `version =` в `pyproject.toml` нет). Журнал
+пишет Antagor при `antagor publish` (см. «Тесты и качество»).
 
 ---
 
@@ -570,7 +568,7 @@ docstring'ов. Добавили команду — написали хорош�
    вопрос задавать только через `output.require_confirmation`.
 7. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
 8. Docstring с `Example: {cli} <команда> …`, `help=` у каждого параметра, группа — через
-   `output.group("…")`; `uv run pytest --snapshot-update` и фрагмент `changelog.d/` (`added`).
+   `output.group("…")`; `uv run pytest --snapshot-update`.
 
 ---
 
@@ -626,15 +624,19 @@ WPBulkEditorError                       UNEXPECTED (1)
 
 ```bash
 uv sync --all-groups
-uv run scripts/release.py --check    # весь гейт — перед каждым коммитом
+uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@<тег шаблона>#subdirectory=gate" rb-release check   # гейт; строка и тег — только в .gitea/workflows/ci.yml
 uv run pytest -q                     # покрытие включено (fail_under в pyproject)
 uv run pytest --snapshot-update      # после правки справки команды
 ```
 
-**Гейт — `scripts/release.py` (стандарт `tools/docs/standard-release.md` §3)**, копия
-из cli-generator дословно, руками не править: `uv lock --check`, ruff check + format,
-ty, pytest (покрытие, контракт справки, форма `auth status`), фрагмент changelog,
-сборка wheel и `wp-bulk --version`/`--help` в чистом venv, osv-scanner по `uv.lock`.
+**Гейт — `rb-release check` (шаг `Gate` в `.gitea/workflows/ci.yml`; Standard cli-generator)**:
+`uv lock --check`, ruff check + format, ty, pytest (покрытие, контракт справки, форма
+`auth status`), контракты, сборка wheel и `wp-bulk --version`/`--help` в чистом venv,
+`standard: *`, gitleaks по истории, osv-scanner по `uv.lock`. pytest гейт запускает с
+`GITHUB_ACTIONS=true FORCE_COLOR=1 PY_COLORS=1`; `tests/conftest.py` (`_plain_output`)
+гасит цвет, иначе снапшоты справки и проверки подстрок расходятся с локальным прогоном.
+Фейковое тестовое значение для gitleaks — одна точная строка в `.gitleaks.toml`;
+`.gitleaksignore` — только fingerprint уже отозванного ключа.
 ty в `tests/` для утиных дублёров только предупреждает (`[tool.ty.overrides]`),
 `src/` — на полной строгости.
 
@@ -647,10 +649,9 @@ ty в `tests/` для утиных дублёров только предупр�
 (несоответствие — tools/dev); правится только своя сторона: плейсхолдеры и фикстуры.
 `test_contracts.py`, `schema.json` и скрипты гейта — копии шаблона cli-generator.
 
-**Релиз:** `uv run scripts/release.py patch|minor|major` на чистом `main` —
-гейт, `towncrier build`, коммит `Release vX.Y.Z` и annotated-тег; пушит пользователь
-(`git push --follow-tags`). Строки `version =` нет, `CHANGELOG.md` руками не правится:
-каждое изменение — фрагмент `changelog.d/+<slug>.<type>.md`.
+**Релиз:** проект под Antagor — `antagor publish [--main] --bump patch|minor|major`
+(гейт, журнал, тег, deploy). Строки `version =` нет; ломающее для вызывающих — minor
+при 0.x, major после. `CHANGELOG.md` руками не правится.
 
 **Долгая команда (дольше пары минут) — только detached:**
 `scripts/run_detached.sh <метка> <команда...>`, затем
@@ -664,8 +665,7 @@ pid, вывод (`<метка>.log`), ошибки (`<метка>.stderr`) и к
 шаблона cli-generator, руками не править.
 
 **Справка команды = её docstring.** Поменял поведение команды — поправь docstring в том
-же коммите (хуки `.claude/settings.json` и `.githooks/pre-commit` это проверяют,
-`scripts/install_hooks.sh` — один раз на клон), строка `Example: {cli} <команда> …`
+же коммите (`scripts/check_command_docstrings.py` — в `checks` Antagor), строка `Example: {cli} <команда> …`
 обязательна (`{cli}` подставляет `output.guard`; у команд без guard — буквально `wp-bulk`),
 у каждого параметра `help=`; `tests/snapshots/help/` обновляет `--snapshot-update`.
 Квадратные скобки в docstring экранировать `\\[…]` — иначе rich съест их как разметку.
@@ -704,12 +704,9 @@ Application Password в отдельном `.env.test`). Основной сце
 ## Каждое заметное изменение выходит релизом
 
 Серверы, другие инструменты и Mac ставят только по тегам, не из `main`:
-влитое без релиза изменение для них не существует. Изменение с фрагментом
-changelog закончено только после релиза: влить в `main` →
-`uv run scripts/release.py patch|minor|major` → попросить пользователя
-сделать push с `--follow-tags` → назвать новый тег в отчёте. Служебные коммиты
-(без фрагмента) ждут следующего релиза. Не оставлять фрагмент на `main` без
-релиза, не назвав причину (`~/Work/tools/docs/standard-release.md` §3).
+влитое без релиза изменение для них не существует. Заметное изменение
+закончено только после релиза: влить в `main` → `antagor publish` → назвать новый
+тег в отчёте. Служебные коммиты ждут следующего релиза.
 
 ## Инструмент в системе
 
