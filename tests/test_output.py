@@ -190,3 +190,38 @@ def test_guard_picks_up_local_json_flag(capsys):
         command(ctx=ctx, json_output=True)
 
     assert read_json(capsys)["ok"] is False
+
+
+class TestUsageErrors:
+    """Ошибка использования (неизвестная опция, нет значения) разбирается Typer до нашего кода (стандарт, Errors)."""
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ("doctor", "--json", "--no-such-option"),
+            ("--json", "--no-such-option"),
+            ("--json", "sync", "--no-such-option"),
+            ("--json", "auth", "status", "--provider"),
+        ],
+    )
+    def test_under_json_is_the_error_envelope(self, args):
+        from typer.testing import CliRunner
+
+        from src.cli import app
+
+        result = CliRunner().invoke(app, list(args))
+
+        assert result.exit_code == 2
+        payload = json.loads(result.stdout)
+        assert (payload["ok"], payload["error"]["code"]) == (False, "INVALID_ARGUMENTS")
+        assert payload["error"]["message"]
+
+    def test_without_json_stays_on_stderr(self):
+        from typer.testing import CliRunner
+
+        from src.cli import app
+
+        result = CliRunner().invoke(app, ["doctor", "--no-such-option"])
+
+        assert result.exit_code == 2
+        assert result.stdout == ""
