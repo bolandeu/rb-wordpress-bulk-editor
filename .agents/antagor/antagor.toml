@@ -1,0 +1,24 @@
+schema = 1
+prefix = "WPBULK"
+name = "wordpress-bulk-editor"
+worker = "claude-code"
+
+[review]
+required_types = ["feature", "bugfix"]  # chore and docs: the short path without review
+
+[connector]
+webhook_secret = "PLANE_WEBHOOK_SECRET_TOOLS"
+kind = "plane"
+base_url = "https://homeserver.tailee01ab.ts.net:8443"
+workspace = "tools"
+project_id = "f3a01572-3141-436b-87a0-b6b6a8459d5c"
+humans = ["r.bolandau@gmail.com"]
+
+[connector.states]
+ideas = "Backlog"
+queue = "Todo"
+in_progress = "In Progress"
+in_review = "In Review"
+publish = "Publishing"
+done = "Done"
+cancelled = "Cancelled"
