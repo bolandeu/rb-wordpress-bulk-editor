@@ -3,6 +3,8 @@ mode = "fast"
 prefix = "WPBULK"
 name = "wordpress-bulk-editor"
 worker = "claude-code"
+checks = ["python3 scripts/check_command_docstrings.py"]
+heavy = ["rb-release check"]
 
 [review]
 required_types = ["feature", "bugfix"]  # chore and docs: the short path without review
@@ -26,3 +28,10 @@ cancelled = "Cancelled"
 
 [daemon]
 enabled = true
+
+[publish]
+versioning = "semver"
+changelog = "CHANGELOG.md"
+deploy_command = "git push origin main --follow-tags"
+gate = "remote"
+gate_status_url = "https://homeserver.tailee01ab.ts.net:3000/api/v1/repos/bolandeu/wordpress-bulk-editor/commits/{commit}/status"
