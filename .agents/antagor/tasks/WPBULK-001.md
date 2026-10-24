@@ -1,7 +1,7 @@
 ---
 id: WPBULK-001
 title: rb-html-to-gutenberg from the Gitea registry, not github git
-status: in_review
+status: publish
 attempts: 0
 blocked: false
 blocked_reason: null
