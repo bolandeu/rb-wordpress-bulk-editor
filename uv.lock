@@ -990,7 +990,7 @@ wheels = [
 [[package]]
 name = "rb-html-to-gutenberg"
 version = "0.4.1"
-source = { git = "https://github.com/bolandeu/html-to-gutenberg?tag=v0.4.1#27a8a917f074e79d1240010a7854083673123f15" }
+source = { registry = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
@@ -1000,6 +1000,9 @@ dependencies = [
     { name = "rich" },
     { name = "tomli-w" },
     { name = "typer" },
+]
+wheels = [
+    { url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/files/rb-html-to-gutenberg/0.4.1/rb_html_to_gutenberg-0.4.1-py3-none-any.whl", hash = "sha256:e27b7750a4487a25a8ad10b95e8f68b98ec8f1ead91970f0fb48fb6d9d26a4de" },
 ]
 
 [[package]]
@@ -1048,7 +1051,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rb-html-to-gutenberg", git = "https://github.com/bolandeu/html-to-gutenberg?tag=v0.4.1" },
+    { name = "rb-html-to-gutenberg", specifier = ">=0.4,<0.5", index = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]

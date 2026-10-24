@@ -94,9 +94,9 @@ antagor, и вручную из терминала — поэтому `SITE_DOMA
 `HtmlToGutenberg().convert_report()` и пишет его `warnings` в лог. Незнакомые теги
 библиотека не выбрасывает, а сохраняет блоком `wp:html`, обёртки (`div`/`section`)
 раскрывает. Чинить конвертацию — в `tools/html-to-gutenberg`, не здесь.
-Источник в `[tool.uv.sources]` — git, чтобы wp-bulk ставился
-из git на любой машине. Новая версия конвертера — push в его репозиторий,
-затем `uv lock --upgrade-package html_to_gutenberg` здесь.
+Источник в `[tool.uv.sources]` — реестр Gitea (`index = "gitea"`), в `dependencies` —
+диапазон версий. Новая версия конвертера — релиз его пакета в реестр, затем
+`uv lock --upgrade-package rb-html-to-gutenberg` здесь.
 
 На машине разработки wp-bulk и `html-to-gutenberg` стоят editable из
 соседних папок — правки любого подхватываются без переустановки:
@@ -106,7 +106,7 @@ uv tool install --editable . --no-sources \
   --with-editable ../html-to-gutenberg --force
 ```
 
-`--no-sources` обязателен: иначе git-источники из `pyproject.toml` конфликтуют с
+`--no-sources` обязателен: иначе источники из `pyproject.toml` конфликтуют с
 `--with-editable` («conflicting URLs»).
 
 ---
