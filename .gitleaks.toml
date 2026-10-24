@@ -1,0 +1,10 @@
+# Secret scan config, read by `gitleaks` from the repo root (release gate, the Standard, Credentials).
+# The default rules stay on. The allowlist holds only fake test values, one exact string each.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "fake test value (tests/test_post_commands.py)"
+regexes = [
+    '''^wrong-secret-9876$''',
+]
