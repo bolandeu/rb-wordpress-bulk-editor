@@ -24,6 +24,7 @@ from ..data import read_skill_doc
 from ..exceptions import CliTooOld, ConfigurationError
 
 app = typer.Typer(
+    cls=output.RootGroup,  # ошибка использования под --json — конверт ошибки
     name="wp-bulk-editor",
     help="WordPress Bulk Editor - Excel <-> WordPress sync",
     # Голый `wp-bulk` печатает справку и выходит с 0 (см. app_callback),

@@ -12,10 +12,11 @@
 import functools
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, NoReturn, Optional
+from typing import Any, Callable, Dict, NoReturn, Optional, cast
 
 import typer
 from loguru import logger
+from typer.core import TyperGroup
 
 from ..exceptions import Aborted, CliError, ValidationError, WPBulkEditorError
 from . import human
@@ -239,6 +240,44 @@ def group(help_text: str) -> typer.Typer:
         help_if_no_command(ctx)
 
     return app
+
+
+# UsageError Click (неизвестная опция, нет аргумента, плохое значение): свежий Typer несёт свою копию Click,
+# поэтому класс берётся у Typer, а не импортом пакета `click`.
+_UsageError = cast("type[Exception]", typer.BadParameter.__bases__[0])
+
+
+class RootGroup(TyperGroup):
+    """Корневая группа: ошибка использования под --json — конверт ошибки, а не usage-сообщение.
+
+    Click находит такую ошибку при разборе аргументов, до запуска команды, поэтому
+    `guard` её не видит. Аргументы корня падают в `make_context`, подкоманды — в `invoke`.
+    """
+
+    def make_context(self, info_name, args, parent=None, **extra):
+        argv = list(args)  # Click съедает `args` при разборе
+        try:
+            ctx = super().make_context(info_name, args, parent, **extra)
+        except _UsageError as exc:
+            _usage_error(exc, argv)
+        ctx.meta["argv"] = argv
+        return ctx
+
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except _UsageError as exc:
+            _usage_error(exc, ctx.meta["argv"])
+
+
+def _usage_error(exc: Exception, argv: list) -> NoReturn:
+    """Под --json: INVALID_ARGUMENTS в stdout, exit 2. Иначе — usage-сообщение Click как есть."""
+    options = argv[: argv.index("--")] if "--" in argv else argv
+    if "--json" not in options:
+        raise exc
+    error = ValidationError(str(exc))
+    json_output.emit_error(error)
+    raise typer.Exit(code=error.exit_code)
 
 
 def guard(func: Callable) -> Callable:
