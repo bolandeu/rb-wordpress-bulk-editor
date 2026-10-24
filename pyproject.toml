@@ -32,6 +32,10 @@ wp-bulk = "src.cli:main"
 [project.urls]
 Repository = "https://github.com/bolandeu/worppress-bulk-editor"
 
+[tool.rb.install]
+homeserver = ["rbtools"]
+mac = true
+
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
@@ -72,6 +76,8 @@ select = ["E", "F", "S"]
 
 [tool.coverage.run]
 source = ["src"]
+# Ядро по умолчанию в Python 3.14 растёт по памяти на каждый вызов CLI (в CI процесс убивался).
+core = "ctrace"
 omit = ["src/__main__.py", "src/cli/__main__.py"]
 
 [tool.coverage.report]
