@@ -33,5 +33,6 @@ enabled = true
 versioning = "semver"
 changelog = "CHANGELOG.md"
 deploy_command = "git push origin main --follow-tags"
-gate = "remote"
-gate_status_url = "https://homeserver.tailee01ab.ts.net:3000/api/v1/repos/bolandeu/wordpress-bulk-editor/commits/{commit}/status"
+gate = "local"
+gate_command = 'uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@v1.27.3#subdirectory=gate" rb-release check'
+env = { UV_PYTHON = "3.11" }
