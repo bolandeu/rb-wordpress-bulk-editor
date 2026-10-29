@@ -129,13 +129,12 @@ class WordPressHttpProvider(HttpProvider):
             headers = {k: v for k, v in self._request_headers().items() if k.lower() != "content-type"}
             return await self.request_json("POST", endpoint, data=data, files=files, headers=headers)
 
-        logger.debug(f"POST {endpoint} with full data: {data}")
+        logger.debug(f"POST {endpoint} with data keys: {list(data.keys())}")
         return await self.request_json("POST", endpoint, json=data)
 
     async def put(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """PUT запрос с retry и circuit breaker."""
         logger.debug(f"PUT {endpoint} with data keys: {list(data.keys())}")
-        logger.debug(f"PUT {endpoint} with full data: {data}")
         return await self.request_json("PUT", endpoint, json=data)
 
     async def delete(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
