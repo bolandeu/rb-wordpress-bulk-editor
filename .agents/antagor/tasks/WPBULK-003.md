@@ -2,7 +2,7 @@
 id: WPBULK-003
 title: 'No siteoptions values in log files: smtp_password, b24_webhook, tokens leak
   at DEBUG'
-status: in_review
+status: publish
 attempts: 0
 blocked: false
 blocked_reason: null
