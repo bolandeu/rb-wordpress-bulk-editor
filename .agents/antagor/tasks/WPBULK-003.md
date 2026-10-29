@@ -2,10 +2,10 @@
 id: WPBULK-003
 title: 'No siteoptions values in log files: smtp_password, b24_webhook, tokens leak
   at DEBUG'
-status: in_progress
+status: queue
 attempts: 1
-blocked: true
-blocked_reason: scope_held
+blocked: false
+blocked_reason: null
 phase: null
 tests_hash: null
 publish_stage: null
@@ -79,3 +79,7 @@ The log file sink is always DEBUG (utils/logger.py: 'В файл пишем вс
 ### Attempt 1: the Architect's verdict
 
 One fix: delete changelog.d/+wpbulk-003-options-log-secrets.fixed.md. changelog.d fragments are obsolete: towncrier was removed in a2670ff, CHANGELOG.md is written by 'antagor publish' from task titles; my brief asked for a fragment by mistake. The code and tests are accepted as they are. Your branch carries the old WPBULK-002 commits: take WPBULK-002's reworked version from main/its branch, do not keep the old auth help.
+
+### Blocked: scope_held (holders ['WPBULK-002'], paths ['src/cli/auth_commands.py', 'tests/snapshots/describe.json', 'tests/snapshots/help/auth.txt', 'tests/test_auth_help.py'])
+
+WPBULK-002 finished; your kept work on src/cli/auth_commands.py, tests/snapshots/describe.json, tests/snapshots/help/auth.txt, tests/test_auth_help.py is back in the worktree; main is merged into your branch where it merges clean
