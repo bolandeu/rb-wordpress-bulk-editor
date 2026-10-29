@@ -47,9 +47,12 @@ Doppler. wp-bulk сам не читает Doppler, Windmill и любое дру
 В Doppler имена несут префикс сайта (TZM_SITE_REST_API_PASSWORD): wp-bulk префикс \
 не отрезает, вызывающий переименовывает сам:
 
-  doppler run --project projects --config prd -- sh -c \
-'WP_DOMAIN=tzm.example.com WP_API_USER="$TZM_SITE_REST_API_USER" \
-WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD" wp-bulk fetch ...'
+\b
+  doppler run --project projects --config prd -- sh -c '
+    export WP_DOMAIN=tzm.example.com
+    export WP_API_USER="$TZM_SITE_REST_API_USER"
+    export WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD"
+    wp-bulk fetch ...'
 
 Что используется на деле: `wp-bulk auth status --json` — источник каждого поля \
 (cli/env/keychain/.env), без значений; --check проверяет доступ одним read-only запросом.
