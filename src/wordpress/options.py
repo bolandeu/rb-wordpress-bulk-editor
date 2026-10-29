@@ -34,8 +34,9 @@ class OptionsEndpoint:
 
         result = await self.client.get(self.endpoint)
 
+        # Значения опций (smtp_password, токены) в лог не пишем — только имена ключей.
         logger.info(f"Получено настроек: {len(result)}")
-        logger.debug(f"Опции: {result}")
+        logger.debug(f"Ключи опций: {list(result.keys())}")
         return result
 
     async def update(self, options: Dict[str, Any]) -> Dict[str, Any]:
@@ -56,7 +57,7 @@ class OptionsEndpoint:
             >>> result = await endpoint.update(options)
         """
         logger.info(f"Обновление настроек сайта: {len(options)} опций")
-        logger.debug(f"Опции: {options}")
+        logger.debug(f"Ключи опций: {list(options.keys())}")
 
         result = await self.client.post(self.endpoint, options)
 
