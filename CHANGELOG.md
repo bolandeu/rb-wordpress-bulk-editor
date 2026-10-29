@@ -3,6 +3,12 @@
 Пишется при `antagor publish` — руками не править (записи до v5.0.0 собраны из фрагментов towncrier).
 Что с какой версии — ориентир для `WP_BULK_MIN_VERSION` вызывающего.
 
+## v5.1.2 — 2026-10-29
+
+### Outside epics
+
+- No siteoptions values in log files: smtp_password, b24_webhook, tokens leak at DEBUG (WPBULK-003)
+
 ## v5.1.1 — 2026-10-29
 
 ### Outside epics
