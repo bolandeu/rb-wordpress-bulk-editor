@@ -1,8 +1,8 @@
 ---
 id: WPBULK-002
 title: 'Help: the whole credential chain, and where Doppler fits'
-status: publish
-attempts: 1
+status: in_review
+attempts: 2
 blocked: false
 blocked_reason: null
 phase: null
@@ -88,3 +88,7 @@ ways out:
   - a research record: docs/research/YYYY-MM-DD-slug.md
   - a living doc: a name or folder from the default list, or `[docs] living` in antagor.toml
   - `[docs] data` or `[docs] generated` in antagor.toml for product data or generated files
+
+### Attempt 2: the Architect's verdict
+
+Two fixes. (1) The doppler example breaks on copy-paste: rich rewraps it, at 80 columns (an agent's non-TTY output) the line splits inside sh -c '...', so 'WP_DOMAIN=...' becomes a separate shell line and never reaches wp-bulk's environment. Keep the example's lines verbatim: a \b paragraph (Typer keeps its line breaks) and every line short enough for 80 columns with the indent, e.g. a multi-line sh -c script with one 'export NAME=...' per line and 'wp-bulk fetch ...' last. Add to tests/test_auth_help.py: render 'auth --help' at width 80 (COLUMNS=80 / terminal_width) and assert each line of the example appears whole. (2) changelog.d fragments are obsolete: towncrier was removed in a2670ff, CHANGELOG.md is written by 'antagor publish' from task titles. Delete changelog.d/+wpbulk-002-auth-help.changed and changelog.d/.gitkeep (the whole folder). My brief asked for a fragment by mistake.
