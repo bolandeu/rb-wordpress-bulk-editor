@@ -2,10 +2,10 @@
 id: WPBULK-003
 title: 'No siteoptions values in log files: smtp_password, b24_webhook, tokens leak
   at DEBUG'
-status: publish
-attempts: 0
-blocked: false
-blocked_reason: null
+status: in_progress
+attempts: 1
+blocked: true
+blocked_reason: scope_held
 phase: null
 tests_hash: null
 publish_stage: null
@@ -19,8 +19,12 @@ owns_paths:
 - src/providers/wordpress.py
 - tests/test_options_log_secrets.py
 - changelog.d
+- src/cli/auth_commands.py
 test_paths:
 - tests/test_options_log_secrets.py
+- tests/snapshots/describe.json
+- tests/snapshots/help/auth.txt
+- tests/test_auth_help.py
 docs: none
 tools: []
 worker_args: null
@@ -69,3 +73,9 @@ The log file sink is always DEBUG (utils/logger.py: 'В файл пишем вс
 - The options command's JSON/console output: it keeps returning every key and value the endpoint gives
 - The siteoptions plugin, its key list or schema (not this project)
 - Old log files already on disk (report them, do not delete)
+
+## Feedback
+
+### Attempt 1: the Architect's verdict
+
+One fix: delete changelog.d/+wpbulk-003-options-log-secrets.fixed.md. changelog.d fragments are obsolete: towncrier was removed in a2670ff, CHANGELOG.md is written by 'antagor publish' from task titles; my brief asked for a fragment by mistake. The code and tests are accepted as they are. Your branch carries the old WPBULK-002 commits: take WPBULK-002's reworked version from main/its branch, do not keep the old auth help.
