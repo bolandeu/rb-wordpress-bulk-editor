@@ -1,7 +1,7 @@
 ---
 id: WPBULK-002
 title: 'Help: the whole credential chain, and where Doppler fits'
-status: in_review
+status: publish
 attempts: 2
 blocked: false
 blocked_reason: null
