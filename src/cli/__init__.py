@@ -26,7 +26,10 @@ from ..exceptions import CliTooOld, ConfigurationError
 app = typer.Typer(
     cls=output.RootGroup,  # ошибка использования под --json — конверт ошибки
     name="wp-bulk-editor",
-    help="WordPress Bulk Editor - Excel <-> WordPress sync",
+    help=(
+        "WordPress Bulk Editor - Excel <-> WordPress sync\n\n"
+        "Откуда берутся логин и пароль сайта (флаги, окружение, keychain, .env; Doppler): wp-bulk auth --help"
+    ),
     # Голый `wp-bulk` печатает справку и выходит с 0 (см. app_callback),
     # а не usage error с кодом 2, как делает click по умолчанию.
     no_args_is_help=False,

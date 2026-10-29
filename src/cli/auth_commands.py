@@ -10,10 +10,58 @@ from . import app
 from .. import output
 from ..credentials import health, manager
 from ..exceptions import ValidationError
+from ..utils.auth import _ANTAGOR_ENV_ALIASES
 from ..version import installed_version
 from .helpers import get_project
 
-auth_app = output.group("Доступы: отчёт об их здоровье и хранение доступов сайтов в OS keychain.")
+_EXAMPLE_DOMAIN = "example.com"
+
+
+def _help_names(field: str) -> str:
+    """Имена переменных поля для справки: из кода, не списком от руки."""
+    return ", ".join(manager.env_var_names(_EXAMPLE_DOMAIN, field)).replace("EXAMPLE_COM", "<SLUG>")
+
+
+_AUTH_HELP = f"""Доступы: отчёт об их здоровье и хранение доступов сайтов в OS keychain.
+
+Откуда wp-bulk берёт домен, логин и пароль сайта. Первый источник, где поле есть, \
+выигрывает — для каждого поля отдельно:
+
+1. Флаги команды: --domain / --username / --password (где они есть).
+
+2. Окружение процесса. Домен: WP_DOMAIN. Логин: {_help_names("username")}. \
+Пароль приложения: {_help_names("password")}. Сначала имя сайта, затем общее. \
+<SLUG> — домен заглавными, всё кроме букв и цифр заменено на «_» \
+({_EXAMPLE_DOMAIN} → {manager.env_var_names(_EXAMPLE_DOMAIN, "username")[0]}). \
+Запасные имена antagor: {_ANTAGOR_ENV_ALIASES["domain"]}, {_ANTAGOR_ENV_ALIASES["username"]}, \
+{_ANTAGOR_ENV_ALIASES["password"]}; свои WP_* главнее, а при заданном SITE_CMS не равном \
+wordpress алиасы отключены. SITE_PROD не читается никогда.
+
+3. OS keychain, запись wp:<домен>: `wp-bulk auth login --provider wp:<домен>`.
+
+4. .env проекта (legacy, последним): ищется от текущей папки вверх или берётся из --project. \
+Имена те же (WP_DOMAIN, WP_API_USER, WP_API_TOKEN и алиасы antagor).
+
+Doppler. wp-bulk сам не читает Doppler, Windmill и любое другое хранилище секретов. \
+Хранилище кладёт значения в окружение под именами выше — это делает вызывающий. \
+В Doppler имена несут префикс сайта (TZM_SITE_REST_API_PASSWORD): wp-bulk префикс \
+не отрезает, вызывающий переименовывает сам:
+
+\b
+  doppler run --project projects --config prd -- sh -c '
+    export WP_DOMAIN=tzm.example.com
+    export WP_API_USER="$TZM_SITE_REST_API_USER"
+    export WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD"
+    wp-bulk fetch ...'
+
+Что используется на деле: `wp-bulk auth status --json` — источник каждого поля \
+(cli/env/keychain/.env), без значений; --check проверяет доступ одним read-only запросом.
+
+Доступов нет — не ошибка для команд только на чтение (работают анонимно); \
+для записи нужны.
+"""
+
+auth_app = output.group(_AUTH_HELP)
 app.add_typer(auth_app, name="auth")
 
 _WP_PREFIX = f"{health.WP_KIND}:"
