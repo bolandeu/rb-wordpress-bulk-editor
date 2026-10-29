@@ -2,7 +2,7 @@
 id: WPBULK-002
 title: 'Help: the whole credential chain, and where Doppler fits'
 status: queue
-attempts: 0
+attempts: 1
 blocked: false
 blocked_reason: null
 phase: null
@@ -75,3 +75,16 @@ The chain is one implementation: utils/auth.resolve_credentials (sources cli/env
 - Any change to how credentials are resolved (utils/auth.py, credentials/manager.py stay as they are)
 - Reading Doppler from wp-bulk; a Doppler integration of any kind
 - README/AGENTS.md rewrite: the help is the source; at most one pointer line
+
+## Feedback
+
+### Attempt 1: doc kind
+
+a new .md file is none of the doc kinds:
+  changelog.d/+wpbulk-002-auth-help.changed.md
+ways out:
+  - `antagor idea add` (a plan, backlog or brief is an idea or a task, not a file)
+  - an ADR: docs/adr/NNNN-slug.md
+  - a research record: docs/research/YYYY-MM-DD-slug.md
+  - a living doc: a name or folder from the default list, or `[docs] living` in antagor.toml
+  - `[docs] data` or `[docs] generated` in antagor.toml for product data or generated files
