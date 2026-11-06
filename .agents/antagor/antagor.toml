@@ -2,7 +2,7 @@ schema = 1
 mode = "fast"
 prefix = "WPBULK"
 name = "wordpress-bulk-editor"
-worker = "claude-code"
+worker = "pi"
 checks = ["python3 scripts/check_command_docstrings.py"]
 heavy = ["rb-release check"]
 
@@ -10,6 +10,7 @@ heavy = ["rb-release check"]
 parallel = 4
 
 [review]
+worker = "pi-glm"  # another model than the author (the Human, 6.11)
 required_types = ["feature", "bugfix"]  # chore and docs: the short path without review
 
 [connector]
@@ -39,3 +40,7 @@ deploy_command = "git push origin main --follow-tags"
 gate = "local"
 gate_command = 'uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@v1.27.3#subdirectory=gate" rb-release check'
 env = { UV_PYTHON = "3.11" }
+
+[workers.pi-glm]  # the reviewer: kind pi, model from [model_policy.pi-glm]
+kind = "pi"
+args = []
