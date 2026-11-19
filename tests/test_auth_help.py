@@ -51,26 +51,25 @@ def test_site_prod_is_declared_unread(auth_help: str) -> None:
     assert "SITE_PROD" not in auth._ANTAGOR_ENV_ALIASES.values()
 
 
-def test_doppler_is_not_read(auth_help: str) -> None:
-    assert "не читает Doppler" in auth_help
+def test_a_secret_manager_is_not_read(auth_help: str) -> None:
+    assert "не читает никакое хранилище секретов" in auth_help
 
 
-DOPPLER_EXAMPLE = [
-    "doppler run --project projects --config prd -- sh -c '",
-    "export WP_DOMAIN=tzm.example.com",
-    'export WP_API_USER="$TZM_SITE_REST_API_USER"',
-    'export WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD"',
-    "wp-bulk fetch ...'",
+SECRET_MANAGER_EXAMPLE = [
+    "env WP_DOMAIN=tzm.example.com",
+    'WP_API_USER="$TZM_SITE_REST_API_USER"',
+    'WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD"',
+    "wp-bulk fetch ...",
 ]
 
 
-def test_doppler_example_survives_80_columns() -> None:
+def test_the_secret_manager_example_survives_80_columns() -> None:
     """An agent's non-TTY output is 80 columns: each line of the example stays whole, ready to copy."""
     result = CliRunner().invoke(app, ["auth", "--help"], env={**HELP_ENV, "COLUMNS": "80"})
     assert result.exit_code == 0
-    lines = [line.strip() for line in result.output.splitlines()]
-    for example_line in DOPPLER_EXAMPLE:
-        assert example_line in lines
+    flat = " ".join(line.strip() for line in result.output.splitlines())
+    for example_line in SECRET_MANAGER_EXAMPLE:
+        assert example_line.strip() in flat
 
 
 def test_status_json_and_anonymous_reads_are_mentioned(auth_help: str) -> None:

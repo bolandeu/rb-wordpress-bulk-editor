@@ -42,17 +42,16 @@ wordpress алиасы отключены. SITE_PROD не читается ни�
 4. .env проекта (legacy, последним): ищется от текущей папки вверх или берётся из --project. \
 Имена те же (WP_DOMAIN, WP_API_USER, WP_API_TOKEN и алиасы antagor).
 
-Doppler. wp-bulk сам не читает Doppler, Windmill и любое другое хранилище секретов. \
-Хранилище кладёт значения в окружение под именами выше — это делает вызывающий. \
-В Doppler имена несут префикс сайта (TZM_SITE_REST_API_PASSWORD): wp-bulk префикс \
-не отрезает, вызывающий переименовывает сам:
+Секрет-менеджер. wp-bulk сам не читает никакое хранилище секретов (Vault, 1Password, \
+Windmill — любое). Хранилище кладёт значения в окружение под именами выше — это делает \
+вызывающий. Имена там могут нести префикс сайта (TZM_SITE_REST_API_PASSWORD): wp-bulk \
+префикс не отрезает, переименовывает вызывающий:
 
 \b
-  doppler run --project projects --config prd -- sh -c '
-    export WP_DOMAIN=tzm.example.com
-    export WP_API_USER="$TZM_SITE_REST_API_USER"
-    export WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD"
-    wp-bulk fetch ...'
+  env WP_DOMAIN=tzm.example.com \
+      WP_API_USER="$TZM_SITE_REST_API_USER" \
+      WP_API_TOKEN="$TZM_SITE_REST_API_PASSWORD" \
+      wp-bulk fetch ...
 
 Что используется на деле: `wp-bulk auth status --json` — источник каждого поля \
 (cli/env/keychain/.env), без значений; --check проверяет доступ одним read-only запросом.

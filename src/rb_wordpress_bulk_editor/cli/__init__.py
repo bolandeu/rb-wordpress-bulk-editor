@@ -28,7 +28,7 @@ app = typer.Typer(
     name="wp-bulk-editor",
     help=(
         "WordPress Bulk Editor - Excel <-> WordPress sync\n\n"
-        "Откуда берутся логин и пароль сайта (флаги, окружение, keychain, .env; Doppler): wp-bulk auth --help"
+        "Откуда берутся логин и пароль сайта (флаги, окружение, keychain, .env; секрет-менеджер): wp-bulk auth --help"
     ),
     # Голый `wp-bulk` печатает справку и выходит с 0 (см. app_callback),
     # а не usage error с кодом 2, как делает click по умолчанию.

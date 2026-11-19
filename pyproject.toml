@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "rb-wordpress-bulk-editor"
 # Версия — из git-тега vX.Y.Z (uv-dynamic-versioning); строку `version =` не добавлять.
 dynamic = ["version"]
-description = "WordPress Bulk Editor - Excel <-> WordPress sync"
+description = "WordPress bulk editor: Excel and WordPress in sync."
 requires-python = ">=3.11.5"  # soupsieve, the HTML parser dependency, has no fixed release for 3.11.0-3.11.4
 dependencies = [
     "pandas>=2.2.0",
@@ -47,6 +47,27 @@ fallback-version = "0.0.0"
 # Импортный пакет исторически называется `src`. hatchling кладёт в wheel все
 # файлы пакета, включая бандленный SKILL.md (его читают `wp-bulk --ai` и агент,
 # у которого есть только установленный пакет) и py.typed.
+[tool.hatch.build.targets.sdist]
+# What a release must not carry: the agent's own files, the forge configs and the dev tooling. The wheel is
+# narrow already (`packages = ["src/<pkg>"]`); this is about the sdist, which is otherwise a copy of the repo.
+exclude = [
+  "/.agents",
+  "/.claude",
+  "/.claude-plugin",
+  "/.gitea",
+  "/.github",
+  "/docs",
+  "/scripts",
+  "/uv.lock",
+  "/AGENTS.md",
+  "/CLAUDE.md",
+  "/CODING_STANDARDS.md",
+  "/CONTEXT.md",
+  "/.copier-answers.yml",
+  "^\\.gitignore$",
+  "/.gitleaks.toml",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/rb_wordpress_bulk_editor"]
 
@@ -116,15 +137,7 @@ override-dependencies = ["soupsieve>=4.1.2"]  # 2.10, still locked for 3.11.0-3.
 # Пересобирать editable-установку при новом коммите/теге, чтобы --version шёл за тегом.
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
-[tool.uv.sources]
-rb-html-to-gutenberg = { index = "gitea" }
-
 # Наши пакеты — только из реестра Gitea: диапазон версий в dependencies, не git-тег.
-[[tool.uv.index]]
-name = "gitea"
-url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple"
-explicit = true
-
 [dependency-groups]
 dev = [
     "click>=8",  # tests import click directly; typer no longer installs it
@@ -141,3 +154,11 @@ dev = [
 # Где scripts/check_command_docstrings.py (git pre-commit + хуки Claude Code)
 # ищет команды: здесь они в src/cli/*_commands.py, а не в commands/*.py шаблона.
 commands = ["src/cli/*_commands.py"]
+
+[tool.uv.sources]
+rb-html-to-gutenberg = { index = "gitea" }
+
+[[tool.uv.index]]
+name = "gitea"
+url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple"
+explicit = true
