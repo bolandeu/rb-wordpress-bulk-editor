@@ -6,8 +6,8 @@ Tests for счётчика прогресса синхронизации: стр
 import pytest
 from loguru import logger
 
-from src.records.base import Record
-from src.sync.progress import Progress
+from rb_wordpress_bulk_editor.records.base import Record
+from rb_wordpress_bulk_editor.sync.progress import Progress
 
 
 @pytest.fixture

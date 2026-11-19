@@ -5,7 +5,7 @@
 
 - документ валиден по схеме OpenCLI;
 - в нём ровно зарегистрированные команды, опции — те, что видны в --help;
-- коды выхода — таблица `EXIT_CODES` из `src/exceptions.py`, и каждый
+- коды выхода — таблица `EXIT_CODES` из `src/rb_wordpress_bulk_editor/exceptions.py`, и каждый
   `exit_code = N` исключений в ней есть;
 - переменные окружения — с `WP_API_USER` / `WP_API_TOKEN` (адаптер Windmill);
 - snapshot: tests/snapshots/describe.json. Изменился контракт — тест падает,
@@ -25,8 +25,8 @@ import typer
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from typer.testing import CliRunner
 
-from src import exceptions
-from src.cli import app
+from rb_wordpress_bulk_editor import exceptions
+from rb_wordpress_bulk_editor.cli import app
 
 CLI = "wp-bulk"
 SCHEMA = json.loads((Path(__file__).parent / "data" / "opencli.schema.json").read_text())

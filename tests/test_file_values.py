@@ -4,8 +4,8 @@ Tests for src/utils/file_values.py — значение поля как ссыл
 
 import pytest
 
-from src.exceptions import ValidationError
-from src.utils.file_values import FileValueResolver, looks_like_file_ref
+from rb_wordpress_bulk_editor.exceptions import ValidationError
+from rb_wordpress_bulk_editor.utils.file_values import FileValueResolver, looks_like_file_ref
 
 
 class TestLooksLikeFileRef:

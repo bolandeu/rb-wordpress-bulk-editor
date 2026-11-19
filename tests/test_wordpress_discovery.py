@@ -2,7 +2,7 @@
 Tests for src/wordpress/discovery.py
 """
 
-from src.wordpress.discovery import WordPressDiscovery
+from rb_wordpress_bulk_editor.wordpress.discovery import WordPressDiscovery
 
 
 class FakeClient:

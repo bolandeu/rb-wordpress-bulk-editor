@@ -7,8 +7,8 @@ import json
 import keyring.errors
 import pytest
 
-from src.exceptions import CredentialStoreUnavailable
-from src.credentials import manager
+from rb_wordpress_bulk_editor.exceptions import CredentialStoreUnavailable
+from rb_wordpress_bulk_editor.credentials import manager
 
 
 class FakeKeyring:

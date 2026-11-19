@@ -5,8 +5,8 @@ primary-термины.
 
 import pytest
 
-from src.exceptions import ValidationError
-from src.wordpress.taxonomies import (
+from rb_wordpress_bulk_editor.exceptions import ValidationError
+from rb_wordpress_bulk_editor.wordpress.taxonomies import (
     TaxonomiesEndpoint,
     TaxonomyCache,
     normalize_taxonomy_name,

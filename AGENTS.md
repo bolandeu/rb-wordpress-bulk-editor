@@ -24,13 +24,13 @@ Bidirectional CLI: Excel/JSON ↔ WordPress — только импорт и э�
 Применяется везде: `AppConfig.from_excel`, tool/fetch/export commands.
 
 **`@async_retry` — не заменять на tenacity.**
-Кастомная реализация в `src/utils/retry.py`. Знает иерархию исключений проекта:
+Кастомная реализация в `src/rb_wordpress_bulk_editor/utils/retry.py`. Знает иерархию исключений проекта:
 ретраит `NetworkError`, `ServerError`, HTTP 429/502/503/504;
 никогда не ретраит `AuthenticationError`, `NotFoundError`.
 Если исключение несёт атрибут `retry_after` (его ставит провайдер из заголовка
 `Retry-After`), пауза берётся оттуда.
 
-**Весь HTTP идёт через `src/providers/`.**
+**Весь HTTP идёт через `src/rb_wordpress_bulk_editor/providers/`.**
 `HttpProvider` — общая база (маппинг статусов, ретраи, circuit breaker,
 User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 `WordPressHttpProvider` — специфика WP (Basic Auth, `verify_ssl`, загрузка медиа).
@@ -63,7 +63,7 @@ User-Agent, таймаут, шов `transport` для `httpx.MockTransport`),
 (от папки пользователя, не от файла вызывающего кода).
 
 **Секреты — keychain или окружение, не файлы проекта.**
-`src/credentials/manager.py` (keyring, provider = домен сайта).
+`src/rb_wordpress_bulk_editor/credentials/manager.py` (keyring, provider = домен сайта).
 Порядок: CLI-флаг → переменная окружения → keychain → `.env` (legacy).
 
 **`.env` antagor понимается как есть.** Тот же `.env` проекта
@@ -161,7 +161,7 @@ update (WP → файл по id, WordPress только читается):
                 "rb_services_cat": "Перевозки"}]}}
 ```
 
-**Значение-путь → содержимое файла** (`src/utils/file_values.py`, подключён в
+**Значение-путь → содержимое файла** (`src/rb_wordpress_bulk_editor/utils/file_values.py`, подключён в
 `ContentMapper.map_row` через `file_resolver`): значение, оканчивающееся на
 `.html .htm .md .markdown .txt` (закрытый список — иначе `example.com` сошёл бы за
 файл), заменяется содержимым файла. Сырой HTML, без конвертации в Gutenberg — в
@@ -195,7 +195,7 @@ json в корне проекта, внутри формата приорите�
 **Только Excel** (JSON-эквивалента пока нет): `export*`;
 синхронизация строк `media` (`MediaSync`) — тоже только из листа Excel.
 
-**Хранилище табов — `src/records/store.py`.** Таб = имя + список записей-словарей;
+**Хранилище табов — `src/rb_wordpress_bulk_editor/records/store.py`.** Таб = имя + список записей-словарей;
 `open_store(path)` — единственное место, где по расширению выбирается носитель
 (`JsonTabStore`, `ExcelTabStore`). Новый носитель (БД и т.п.) — новый адаптер в
 `_ADAPTERS`, команды не меняются. `write_tab` заменяет таб целиком, остальные
@@ -210,7 +210,7 @@ json в корне проекта, внутри формата приорите�
 проекта `<проект>/<проект>.json` — `common.refuse_project_registry`.
 
 Выбор источника и табов (`is_json_source`, `require_json_tabs`) — общий модуль
-`src/records/selection.py`; своих проверок `--sheets` в командах не заводить.
+`src/rb_wordpress_bulk_editor/records/selection.py`; своих проверок `--sheets` в командах не заводить.
 
 ### Обратное направление для JSON: `update`, `fetch`, `validate`
 
@@ -242,7 +242,7 @@ json в корне проекта, внутри формата приорите�
 
 ### Проверка перед отправкой (preflight)
 
-`src/records/preflight.py`, одна для Excel и JSON (работает на `Record`).
+`src/rb_wordpress_bulk_editor/records/preflight.py`, одна для Excel и JSON (работает на `Record`).
 Её показывает `validate`, и она же **автоматически идёт перед `sync`/`async`**
 (`_preflight` в `sync_commands.py`, внутри `_open_plan` — после подключения и
 чтения схемы сайта, но до подтверждения и до первого изменения на сайте, в том
@@ -295,7 +295,7 @@ json в корне проекта, внутри формата приорите�
 значению поля. Dot-нотация — обычное имя поля (`--filter acf.f1=да`), понимать
 вложенность payload не требуется. `type`/`taxonomy` берутся из дискриминатора
 записи (в `Record.data` их нет). Отфильтрованные записи попадают в отчёт как
-`skipped`. Реализация — `src/records/filters.py`, подключён к `sync`/`async`.
+`skipped`. Реализация — `src/rb_wordpress_bulk_editor/records/filters.py`, подключён к `sync`/`async`.
 
 **`--dry-run` не открывает writer'ы — исправление реальной порчи файлов.**
 До этого dry-run проходил полный путь обратной записи и заливал в файл проекта
@@ -320,7 +320,7 @@ create-запрос — нет; отсутствующий термин возв
 ### Прогресс: `[n/total]` в логе
 
 По завершении каждой записи `sync`/`async` пишут в лог (INFO) строку
-`[17/104] id=3425 updated` — `src/sync/progress.py`. Это контракт: antagor
+`[17/104] id=3425 updated` — `src/rb_wordpress_bulk_editor/sync/progress.py`. Это контракт: antagor
 читает поток лога и по нему показывает долю сделанного — снаружи номер записи
 не вычислить. Не менять формат без поднятия версии.
 
@@ -338,7 +338,7 @@ create-запрос — нет; отсутствующий термин возв
 
 ### Загрузка медиа: `media-upload`
 
-`src/cli/media_commands.py`. Пути — аргументами или `--manifest`
+`src/rb_wordpress_bulk_editor/cli/media_commands.py`. Пути — аргументами или `--manifest`
 (`[{path, alt?, title?, caption?}]`), ответ — id вложений. Команда **не знает
 про файл данных**: не читает и не пишет Excel/JSON, id с записями
 (`featured_media`) связывает вызывающий (antagor) — по имени файла, поэтому
@@ -361,7 +361,7 @@ create-запрос — нет; отсутствующий термин возв
 
 ### WP-адаптер Windmill: `post upsert/get`, `media attach`, `describe`
 
-`src/cli/post_commands.py` + логика `src/wordpress/post_adapter.py` (T104,
+`src/rb_wordpress_bulk_editor/cli/post_commands.py` + логика `src/rb_wordpress_bulk_editor/wordpress/post_adapter.py` (T104,
 сценарии — `~/Work/tools/docs/t104-wp-adapter.md`). Одна запись за вызов, вход
 JSON (`--input <файл|->`), выход — JSON-конверт; файла данных проекта не знают.
 
@@ -388,7 +388,7 @@ JSON (`--input <файл|->`), выход — JSON-конверт; файла д
   `content.raw` ответа WordPress (context=edit), не от отправленного.
 - **Логи** — только stderr, файлов не пишут. Без проекта остальные команды
   пишут логи в `platformdirs.user_log_path("wp-bulk")`, не в cwd.
-- **`describe --json`** — документ OpenCLI (`src/opencli.py`, порт шаблона
+- **`describe --json`** — документ OpenCLI (`src/rb_wordpress_bulk_editor/opencli.py`, порт шаблона
   cli-generator): коды выхода — `exceptions.EXIT_CODES`, переменные окружения —
   `opencli.ENV_VARS` (новая переменная — строка туда). Снапшот
   `tests/snapshots/describe.json` — контракт для Windmill: его изменение ломающее.
@@ -500,7 +500,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 
 Проект (данные сайта: `.env`, Excel/JSON, `media/`, `content/`, `logs/`) живёт вне
 этого репозитория — `--project`/`-P` (или `WP_PROJECT`) находит его директорию,
-`resolve_project()` в `src/cli/project.py`, порядок разрешения:
+`resolve_project()` в `src/rb_wordpress_bulk_editor/cli/project.py`, порядок разрешения:
 
 1. **Явный путь** — `--project /path/to/project` (абсолютный или относительно cwd)
    указывает на существующую директорию → используется как есть.
@@ -529,8 +529,8 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 Запуск из исходников (пакет не установлен) версии не имеет — проверка пропускается.
 
 **`cli_version` в каждом JSON-конверте** (успех и ошибка) — кладёт
-`src/output/json.py`, не команды: вызывающий (antagor) пишет в журнал, чем сделан
-результат. Версию читает `src/version.py` из метаданных пакета — у editable-установки
+`src/rb_wordpress_bulk_editor/output/json.py`, не команды: вызывающий (antagor) пишет в журнал, чем сделан
+результат. Версию читает `src/rb_wordpress_bulk_editor/version.py` из метаданных пакета — у editable-установки
 они фиксируются при установке, поэтому после нового тега переустановить tool. Что с какой версии (для `WP_BULK_MIN_VERSION` вызывающего) — в `CHANGELOG.md`.
 
 Версия — это git-тег `vX.Y.Z` (строки `version =` в `pyproject.toml` нет). Журнал
@@ -546,7 +546,7 @@ CircuitBreaker: CLOSED → OPEN → HALF_OPEN
 только по явному флагу, чтобы doctor оставался быстрым и офлайновым.
 Статусы: `ok` / `warn` / `fail`; сам запуск диагностики всегда exit 0.
 
-`src/data/SKILL.md` — соглашения CLI для агента, едет внутри пакета
+`src/rb_wordpress_bulk_editor/data/SKILL.md` — соглашения CLI для агента, едет внутри пакета
 (hatchling кладёт в wheel все файлы пакета `src`). Печатается флагом `wp-bulk --ai`.
 **Списка команд там нет и быть не должно:** его печатает голый `wp-bulk` из
 docstring'ов. Добавили команду — написали хороший docstring, SKILL.md не трогаем.
@@ -555,7 +555,7 @@ docstring'ов. Добавили команду — написали хорош�
 
 ## Добавление новой команды
 
-1. Выбрать нужный файл в `src/cli/` по теме или создать новый.
+1. Выбрать нужный файл в `src/rb_wordpress_bulk_editor/cli/` по теме или создать новый.
 2. Навесить `@output.guard` под `@app.command()`, добавить `json_output: bool = output.JsonOption`
    и `quiet: bool = output.QuietOption`, результат отдавать через `output.emit_success(ctx, payload, render)`.
    (Ещё не переведённые команды используют `handle_command_errors(ctx)` из `common.py` — то же самое,
@@ -566,7 +566,7 @@ docstring'ов. Добавили команду — написали хорош�
 6. Если команда что-то спрашивает или необратимо меняет сайт — добавить
    `confirm: bool = output.ConfirmOption` и `non_interactive: bool = output.NonInteractiveOption`,
    вопрос задавать только через `output.require_confirmation`.
-7. Импортировать модуль в `src/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
+7. Импортировать модуль в `src/rb_wordpress_bulk_editor/cli/__init__.py` — регистрация происходит автоматически через `@app.command()`.
 8. Docstring с `Example: {cli} <команда> …`, `help=` у каждого параметра, группа — через
    `output.group("…")`; `uv run pytest --snapshot-update`.
 
@@ -575,7 +575,7 @@ docstring'ов. Добавили команду — написали хорош�
 ## Исключения — иерархия
 
 Каждое исключение несёт `code` и `exit_code` (контракт cli-builder), их печатает
-`src/output/`. `CliError` — алиас `WPBulkEditorError`.
+`src/rb_wordpress_bulk_editor/output/`. `CliError` — алиас `WPBulkEditorError`.
 
 ```
 WPBulkEditorError                       UNEXPECTED (1)
@@ -624,12 +624,12 @@ WPBulkEditorError                       UNEXPECTED (1)
 
 ```bash
 uv sync --all-groups
-uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@<тег шаблона>#subdirectory=gate" rb-release check   # гейт; строка и тег — только в .gitea/workflows/ci.yml
+uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@<тег шаблона>#subdirectory=gate" gate check   # гейт; строка и тег — только в .gitea/workflows/ci.yml
 uv run pytest -q                     # покрытие включено (fail_under в pyproject)
 uv run pytest --snapshot-update      # после правки справки команды
 ```
 
-**Гейт — `rb-release check` (шаг `Gate` в `.gitea/workflows/ci.yml`; Standard cli-generator)**:
+**Гейт — `gate check` (шаг `Gate` в `.gitea/workflows/ci.yml`; Standard cli-generator)**:
 `uv lock --check`, ruff check + format, ty, pytest (покрытие, контракт справки, форма
 `auth status`), контракты, сборка wheel и `wp-bulk --version`/`--help` в чистом venv,
 `standard: *`, gitleaks по истории, osv-scanner по `uv.lock`. pytest гейт запускает с
@@ -638,7 +638,7 @@ uv run pytest --snapshot-update      # после правки справки к
 Фейковое тестовое значение для gitleaks — одна точная строка в `.gitleaks.toml`;
 `.gitleaksignore` — только fingerprint уже отозванного ключа.
 ty в `tests/` для утиных дублёров только предупреждает (`[tool.ty.overrides]`),
-`src/` — на полной строгости.
+`src/rb_wordpress_bulk_editor/` — на полной строгости.
 
 **Контракты потребителей** — `tests/contracts/<потребитель>/wp-bulk.yaml`
 (сейчас `windmill/`: дословная копия из репо windmill), формат `contract: 1`
@@ -670,7 +670,7 @@ pid, вывод (`<метка>.log`), ошибки (`<метка>.stderr`) и к
 у каждого параметра `help=`; `tests/snapshots/help/` обновляет `--snapshot-update`.
 Квадратные скобки в docstring экранировать `\\[…]` — иначе rich съест их как разметку.
 
-**`auth status` (§8)** — `src/credentials/health.py`, форма зафиксирована
+**`auth status` (§8)** — `src/rb_wordpress_bulk_editor/credentials/health.py`, форма зафиксирована
 `tests/test_auth_status.py` (её смена — ломающее изменение). Цели `wp:<домен>`:
 индекс сохранённых доменов в keychain (`credentials.manager.stored_names`, keyring
 не умеет перечислять) + сайт активного проекта + `--provider`.

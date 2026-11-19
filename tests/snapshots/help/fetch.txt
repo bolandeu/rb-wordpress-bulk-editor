@@ -19,23 +19,23 @@
  Example: wp-bulk fetch --to-json --tab site.ru --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --file             -f      FILE     Файл выгрузки: .xlsx (по умолчанию fetch.xlsx) или .json     │
-│                                     (один таб на сайт)                                           │
-│ --domain                   TEXT     WordPress domain (например, https://example.com)             │
-│ --username                 TEXT     WordPress username                                           │
-│ --password                 TEXT     WordPress Application Password                               │
-│ --sheets                   TEXT     Типы записей и таксономии через запятую                      │
-│                                     (posts,pages,category)                                       │
-│ --env-file                 FILE     Путь к .env файлу (по умолчанию .env)                        │
-│ --status                   TEXT     Фильтр по статусу (publish, draft, any) [default: any]       │
-│ --limit                    INTEGER  Максимум записей на лист (в JSON — на тип записи/таксономию) │
-│ --exclude                  TEXT     Список типов для исключения через запятую (posts,category)   │
-│ --to-json                           Выгрузить в JSON без --file: <проект>/wp-fetch/<домен>.json  │
-│ --tab                      TEXT     Имя таба JSON (по умолчанию — домен сайта)                   │
-│ --confirm                           Подтвердить опасную операцию без вопроса.                    │
-│ --non-interactive                   Никогда не спрашивать; вместо вопроса — ошибка.              │
-│ --json                              Машиночитаемый JSON-вывод.                                   │
-│ --quiet                             Только существенный вывод.                                   │
-│ --help                              Show this message and exit.                                  │
+│ --file             -f      <file>  Файл выгрузки: .xlsx (по умолчанию fetch.xlsx) или .json      │
+│                                    (один таб на сайт)                                            │
+│ --domain                   <str>   WordPress domain (например, https://example.com)              │
+│ --username                 <str>   WordPress username                                            │
+│ --password                 <str>   WordPress Application Password                                │
+│ --sheets                   <str>   Типы записей и таксономии через запятую                       │
+│                                    (posts,pages,category)                                        │
+│ --env-file                 <file>  Путь к .env файлу (по умолчанию .env)                         │
+│ --status                   <str>   Фильтр по статусу (publish, draft, any) [default: any]        │
+│ --limit                    <int>   Максимум записей на лист (в JSON — на тип записи/таксономию)  │
+│ --exclude                  <str>   Список типов для исключения через запятую (posts,category)    │
+│ --to-json                          Выгрузить в JSON без --file: <проект>/wp-fetch/<домен>.json   │
+│ --tab                      <str>   Имя таба JSON (по умолчанию — домен сайта)                    │
+│ --confirm                          Подтвердить опасную операцию без вопроса.                     │
+│ --non-interactive                  Никогда не спрашивать; вместо вопроса — ошибка.               │
+│ --json                             Машиночитаемый JSON-вывод.                                    │
+│ --quiet                            Только существенный вывод.                                    │
+│ --help                             Show this message and exit.                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

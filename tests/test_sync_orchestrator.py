@@ -2,9 +2,9 @@
 Tests for src/sync/orchestrator.py — группировка записей по дискриминатору
 """
 
-from src.models import SyncReport
-from src.records.base import Record
-from src.sync.orchestrator import merge_reports, sync_record_groups
+from rb_wordpress_bulk_editor.models import SyncReport
+from rb_wordpress_bulk_editor.records.base import Record
+from rb_wordpress_bulk_editor.sync.orchestrator import merge_reports, sync_record_groups
 
 
 class RecordingSync:

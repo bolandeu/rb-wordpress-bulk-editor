@@ -16,12 +16,12 @@
  Example: wp-bulk post get --id 42 --site example.com --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --id           INTEGER RANGE [x>=1]  ID записи                                                   │
-│ --type         TEXT                  Тип записи WordPress (post, page, rb_services…)             │
-│                                      [default: post]                                             │
-│ --site         TEXT                  Домен сайта (example.com или https://example.com)           │
-│ --json                               Машиночитаемый JSON-вывод.                                  │
-│ --quiet                              Только существенный вывод.                                  │
-│ --help                               Show this message and exit.                                 │
+│ --id           <int range> [x>=1]  ID записи                                                     │
+│ --type         <str>               Тип записи WordPress (post, page, rb_services…)               │
+│                                    [default: post]                                               │
+│ --site         <str>               Домен сайта (example.com или https://example.com)             │
+│ --json                             Машиночитаемый JSON-вывод.                                    │
+│ --quiet                            Только существенный вывод.                                    │
+│ --help                             Show this message and exit.                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

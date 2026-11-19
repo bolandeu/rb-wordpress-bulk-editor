@@ -7,18 +7,18 @@ import asyncio
 import httpx
 import pytest
 
-from src.config import WordPressConfig
-from src.exceptions import (
+from rb_wordpress_bulk_editor.config import WordPressConfig
+from rb_wordpress_bulk_editor.exceptions import (
     AuthenticationError,
     NetworkError,
     NotFoundError,
     ServerError,
     WordPressError,
 )
-from src.providers.wordpress import WordPressHttpProvider
-from src.utils.retry import CircuitBreaker, CircuitBreakerOpenError, CircuitState, RetryConfig
-from src.wordpress.client import WordPressClient
-from src.wordpress.media import MediaEndpoint
+from rb_wordpress_bulk_editor.providers.wordpress import WordPressHttpProvider
+from rb_wordpress_bulk_editor.utils.retry import CircuitBreaker, CircuitBreakerOpenError, CircuitState, RetryConfig
+from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
+from rb_wordpress_bulk_editor.wordpress.media import MediaEndpoint
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

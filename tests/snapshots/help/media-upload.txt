@@ -1,5 +1,5 @@
 
- Usage: wp-bulk media-upload [OPTIONS] [PATHS]...
+ Usage: wp-bulk media-upload [OPTIONS] [paths]...
 
  Загрузка файлов с диска в медиатеку WordPress -> id вложений.
 
@@ -20,23 +20,24 @@
  Example: wp-bulk media-upload media/1.jpg media/2.jpg --alt "Фото" --json
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────╮
-│   paths      [PATHS]...                                                                          │
+│   paths      <str>  Пути к файлам (абсолютные или от текущей папки). Взаимоисключающи с          │
+│                     --manifest                                                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --manifest           FILE                  JSON-массив [{"path", "alt"?, "title"?, "caption"?}]  │
-│                                            — пакетная загрузка                                   │
-│ --alt                TEXT                  Alt-текст для всех путей-аргументов                   │
-│ --title              TEXT                  Заголовок вложения для всех путей-аргументов          │
-│ --caption            TEXT                  Подпись для всех путей-аргументов                     │
-│ --concurrency        INTEGER RANGE [x>=1]  Количество параллельных загрузок [default: 5]         │
-│ --dry-run                                  Проверить манифест и наличие файлов, к сайту не       │
-│                                            обращаться (id: null)                                 │
-│ --domain             TEXT                  WordPress domain                                      │
-│ --username           TEXT                  WordPress username                                    │
-│ --password           TEXT                  WordPress Application Password                        │
-│ --env-file           FILE                  Путь к .env файлу                                     │
-│ --json                                     Машиночитаемый JSON-вывод.                            │
-│ --quiet                                    Только существенный вывод.                            │
-│ --help                                     Show this message and exit.                           │
+│ --manifest           <file>              JSON-массив [{"path", "alt"?, "title"?, "caption"?}] —  │
+│                                          пакетная загрузка                                       │
+│ --alt                <str>               Alt-текст для всех путей-аргументов                     │
+│ --title              <str>               Заголовок вложения для всех путей-аргументов            │
+│ --caption            <str>               Подпись для всех путей-аргументов                       │
+│ --concurrency        <int range> [x>=1]  Количество параллельных загрузок [default: 5]           │
+│ --dry-run                                Проверить манифест и наличие файлов, к сайту не         │
+│                                          обращаться (id: null)                                   │
+│ --domain             <str>               WordPress domain                                        │
+│ --username           <str>               WordPress username                                      │
+│ --password           <str>               WordPress Application Password                          │
+│ --env-file           <file>              Путь к .env файлу                                       │
+│ --json                                   Машиночитаемый JSON-вывод.                              │
+│ --quiet                                  Только существенный вывод.                              │
+│ --help                                   Show this message and exit.                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

@@ -10,8 +10,8 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app, tool_commands
-from src.version import installed_version
+from rb_wordpress_bulk_editor.cli import app, tool_commands
+from rb_wordpress_bulk_editor.version import installed_version
 
 runner = CliRunner()
 

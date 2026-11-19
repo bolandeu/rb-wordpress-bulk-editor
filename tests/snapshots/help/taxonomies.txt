@@ -17,11 +17,11 @@
  Example: wp-bulk taxonomies --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --env-file              FILE  Путь к .env (по умолчанию .env проекта)                            │
-│ --include-system              Включать служебные таксономии (nav_menu, post_format,              │
-│                               wp_pattern_category и т.п.)                                        │
-│ --json                        Машиночитаемый JSON-вывод.                                         │
-│ --quiet                       Только существенный вывод.                                         │
-│ --help                        Show this message and exit.                                        │
+│ --env-file              <file>  Путь к .env (по умолчанию .env проекта)                          │
+│ --include-system                Включать служебные таксономии (nav_menu, post_format,            │
+│                                 wp_pattern_category и т.п.)                                      │
+│ --json                          Машиночитаемый JSON-вывод.                                       │
+│ --quiet                         Только существенный вывод.                                       │
+│ --help                          Show this message and exit.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

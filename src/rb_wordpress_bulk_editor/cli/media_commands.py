@@ -103,7 +103,7 @@ def _build_items(
 class _Progress:
     """
     Строка `[17/104] 3425.jpg -> id=4821` по завершении каждого файла —
-    тот же формат, что у sync/async (`src/sync/progress.py`): по ней
+    тот же формат, что у sync/async (`src/rb_wordpress_bulk_editor/sync/progress.py`): по ней
     вызывающий видит долю сделанного. Номер — сколько сделано, не позиция.
     """
 

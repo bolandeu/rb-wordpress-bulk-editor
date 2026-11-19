@@ -11,9 +11,9 @@ import pytest
 from openpyxl import Workbook, load_workbook
 from typer.testing import CliRunner
 
-from src.cli import app
-from src.cli import fetch_commands, tool_commands, update_commands
-from src.exceptions import AuthenticationError
+from rb_wordpress_bulk_editor.cli import app
+from rb_wordpress_bulk_editor.cli import fetch_commands, tool_commands, update_commands
+from rb_wordpress_bulk_editor.exceptions import AuthenticationError
 
 runner = CliRunner()
 
@@ -89,7 +89,7 @@ class FakeSite:
             for item in self.items.get(base, []):
                 if item["id"] == int(item_id):
                     return item
-            from src.exceptions import NotFoundError
+            from rb_wordpress_bulk_editor.exceptions import NotFoundError
 
             raise NotFoundError(f"{endpoint} не найден")
         return list(self.items.get(path, []))
@@ -421,7 +421,7 @@ class TestValidateWithSite:
 
     @pytest.fixture
     def online(self, fake_wp, monkeypatch):
-        from src.wordpress.site_schema import SiteSchema
+        from rb_wordpress_bulk_editor.wordpress.site_schema import SiteSchema
 
         schema = SiteSchema.from_rest(
             {"rb_topic": {"slug": "rb_topic", "rest_base": "rb_topic", "types": ["rb_services"]}},
@@ -484,7 +484,7 @@ class TestValidateWithSite:
         assert online["calls"] == 0
 
     def test_site_down_is_an_error_not_a_silent_offline(self, online, monkeypatch, tmp_path):
-        from src.exceptions import NetworkError
+        from rb_wordpress_bulk_editor.exceptions import NetworkError
 
         async def down(wp_config):
             raise NetworkError("сайт не ответил")
@@ -513,15 +513,15 @@ class TestTermPayloadRoundTrip:
     @staticmethod
     def build(data, tmp_path):
         from unittest.mock import MagicMock
-        from src.sync.taxonomy_sync import TaxonomySync
+        from rb_wordpress_bulk_editor.sync.taxonomy_sync import TaxonomySync
 
         config = MagicMock()
         config.paths.excel_file = tmp_path / "data.json"
         return TaxonomySync(MagicMock(), config)._build_payload(data)
 
     def test_fetched_term_goes_back_nested(self, tmp_path):
-        from src.records.json_fetch import term_to_record
-        from src.records.json_source import SOURCE_META_FIELDS
+        from rb_wordpress_bulk_editor.records.json_fetch import term_to_record
+        from rb_wordpress_bulk_editor.records.json_source import SOURCE_META_FIELDS
 
         record = term_to_record(
             {

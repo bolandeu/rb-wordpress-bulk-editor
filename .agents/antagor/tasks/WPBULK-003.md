@@ -64,9 +64,9 @@ The log file sink is always DEBUG (utils/logger.py: 'В файл пишем вс
 
 ## Read first
 
-- `src/wordpress/options.py`
-- `src/providers/wordpress.py`
-- `src/utils/logger.py`
+- `src/rb_wordpress_bulk_editor/wordpress/options.py`
+- `src/rb_wordpress_bulk_editor/providers/wordpress.py`
+- `src/rb_wordpress_bulk_editor/utils/logger.py`
 
 ## Out of scope
 

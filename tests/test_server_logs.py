@@ -10,7 +10,7 @@ from pathlib import Path
 
 import platformdirs
 
-from src.cli.project import ProjectContext
+from rb_wordpress_bulk_editor.cli.project import ProjectContext
 
 
 class TestLogsFolder:

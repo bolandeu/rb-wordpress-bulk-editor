@@ -2,7 +2,7 @@
 Tests for src/exceptions.py — inheritance chain validation.
 """
 
-from src.exceptions import (
+from rb_wordpress_bulk_editor.exceptions import (
     WPBulkEditorError,
     ConfigurationError,
     ExcelError,

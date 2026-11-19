@@ -14,8 +14,8 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app, tool_commands
-from src.wordpress.client import WordPressClient
+from rb_wordpress_bulk_editor.cli import app, tool_commands
+from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
 
 runner = CliRunner()
 

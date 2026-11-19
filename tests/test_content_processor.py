@@ -2,7 +2,7 @@
 Tests for src/utils/content_processor.py — content_path → блоки Gutenberg.
 """
 
-from src.utils.content_processor import ContentProcessor
+from rb_wordpress_bulk_editor.utils.content_processor import ContentProcessor
 
 
 class TestProcessFile:

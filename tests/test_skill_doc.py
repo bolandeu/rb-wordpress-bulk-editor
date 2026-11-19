@@ -4,8 +4,8 @@ Tests for бандленного SKILL.md и флага --ai.
 
 from typer.testing import CliRunner
 
-from src.cli import app
-from src.data import read_skill_doc
+from rb_wordpress_bulk_editor.cli import app
+from rb_wordpress_bulk_editor.data import read_skill_doc
 
 runner = CliRunner()
 

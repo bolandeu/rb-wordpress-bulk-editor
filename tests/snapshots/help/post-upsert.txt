@@ -27,12 +27,12 @@
  Example: wp-bulk post upsert --site example.com --input post.json --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --input        TEXT                  JSON {type?, id?, slug, title, content, seo?, featured?}:   │
-│                                      путь к файлу или - (stdin)                                  │
-│ --id           INTEGER RANGE [x>=1]  ID записи для обновления (иначе — поиск по slug)            │
-│ --site         TEXT                  Домен сайта (example.com или https://example.com)           │
-│ --json                               Машиночитаемый JSON-вывод.                                  │
-│ --quiet                              Только существенный вывод.                                  │
-│ --help                               Show this message and exit.                                 │
+│ --input        <str>               JSON {type?, id?, slug, title, content, seo?, featured?}:     │
+│                                    путь к файлу или - (stdin)                                    │
+│ --id           <int range> [x>=1]  ID записи для обновления (иначе — поиск по slug)              │
+│ --site         <str>               Домен сайта (example.com или https://example.com)             │
+│ --json                             Машиночитаемый JSON-вывод.                                    │
+│ --quiet                            Только существенный вывод.                                    │
+│ --help                             Show this message and exit.                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

@@ -7,8 +7,8 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.excel.reader import ExcelReader
-from src.exceptions import ExcelError, ExcelStructureError
+from rb_wordpress_bulk_editor.excel.reader import ExcelReader
+from rb_wordpress_bulk_editor.exceptions import ExcelError, ExcelStructureError
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────

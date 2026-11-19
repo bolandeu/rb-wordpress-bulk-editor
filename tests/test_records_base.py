@@ -10,7 +10,7 @@ import math
 import pandas as pd
 import pytest
 
-from src.records.base import (
+from rb_wordpress_bulk_editor.records.base import (
     Record,
     collect_fields,
     group_by_discriminator,

@@ -5,7 +5,7 @@ WP-адаптер для Windmill (T104): `post upsert`, `post get`, `media atta
 Сайт — `--site`, доступы — только окружение `WP_API_USER` / `WP_API_TOKEN`
 (`utils/auth.adapter_credentials`): без keychain, `.env` и флагов, поэтому
 команды одинаково работают на Mac и на сервере (rb-run). Файлов логов не
-пишут — лог идёт в stderr. Логика — `src/wordpress/post_adapter.py`.
+пишут — лог идёт в stderr. Логика — `src/rb_wordpress_bulk_editor/wordpress/post_adapter.py`.
 """
 
 import asyncio

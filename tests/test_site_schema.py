@@ -7,8 +7,8 @@ REST API при каждом прогоне, а не из списка в .env.
 
 import pytest
 
-from src.exceptions import NetworkError
-from src.wordpress.site_schema import SiteSchema, load_site_schema
+from rb_wordpress_bulk_editor.exceptions import NetworkError
+from rb_wordpress_bulk_editor.wordpress.site_schema import SiteSchema, load_site_schema
 
 TAXONOMIES = {
     "category": {"slug": "category", "rest_base": "categories", "types": ["post"]},

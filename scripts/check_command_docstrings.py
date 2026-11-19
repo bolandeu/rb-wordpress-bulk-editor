@@ -3,7 +3,7 @@
 
 Every command function's docstring is what Typer renders as `--help` —
 the documentation agents and humans read (see architecture.md, "AI-first
-output"). A command is a function in `src/*/commands/*.py` (or the globs in
+output"). A command is a function in `src/rb_wordpress_bulk_editor/*/commands/*.py` (or the globs in
 `[tool.cli-generator] commands` in pyproject.toml) decorated with
 `output.guard` or registered with `@<app>.command(...)`; "logic" is its signature plus its body minus the
 docstring. One check, three callers:

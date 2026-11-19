@@ -19,17 +19,18 @@
  Example: wp-bulk update --file site.json --sheets site.ru --columns slug,link --dry-run
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│    --id                 TEXT  ID записей через запятую: 123,456,789. Без --id — все записи с id. │
-│ *  --columns    -c      TEXT  Поля для обновления из WordPress: title,excerpt,seo.title,acf.f1   │
-│                               [required]                                                         │
-│    --file       -f      PATH  Файл данных .xlsx или .json (авто-определяется из --project)       │
-│    --sheets             TEXT  Листы Excel / табы JSON через запятую. Для JSON обязателен         │
-│    --dry-run    -d            Показать изменения без записи в файл                               │
-│    --test-mode                Только первые 3 записи каждого набора                              │
-│    --verbose    -v            Подробные логи                                                     │
-│    --env-file           PATH  Путь к .env файлу                                                  │
-│    --json                     Машиночитаемый JSON-вывод.                                         │
-│    --quiet                    Только существенный вывод.                                         │
-│    --help                     Show this message and exit.                                        │
+│    --id                 <str>   ID записей через запятую: 123,456,789. Без --id — все записи с   │
+│                                 id.                                                              │
+│ *  --columns    -c      <str>   Поля для обновления из WordPress: title,excerpt,seo.title,acf.f1 │
+│                                 [required]                                                       │
+│    --file       -f      <path>  Файл данных .xlsx или .json (авто-определяется из --project)     │
+│    --sheets             <str>   Листы Excel / табы JSON через запятую. Для JSON обязателен       │
+│    --dry-run    -d              Показать изменения без записи в файл                             │
+│    --test-mode                  Только первые 3 записи каждого набора                            │
+│    --verbose    -v              Подробные логи                                                   │
+│    --env-file           <path>  Путь к .env файлу                                                │
+│    --json                       Машиночитаемый JSON-вывод.                                       │
+│    --quiet                      Только существенный вывод.                                       │
+│    --help                       Show this message and exit.                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

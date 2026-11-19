@@ -1,5 +1,5 @@
 
- Usage: wp-bulk media [OPTIONS] [COMMAND] [ARGS]...
+ Usage: wp-bulk media [OPTIONS] COMMAND [ARGS]...
 
  Медиа записи: изображение (featured) для существующей записи.
 

@@ -7,8 +7,8 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.excel.writer import ExcelWriter, normalize_api_value
-from src.exceptions import ExcelError
+from rb_wordpress_bulk_editor.excel.writer import ExcelWriter, normalize_api_value
+from rb_wordpress_bulk_editor.exceptions import ExcelError
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────

@@ -11,12 +11,12 @@
  Example: wp-bulk auth login --provider wp:example.com --username editor
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ *  --provider               TEXT  Сайт: wp:<домен>, например wp:example.com. [required]          │
-│    --username               TEXT  Логин WordPress (иначе WP_<DOMAIN>_API_USER / WP_API_USER или  │
-│                                   вопрос).                                                       │
-│    --non-interactive              Никогда не спрашивать; вместо вопроса — ошибка.                │
-│    --json                         Машиночитаемый JSON-вывод.                                     │
-│    --quiet                        Только существенный вывод.                                     │
-│    --help                         Show this message and exit.                                    │
+│ *  --provider               <str>  Сайт: wp:<домен>, например wp:example.com. [required]         │
+│    --username               <str>  Логин WordPress (иначе WP_<DOMAIN>_API_USER / WP_API_USER или │
+│                                    вопрос).                                                      │
+│    --non-interactive               Никогда не спрашивать; вместо вопроса — ошибка.               │
+│    --json                          Машиночитаемый JSON-вывод.                                    │
+│    --quiet                         Только существенный вывод.                                    │
+│    --help                          Show this message and exit.                                   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

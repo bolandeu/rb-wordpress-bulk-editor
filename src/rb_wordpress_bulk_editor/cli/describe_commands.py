@@ -1,5 +1,5 @@
 """
-Команда describe: машиночитаемый контракт CLI (документ OpenCLI, `src/opencli.py`).
+Команда describe: машиночитаемый контракт CLI (документ OpenCLI, `src/rb_wordpress_bulk_editor/opencli.py`).
 """
 
 import json

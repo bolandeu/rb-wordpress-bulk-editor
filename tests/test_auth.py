@@ -9,9 +9,9 @@ import os
 
 import pytest
 
-from src.exceptions import AuthenticationError, ConfigurationError
-from src.credentials import manager
-from src.utils.auth import load_credentials_from_env, resolve_credentials
+from rb_wordpress_bulk_editor.exceptions import AuthenticationError, ConfigurationError
+from rb_wordpress_bulk_editor.credentials import manager
+from rb_wordpress_bulk_editor.utils.auth import load_credentials_from_env, resolve_credentials
 
 
 @pytest.fixture(autouse=True)

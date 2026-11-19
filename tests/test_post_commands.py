@@ -17,8 +17,8 @@ import keyring
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app
-from src.wordpress.client import WordPressClient
+from rb_wordpress_bulk_editor.cli import app
+from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
 from tests.fake_wp import ENV_TOKEN, ENV_USER, SITE, TOKEN, USER, FakeWordPress
 
 runner = CliRunner()
@@ -31,7 +31,7 @@ def sha256(text: str) -> str:
 @pytest.fixture
 def wp(monkeypatch, tmp_path):
     """Фальшивый сайт + env-доступы; cwd — пустая временная папка (логи туда не пишутся)."""
-    from src.cli import post_commands
+    from rb_wordpress_bulk_editor.cli import post_commands
 
     fake = FakeWordPress()
     for name in ("WP_DOMAIN", "SITE_DOMAIN", "WP_PROJECT"):
@@ -435,7 +435,7 @@ class TestNetwork:
     )
     def test_network_or_tls_failure_is_provider_error(self, wp, monkeypatch, error):
         # T141: сеть/TLS — PROVIDER_ERROR с exit 5, и код 5 описан в EXIT_CODES (а значит в describe)
-        from src.exceptions import EXIT_CODES
+        from rb_wordpress_bulk_editor.exceptions import EXIT_CODES
 
         real_sleep = asyncio.sleep
 

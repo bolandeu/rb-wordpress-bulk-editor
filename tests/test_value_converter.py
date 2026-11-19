@@ -7,7 +7,7 @@ import pytest
 
 from datetime import datetime
 
-from src.mappers.value_converter import parse_bool_default_true, to_wp_date
+from rb_wordpress_bulk_editor.mappers.value_converter import parse_bool_default_true, to_wp_date
 
 
 class TestParseBoolDefaultTrue:

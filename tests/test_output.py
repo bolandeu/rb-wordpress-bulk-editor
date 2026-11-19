@@ -8,17 +8,17 @@ import click
 import pytest
 import typer
 
-from src import output
-from src.output import json as output_json
-from src.version import installed_version
-from src.exceptions import (
+from rb_wordpress_bulk_editor import output
+from rb_wordpress_bulk_editor.output import json as output_json
+from rb_wordpress_bulk_editor.version import installed_version
+from rb_wordpress_bulk_editor.exceptions import (
     Aborted,
     AuthenticationError,
     CredentialStoreUnavailable,
     ServerError,
     ValidationError,
 )
-from src.utils.retry import CircuitBreakerOpenError
+from rb_wordpress_bulk_editor.utils.retry import CircuitBreakerOpenError
 
 
 def make_ctx(json_mode: bool = False, verbose: bool = False) -> typer.Context:
@@ -207,7 +207,7 @@ class TestUsageErrors:
     def test_under_json_is_the_error_envelope(self, args):
         from typer.testing import CliRunner
 
-        from src.cli import app
+        from rb_wordpress_bulk_editor.cli import app
 
         result = CliRunner().invoke(app, list(args))
 
@@ -219,7 +219,7 @@ class TestUsageErrors:
     def test_without_json_stays_on_stderr(self):
         from typer.testing import CliRunner
 
-        from src.cli import app
+        from rb_wordpress_bulk_editor.cli import app
 
         result = CliRunner().invoke(app, ["doctor", "--no-such-option"])
 

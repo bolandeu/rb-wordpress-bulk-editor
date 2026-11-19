@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.exceptions import (
+from rb_wordpress_bulk_editor.exceptions import (
     NetworkError,
     ServerError,
     AuthenticationError,
     NotFoundError,
     WordPressError,
 )
-from src.utils.retry import (
+from rb_wordpress_bulk_editor.utils.retry import (
     is_retryable_error,
     async_retry,
     RetryConfig,

@@ -9,10 +9,10 @@ import httpx
 import pytest
 from loguru import logger
 
-from src.config import WordPressConfig
-from src.providers.wordpress import WordPressHttpProvider
-from src.wordpress.client import WordPressClient
-from src.wordpress.options import OptionsEndpoint
+from rb_wordpress_bulk_editor.config import WordPressConfig
+from rb_wordpress_bulk_editor.providers.wordpress import WordPressHttpProvider
+from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
+from rb_wordpress_bulk_editor.wordpress.options import OptionsEndpoint
 
 SMTP_PASSWORD = "s3cret-123"
 B24_WEBHOOK = "https://x/rest/3/tok-456/"

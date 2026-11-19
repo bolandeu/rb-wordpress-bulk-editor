@@ -10,7 +10,7 @@ Sources: the wp-bulk code, two fetches of ost-term.ru (15.05.2026: log
 
 - wp-bulk has none. It is a transport: `GET /wp-json/siteoptions/v1/options`
   → the dict as is → tab `options` as `{key, value}` records
-  (`src/wordpress/options.py`, `options` in `src/cli/tool_commands.py`).
+  (`src/rb_wordpress_bulk_editor/wordpress/options.py`, `options` in `src/rb_wordpress_bulk_editor/cli/tool_commands.py`).
   No key list, types, groups or secret flags in the wp-bulk code or docs.
 - The siteoptions plugin is not part of this project and its source is not
   in `~/Work`. The schema belongs to the plugin and its owner.

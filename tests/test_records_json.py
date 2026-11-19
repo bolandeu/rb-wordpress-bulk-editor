@@ -8,10 +8,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.exceptions import RecordSourceError
-from src.mappers.content_mapper import ContentMapper
-from src.records.json_source import JsonRecordSource, JsonRecordWriter
-from src.sync.taxonomy_sync import TaxonomySync
+from rb_wordpress_bulk_editor.exceptions import RecordSourceError
+from rb_wordpress_bulk_editor.mappers.content_mapper import ContentMapper
+from rb_wordpress_bulk_editor.records.json_source import JsonRecordSource, JsonRecordWriter
+from rb_wordpress_bulk_editor.sync.taxonomy_sync import TaxonomySync
 
 
 TAB = "example.ru"

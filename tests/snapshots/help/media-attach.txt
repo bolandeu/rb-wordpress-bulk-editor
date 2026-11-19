@@ -15,16 +15,16 @@
  Example: wp-bulk media attach --post 42 --path cover.jpg --alt "Обложка" --site example.com --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --post            INTEGER RANGE [x>=1]  ID записи, которой ставится изображение                  │
-│ --path            TEXT                  Локальный файл: загрузить и привязать                    │
-│ --url             TEXT                  URL файла: загрузить на сайт и привязать                 │
-│ --media-id        INTEGER RANGE [x>=1]  ID уже загруженного медиа: привязать без загрузки        │
-│ --alt             TEXT                  Alt-текст медиа                                          │
-│ --type            TEXT                  Тип записи WordPress (post, page, rb_services…)          │
-│                                         [default: post]                                          │
-│ --site            TEXT                  Домен сайта (example.com или https://example.com)        │
-│ --json                                  Машиночитаемый JSON-вывод.                               │
-│ --quiet                                 Только существенный вывод.                               │
-│ --help                                  Show this message and exit.                              │
+│ --post            <int range> [x>=1]  ID записи, которой ставится изображение                    │
+│ --path            <str>               Локальный файл: загрузить и привязать                      │
+│ --url             <str>               URL файла: загрузить на сайт и привязать                   │
+│ --media-id        <int range> [x>=1]  ID уже загруженного медиа: привязать без загрузки          │
+│ --alt             <str>               Alt-текст медиа                                            │
+│ --type            <str>               Тип записи WordPress (post, page, rb_services…)            │
+│                                       [default: post]                                            │
+│ --site            <str>               Домен сайта (example.com или https://example.com)          │
+│ --json                                Машиночитаемый JSON-вывод.                                 │
+│ --quiet                               Только существенный вывод.                                 │
+│ --help                                Show this message and exit.                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

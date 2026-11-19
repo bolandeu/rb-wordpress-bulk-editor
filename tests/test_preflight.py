@@ -7,8 +7,8 @@ Tests for src/records/preflight.py — проверка набора данны�
 
 import pytest
 
-from src.records.base import Record
-from src.records.preflight import FieldRules, check_records
+from rb_wordpress_bulk_editor.records.base import Record
+from rb_wordpress_bulk_editor.records.preflight import FieldRules, check_records
 
 
 def post(write_key=2, discriminator="posts", **data):
@@ -250,7 +250,7 @@ def test_location_uses_custom_label():
 
 # ── Сверка с сайтом ──────────────────────────────────────────────────
 
-from src.wordpress.site_schema import SiteSchema  # noqa: E402
+from rb_wordpress_bulk_editor.wordpress.site_schema import SiteSchema  # noqa: E402
 
 SITE = SiteSchema.from_rest(
     {

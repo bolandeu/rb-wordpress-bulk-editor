@@ -66,9 +66,9 @@ The chain is one implementation: utils/auth.resolve_credentials (sources cli/env
 
 ## Read first
 
-- `src/utils/auth.py`
-- `src/credentials/manager.py`
-- `src/cli/auth_commands.py`
+- `src/rb_wordpress_bulk_editor/utils/auth.py`
+- `src/rb_wordpress_bulk_editor/credentials/manager.py`
+- `src/rb_wordpress_bulk_editor/cli/auth_commands.py`
 
 ## Out of scope
 

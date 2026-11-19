@@ -7,12 +7,12 @@ name = "rb-wordpress-bulk-editor"
 # Версия — из git-тега vX.Y.Z (uv-dynamic-versioning); строку `version =` не добавлять.
 dynamic = ["version"]
 description = "WordPress Bulk Editor - Excel <-> WordPress sync"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"  # soupsieve, the HTML parser dependency, has no fixed release for 3.11.0-3.11.4
 dependencies = [
     "pandas>=2.2.0",
     "openpyxl>=3.1.0",
     "httpx>=0.26.0",
-    "typer>=0.9.0",
+    "typer>=0.27,<0.29",
     "rich>=13.7.0",
     "loguru>=0.7.0",
     "pydantic>=2.5.0",
@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-wp-bulk = "src.cli:main"
+wp-bulk = "rb_wordpress_bulk_editor.cli:main"
 
 [project.urls]
 Repository = "https://github.com/bolandeu/worppress-bulk-editor"
@@ -48,7 +48,7 @@ fallback-version = "0.0.0"
 # файлы пакета, включая бандленный SKILL.md (его читают `wp-bulk --ai` и агент,
 # у которого есть только установленный пакет) и py.typed.
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src/rb_wordpress_bulk_editor"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -75,7 +75,7 @@ select = ["E", "F", "S"]
 "scripts/*" = ["S603", "S607", "E501"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/rb_wordpress_bulk_editor"]
 # Ядро по умолчанию в Python 3.14 растёт по памяти на каждый вызов CLI (в CI процесс убивался).
 core = "ctrace"
 omit = ["src/__main__.py", "src/cli/__main__.py"]
@@ -111,6 +111,8 @@ disallow_untyped_defs = false
 ignore_missing_imports = true
 
 [tool.uv]
+# soupsieve 2.10 (still locked for python 3.11.0-3.11.4) carries 4 advisories.
+override-dependencies = ["soupsieve>=4.1.2"]  # 2.10, still locked for 3.11.0-3.11.4, carries 4 advisories
 # Пересобирать editable-установку при новом коммите/теге, чтобы --version шёл за тегом.
 cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
@@ -125,6 +127,7 @@ explicit = true
 
 [dependency-groups]
 dev = [
+    "click>=8",  # tests import click directly; typer no longer installs it
     "jsonschema>=4.23",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",

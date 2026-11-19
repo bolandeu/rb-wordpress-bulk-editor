@@ -9,7 +9,7 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app, tool_commands
+from rb_wordpress_bulk_editor.cli import app, tool_commands
 
 runner = CliRunner()
 
@@ -68,7 +68,7 @@ class TestTaxonomiesCommand:
         assert site["include_system"] is True
 
     def test_missing_credentials_is_an_envelope(self, monkeypatch):
-        from src.exceptions import AuthenticationError
+        from rb_wordpress_bulk_editor.exceptions import AuthenticationError
 
         def no_credentials(**kwargs):
             raise AuthenticationError("нет доступа")

@@ -25,22 +25,22 @@
  Example: wp-bulk bulk-delete --post-type posts --dry-run
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│    --domain                   TEXT  WordPress domain (например, https://example.com)             │
-│    --username                 TEXT  WordPress username                                           │
-│    --password                 TEXT  WordPress Application Password                               │
-│    --env-file                 FILE  Путь к .env файлу (по умолчанию .env)                        │
-│ *  --post-type        -t      TEXT  Тип контента для удаления (posts, pages, service, и т.д.)    │
-│                                     [required]                                                   │
-│    --status                   TEXT  Статус записей для удаления (any, publish, draft, etc.)      │
-│                                     [default: any]                                               │
-│    --force                          Удалить полностью (минуя корзину)                            │
-│    --delete-media                   Удалять связанные featured media                             │
-│    --dry-run          -d            Показать что будет удалено, без удаления                     │
-│    --confirm                        Подтвердить опасную операцию без вопроса.                    │
-│    --non-interactive                Никогда не спрашивать; вместо вопроса — ошибка.              │
-│    --json                           Машиночитаемый JSON-вывод.                                   │
-│    --quiet                          Только существенный вывод.                                   │
-│    --verbose          -v            Подробные логи                                               │
-│    --help                           Show this message and exit.                                  │
+│    --domain                   <str>   WordPress domain (например, https://example.com)           │
+│    --username                 <str>   WordPress username                                         │
+│    --password                 <str>   WordPress Application Password                             │
+│    --env-file                 <file>  Путь к .env файлу (по умолчанию .env)                      │
+│ *  --post-type        -t      <str>   Тип контента для удаления (posts, pages, service, и т.д.)  │
+│                                       [required]                                                 │
+│    --status                   <str>   Статус записей для удаления (any, publish, draft, etc.)    │
+│                                       [default: any]                                             │
+│    --force                            Удалить полностью (минуя корзину)                          │
+│    --delete-media                     Удалять связанные featured media                           │
+│    --dry-run          -d              Показать что будет удалено, без удаления                   │
+│    --confirm                          Подтвердить опасную операцию без вопроса.                  │
+│    --non-interactive                  Никогда не спрашивать; вместо вопроса — ошибка.            │
+│    --json                             Машиночитаемый JSON-вывод.                                 │
+│    --quiet                            Только существенный вывод.                                 │
+│    --verbose          -v              Подробные логи                                             │
+│    --help                             Show this message and exit.                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

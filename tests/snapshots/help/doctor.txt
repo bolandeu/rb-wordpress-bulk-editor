@@ -15,13 +15,13 @@
  Example: wp-bulk doctor --check-connection --json
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --domain                  TEXT  WordPress domain                                                 │
-│ --username                TEXT  WordPress username                                               │
-│ --password                TEXT  WordPress Application Password                                   │
-│ --env-file                FILE  Путь к .env файлу (по умолчанию .env проекта)                    │
-│ --check-connection              Дополнительно проверить, отвечает ли сайт (сетевой запрос).      │
-│ --json                          Машиночитаемый JSON-вывод.                                       │
-│ --quiet                         Только существенный вывод.                                       │
-│ --help                          Show this message and exit.                                      │
+│ --domain                  <str>   WordPress domain                                               │
+│ --username                <str>   WordPress username                                             │
+│ --password                <str>   WordPress Application Password                                 │
+│ --env-file                <file>  Путь к .env файлу (по умолчанию .env проекта)                  │
+│ --check-connection                Дополнительно проверить, отвечает ли сайт (сетевой запрос).    │
+│ --json                            Машиночитаемый JSON-вывод.                                     │
+│ --quiet                           Только существенный вывод.                                     │
+│ --help                            Show this message and exit.                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

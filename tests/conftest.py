@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import typer.rich_utils
 
-from src.output import human
+from rb_wordpress_bulk_editor.output import human
 
 
 @pytest.fixture(autouse=True)
@@ -92,8 +92,8 @@ def _contract_site(monkeypatch):
 
     import httpx
 
-    from src.cli import post_commands
-    from src.wordpress.client import WordPressClient
+    from rb_wordpress_bulk_editor.cli import post_commands
+    from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
     from tests.fake_wp import FakeWordPress
 
     site = FakeWordPress(seo_types={"posts"})

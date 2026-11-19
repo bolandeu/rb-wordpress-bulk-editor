@@ -10,9 +10,9 @@ import pandas as pd
 import pytest
 from openpyxl import Workbook
 
-from src.excel.reader import ExcelReader
-from src.excel.writer import ExcelWriter
-from src.records.excel import ExcelRecordSource, ExcelRecordWriter
+from rb_wordpress_bulk_editor.excel.reader import ExcelReader
+from rb_wordpress_bulk_editor.excel.writer import ExcelWriter
+from rb_wordpress_bulk_editor.records.excel import ExcelRecordSource, ExcelRecordWriter
 
 
 @pytest.fixture

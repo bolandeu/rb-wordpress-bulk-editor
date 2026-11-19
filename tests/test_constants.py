@@ -5,7 +5,7 @@ Tests for src/constants.py helper functions.
 import pytest
 from pathlib import Path
 
-from src.constants import (
+from rb_wordpress_bulk_editor.constants import (
     build_nested_payload,
     is_dot_notation_column,
     is_taxonomy_column,
@@ -13,8 +13,8 @@ from src.constants import (
     read_nested_value,
     TAXONOMY_DELIMITER,
 )
-from src.utils.wp_helpers import wp_rendered, convert_taxonomy_ids_to_names
-from src.utils.path_utils import resolve_media_file
+from rb_wordpress_bulk_editor.utils.wp_helpers import wp_rendered, convert_taxonomy_ids_to_names
+from rb_wordpress_bulk_editor.utils.path_utils import resolve_media_file
 
 
 # ── is_taxonomy_column ──────────────────────────────────────────────

@@ -12,10 +12,10 @@ import pandas as pd
 import pytest
 import typer
 
-from src import output
-from src.cli.sync_commands import _confirm_irreversible, _count_permanent_media_deletes
-from src.config import SyncConfig
-from src.exceptions import ValidationError
+from rb_wordpress_bulk_editor import output
+from rb_wordpress_bulk_editor.cli.sync_commands import _confirm_irreversible, _count_permanent_media_deletes
+from rb_wordpress_bulk_editor.config import SyncConfig
+from rb_wordpress_bulk_editor.exceptions import ValidationError
 
 
 class FakeReader:

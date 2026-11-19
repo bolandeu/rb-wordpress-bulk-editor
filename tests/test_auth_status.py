@@ -12,10 +12,10 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app
-from src.config import WordPressConfig
-from src.credentials import health, manager
-from src.providers.wordpress import check_credentials
+from rb_wordpress_bulk_editor.cli import app
+from rb_wordpress_bulk_editor.config import WordPressConfig
+from rb_wordpress_bulk_editor.credentials import health, manager
+from rb_wordpress_bulk_editor.providers.wordpress import check_credentials
 from tests.test_credentials import FakeKeyring
 
 ENTRY_KEYS = {

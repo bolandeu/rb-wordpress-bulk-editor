@@ -6,9 +6,9 @@ import base64
 import pytest
 import httpx
 
-from src.wordpress.client import WordPressClient
-from src.config import WordPressConfig
-from src.exceptions import AuthenticationError, NotFoundError, ServerError
+from rb_wordpress_bulk_editor.wordpress.client import WordPressClient
+from rb_wordpress_bulk_editor.config import WordPressConfig
+from rb_wordpress_bulk_editor.exceptions import AuthenticationError, NotFoundError, ServerError
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ class TestMediaUploadHeaders:
         строчными, и при слиянии обычным dict наш 'Content-Type' уходил вторым
         значением — WordPress разбирал JPEG как JSON и отвечал 400.
         """
-        from src.wordpress.media import MediaEndpoint
+        from rb_wordpress_bulk_editor.wordpress.media import MediaEndpoint
 
         seen = []
 

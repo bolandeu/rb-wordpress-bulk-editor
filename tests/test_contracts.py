@@ -41,11 +41,11 @@ from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import Version
 from typer.testing import CliRunner
 
-from src.cli import app as cli_app
-from src import opencli
-from src.opencli import DEV_VERSION
-from src.output import CLI_NAME
-from src.version import installed_version
+from rb_wordpress_bulk_editor.cli import app as cli_app
+from rb_wordpress_bulk_editor import opencli
+from rb_wordpress_bulk_editor.opencli import DEV_VERSION
+from rb_wordpress_bulk_editor.output import CLI_NAME
+from rb_wordpress_bulk_editor.version import installed_version
 
 CONTRACTS = Path(__file__).parent / "contracts"
 SCHEMA = json.loads((CONTRACTS / "schema.json").read_text())

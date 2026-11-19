@@ -2,8 +2,8 @@
 Tests for src/mappers/field_detector.py
 """
 
-from src.mappers.field_detector import FieldDetector
-from src.mappers.value_converter import convert_acf_value
+from rb_wordpress_bulk_editor.mappers.field_detector import FieldDetector
+from rb_wordpress_bulk_editor.mappers.value_converter import convert_acf_value
 
 
 # ── FieldDetector.analyze() ─────────────────────────────────────────

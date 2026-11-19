@@ -4,7 +4,7 @@ Tests for src/mappers/content_mapper.py
 
 import pandas as pd
 
-from src.mappers.content_mapper import ContentMapper
+from rb_wordpress_bulk_editor.mappers.content_mapper import ContentMapper
 
 
 # ── Helpers ─────────────────────────────────────────────────────────

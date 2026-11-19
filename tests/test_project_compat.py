@@ -8,10 +8,10 @@ import sys
 import pytest
 from typer.testing import CliRunner
 
-from src import cli
-from src.cli import app, project as project_module
-from src.cli.project import ProjectContext, check_cli_compat
-from src.exceptions import CliTooOld
+from rb_wordpress_bulk_editor import cli
+from rb_wordpress_bulk_editor.cli import app, project as project_module
+from rb_wordpress_bulk_editor.cli.project import ProjectContext, check_cli_compat
+from rb_wordpress_bulk_editor.exceptions import CliTooOld
 
 runner = CliRunner()
 
@@ -116,7 +116,7 @@ def test_installed_version_falls_back_to_legacy_dist_name(monkeypatch):
     """Editable-установка под старым именем wp-bulk-editor всё ещё сообщает версию."""
     from importlib import metadata
 
-    from src import version as version_module
+    from rb_wordpress_bulk_editor import version as version_module
 
     def fake_version(name):
         if name == "wp-bulk-editor":

@@ -2,8 +2,8 @@
 Tests for src/wordpress/posts.py
 """
 
-from src.wordpress.posts import FETCH_ALL_STATUSES, PostsEndpoint
-from src.exceptions import WordPressError
+from rb_wordpress_bulk_editor.wordpress.posts import FETCH_ALL_STATUSES, PostsEndpoint
+from rb_wordpress_bulk_editor.exceptions import WordPressError
 
 
 class FakeClient:

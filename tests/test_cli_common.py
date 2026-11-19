@@ -2,7 +2,7 @@
 Tests for src/cli/common.py — parse_comma_list.
 """
 
-from src.cli.common import parse_comma_list
+from rb_wordpress_bulk_editor.cli.common import parse_comma_list
 
 
 class TestParseCommaList:

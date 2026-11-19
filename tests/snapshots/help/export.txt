@@ -9,14 +9,14 @@
  Example: wp-bulk export --output ./exported_content
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --domain         -d      TEXT     WordPress domain                                               │
-│ --username       -u      TEXT     WordPress username                                             │
-│ --password       -p      TEXT     WordPress Application Password                                 │
-│ --env-file               FILE     Путь к .env файлу                                              │
-│ --output         -o      PATH     Папка для экспорта контента [default: exported_content]        │
-│ --concurrency    -c      INTEGER  Количество параллельных загрузок [default: 10]                 │
-│ --include-media                   Включить экспорт метаданных медиа                              │
-│ --verbose        -v               Подробные логи                                                 │
-│ --help                            Show this message and exit.                                    │
+│ --domain         -d      <str>   WordPress domain                                                │
+│ --username       -u      <str>   WordPress username                                              │
+│ --password       -p      <str>   WordPress Application Password                                  │
+│ --env-file               <file>  Путь к .env файлу                                               │
+│ --output         -o      <path>  Папка для экспорта контента [default: exported_content]         │
+│ --concurrency    -c      <int>   Количество параллельных загрузок [default: 10]                  │
+│ --include-media                  Включить экспорт метаданных медиа                               │
+│ --verbose        -v              Подробные логи                                                  │
+│ --help                           Show this message and exit.                                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

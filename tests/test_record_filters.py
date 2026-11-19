@@ -4,9 +4,9 @@ Tests for src/records/filters.py — предикат `--filter field=value`.
 
 import pytest
 
-from src.exceptions import ValidationError
-from src.records.base import Record
-from src.records.filters import matches, parse_filters
+from rb_wordpress_bulk_editor.exceptions import ValidationError
+from rb_wordpress_bulk_editor.records.base import Record
+from rb_wordpress_bulk_editor.records.filters import matches, parse_filters
 
 
 def content(data, discriminator="rb_services") -> Record:

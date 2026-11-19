@@ -11,9 +11,9 @@ import pytest
 from openpyxl import Workbook, load_workbook
 from typer.testing import CliRunner
 
-from src.cli import app, fetch_commands, tool_commands
-from src.exceptions import ValidationError
-from src.records.store import ExcelTabStore, JsonTabStore, open_store
+from rb_wordpress_bulk_editor.cli import app, fetch_commands, tool_commands
+from rb_wordpress_bulk_editor.exceptions import ValidationError
+from rb_wordpress_bulk_editor.records.store import ExcelTabStore, JsonTabStore, open_store
 
 runner = CliRunner()
 

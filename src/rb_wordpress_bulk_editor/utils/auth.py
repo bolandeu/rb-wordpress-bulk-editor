@@ -4,7 +4,7 @@
 Порядок разрешения (протокол cli-builder): CLI-флаг → переменная окружения →
 OS keychain. Файл `.env` остаётся последним, legacy-слоем: он ещё работает для
 существующих проектов, но новый путь секреты в файлах проекта не требует —
-`wp-bulk` берёт их из keychain (`src/credentials/manager.py`) или из окружения.
+`wp-bulk` берёт их из keychain (`src/rb_wordpress_bulk_editor/credentials/manager.py`) или из окружения.
 """
 
 import os

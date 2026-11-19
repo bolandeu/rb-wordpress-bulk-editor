@@ -5,8 +5,8 @@ Tests for src/config.py Pydantic models.
 import pytest
 from pathlib import Path
 
-from src.config import AppConfig, WordPressConfig, SyncConfig, LoggingConfig, PathsConfig, Settings
-from src.constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY_PATTERNS
+from rb_wordpress_bulk_editor.config import AppConfig, WordPressConfig, SyncConfig, LoggingConfig, PathsConfig, Settings
+from rb_wordpress_bulk_editor.constants import DEFAULT_SKIP_POST_TYPE_PATTERNS, DEFAULT_SKIP_TAXONOMY_PATTERNS
 
 
 # ── WordPressConfig ─────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 
- Usage: wp-bulk auth [OPTIONS] [COMMAND] [ARGS]...
+ Usage: wp-bulk auth [OPTIONS] COMMAND [ARGS]...
 
  Доступы: отчёт об их здоровье и хранение доступов сайтов в OS keychain.
 

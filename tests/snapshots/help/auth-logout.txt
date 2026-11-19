@@ -6,9 +6,9 @@
  Example: wp-bulk auth logout --provider wp:example.com
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ *  --provider        TEXT  Сайт: wp:<домен>. [required]                                          │
-│    --json                  Машиночитаемый JSON-вывод.                                            │
-│    --quiet                 Только существенный вывод.                                            │
-│    --help                  Show this message and exit.                                           │
+│ *  --provider        <str>  Сайт: wp:<домен>. [required]                                         │
+│    --json                   Машиночитаемый JSON-вывод.                                           │
+│    --quiet                  Только существенный вывод.                                           │
+│    --help                   Show this message and exit.                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

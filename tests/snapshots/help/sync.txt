@@ -32,34 +32,34 @@
  Example: wp-bulk sync --file site.json --sheets site.ru --dry-run
 
 ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────╮
-│ --file                 -f      PATH     Путь к файлу данных .xlsx или .json (авто-определяется   │
-│                                         из --project)                                            │
-│ --domain                       TEXT     WordPress domain (например, https://example.com)         │
-│ --username                     TEXT     WordPress username                                       │
-│ --password                     TEXT     WordPress Application Password                           │
-│ --sheets                       TEXT     Листы Excel / табы JSON через запятую (posts,pages). Для │
-│                                         JSON обязателен                                          │
-│ --filter                       TEXT     Фильтр записей field=value (повторяемый, условия по И):  │
-│                                         --filter type=rb_services                                │
-│ --env-file                     FILE     Путь к .env файлу (по умолчанию .env)                    │
-│ --dry-run              -d               Режим dry-run (без изменений)                            │
-│ --verbose              -v               Подробные логи                                           │
-│ --concurrency                  INTEGER  Количество параллельных запросов [default: 5]            │
-│ --skip-media                            Пропустить загрузку медиа                                │
-│ --skip-tax                              Пропустить обновление таксономий (категории, теги)       │
-│ --no-update-excel                       Не записывать ID обратно в файл данных (Excel или JSON)  │
-│ --delete-media                          Удалять featured media при удалении записей              │
-│                                         (action=delete)                                          │
-│ --skip-existing-media                   Не прикреплять существующие featured_media при update    │
-│ --test-mode                             Тестовый режим: обрабатывает только первые 3 строки из   │
-│                                         одного листа                                             │
-│ --columns                      TEXT     Колонки для обновления через запятую (excerpt,seo_title) │
-│ --skip-checks                           Не проверять данные перед отправкой (имена полей,        │
-│                                         таксономий, значения)                                    │
-│ --confirm                               Подтвердить опасную операцию без вопроса.                │
-│ --non-interactive                       Никогда не спрашивать; вместо вопроса — ошибка.          │
-│ --json                                  Машиночитаемый JSON-вывод.                               │
-│ --quiet                                 Только существенный вывод.                               │
-│ --help                                  Show this message and exit.                              │
+│ --file                 -f      <path>  Путь к файлу данных .xlsx или .json (авто-определяется из │
+│                                        --project)                                                │
+│ --domain                       <str>   WordPress domain (например, https://example.com)          │
+│ --username                     <str>   WordPress username                                        │
+│ --password                     <str>   WordPress Application Password                            │
+│ --sheets                       <str>   Листы Excel / табы JSON через запятую (posts,pages). Для  │
+│                                        JSON обязателен                                           │
+│ --filter                       <str>   Фильтр записей field=value (повторяемый, условия по И):   │
+│                                        --filter type=rb_services                                 │
+│ --env-file                     <file>  Путь к .env файлу (по умолчанию .env)                     │
+│ --dry-run              -d              Режим dry-run (без изменений)                             │
+│ --verbose              -v              Подробные логи                                            │
+│ --concurrency                  <int>   Количество параллельных запросов [default: 5]             │
+│ --skip-media                           Пропустить загрузку медиа                                 │
+│ --skip-tax                             Пропустить обновление таксономий (категории, теги)        │
+│ --no-update-excel                      Не записывать ID обратно в файл данных (Excel или JSON)   │
+│ --delete-media                         Удалять featured media при удалении записей               │
+│                                        (action=delete)                                           │
+│ --skip-existing-media                  Не прикреплять существующие featured_media при update     │
+│ --test-mode                            Тестовый режим: обрабатывает только первые 3 строки из    │
+│                                        одного листа                                              │
+│ --columns                      <str>   Колонки для обновления через запятую (excerpt,seo_title)  │
+│ --skip-checks                          Не проверять данные перед отправкой (имена полей,         │
+│                                        таксономий, значения)                                     │
+│ --confirm                              Подтвердить опасную операцию без вопроса.                 │
+│ --non-interactive                      Никогда не спрашивать; вместо вопроса — ошибка.           │
+│ --json                                 Машиночитаемый JSON-вывод.                                │
+│ --quiet                                Только существенный вывод.                                │
+│ --help                                 Show this message and exit.                               │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 

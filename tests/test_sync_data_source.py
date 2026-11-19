@@ -16,7 +16,7 @@ import pytest
 from openpyxl import Workbook, load_workbook
 from typer.testing import CliRunner
 
-from src.cli import app, sync_commands
+from rb_wordpress_bulk_editor.cli import app, sync_commands
 
 runner = CliRunner()
 
@@ -764,7 +764,7 @@ class TestSiteTaxonomies:
         assert fake_wp[0].writes() == []
 
     def test_schema_failure_stops_the_run(self, fake_wp, json_project, monkeypatch):
-        from src.exceptions import NetworkError
+        from rb_wordpress_bulk_editor.exceptions import NetworkError
 
         async def broken(client):
             raise NetworkError("сайт не ответил")
@@ -779,8 +779,8 @@ class TestSiteTaxonomies:
 
 class TestValidateExcel:
     def test_typo_found_without_credentials(self, monkeypatch, tmp_path):
-        from src.cli import tool_commands
-        from src.exceptions import AuthenticationError
+        from rb_wordpress_bulk_editor.cli import tool_commands
+        from rb_wordpress_bulk_editor.exceptions import AuthenticationError
 
         def _no_credentials(**kwargs):
             raise AuthenticationError("нет доступов")

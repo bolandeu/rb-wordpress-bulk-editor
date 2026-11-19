@@ -7,9 +7,9 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app, doctor_commands
-from src.credentials import manager
-from src.utils.auth import load_credentials_from_env
+from rb_wordpress_bulk_editor.cli import app, doctor_commands
+from rb_wordpress_bulk_editor.credentials import manager
+from rb_wordpress_bulk_editor.utils.auth import load_credentials_from_env
 
 runner = CliRunner()
 

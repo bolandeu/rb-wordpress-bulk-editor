@@ -28,7 +28,7 @@ from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from typer.models import ParameterInfo
 from typer.testing import CliRunner
 
-from src.cli import app
+from rb_wordpress_bulk_editor.cli import app
 
 CLI = "wp-bulk"
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots" / "help"

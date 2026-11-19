@@ -8,11 +8,11 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.records.base import Record
-from src.sync.content_sync import ContentSync
-from src.models import SyncReport, SyncResult
-from src.config import AppConfig, WordPressConfig, SyncConfig, PathsConfig
-from src.wordpress.taxonomies import TaxonomyCache
+from rb_wordpress_bulk_editor.records.base import Record
+from rb_wordpress_bulk_editor.sync.content_sync import ContentSync
+from rb_wordpress_bulk_editor.models import SyncReport, SyncResult
+from rb_wordpress_bulk_editor.config import AppConfig, WordPressConfig, SyncConfig, PathsConfig
+from rb_wordpress_bulk_editor.wordpress.taxonomies import TaxonomyCache
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -482,7 +482,7 @@ class TestSyncReportFromStats:
 class TestApplyContentFile:
     @staticmethod
     def _processor(content_folder: Path):
-        from src.utils.content_processor import ContentProcessor
+        from rb_wordpress_bulk_editor.utils.content_processor import ContentProcessor
 
         return ContentProcessor(content_folder)
 

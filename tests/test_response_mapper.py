@@ -4,7 +4,7 @@ Tests for src/mappers/response_mapper.py
 
 import pytest
 
-from src.mappers.response_mapper import ResponseMapper
+from rb_wordpress_bulk_editor.mappers.response_mapper import ResponseMapper
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────

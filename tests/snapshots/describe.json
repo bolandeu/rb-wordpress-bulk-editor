@@ -23,7 +23,11 @@
         "metadata": [
           {
             "name": "x-rb-type",
-            "value": "text"
+            "value": "str"
+          },
+          {
+            "name": "x-rb-default",
+            "value": null
           }
         ]
       },
@@ -118,6 +122,10 @@
           {
             "name": "x-rb-type",
             "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": null
           }
         ]
       },
@@ -128,6 +136,10 @@
           {
             "name": "x-rb-type",
             "value": "boolean"
+          },
+          {
+            "name": "x-rb-default",
+            "value": null
           }
         ]
       }
@@ -153,6 +165,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -168,7 +184,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -184,7 +204,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -200,7 +224,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -216,7 +244,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -232,7 +264,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               },
               {
                 "name": "x-rb-multiple",
@@ -253,6 +289,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -302,7 +342,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
               },
               {
                 "name": "x-rb-default",
@@ -406,7 +446,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -502,6 +546,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -517,7 +565,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -533,7 +585,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -549,7 +605,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -565,7 +625,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -581,7 +645,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               },
               {
                 "name": "x-rb-multiple",
@@ -602,6 +670,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -651,7 +723,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -667,7 +743,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -683,7 +763,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -800,7 +884,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -896,6 +984,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -911,7 +1003,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -927,7 +1023,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -943,7 +1043,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -959,7 +1063,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -976,6 +1084,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -991,7 +1103,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
               },
               {
                 "name": "x-rb-default",
@@ -1011,7 +1123,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1027,7 +1143,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1057,7 +1177,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1139,6 +1263,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1155,6 +1283,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1249,7 +1381,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1269,7 +1405,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1289,6 +1429,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1304,7 +1448,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1369,6 +1517,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1421,7 +1573,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1440,7 +1596,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1459,7 +1619,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1476,6 +1640,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1517,7 +1685,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
               },
               {
                 "name": "x-rb-default",
@@ -1574,7 +1742,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1590,7 +1762,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1606,7 +1782,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1623,6 +1803,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1678,7 +1862,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer"
+                "value": "int"
               },
               {
                 "name": "x-rb-default",
@@ -1725,6 +1909,10 @@
               {
                 "name": "x-rb-type",
                 "value": "path"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1740,7 +1928,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1757,6 +1949,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1824,6 +2020,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1840,6 +2040,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1948,7 +2152,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1964,7 +2172,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1980,7 +2192,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -1997,6 +2213,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2016,7 +2236,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2032,7 +2256,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
               },
               {
                 "name": "x-rb-default",
@@ -2177,6 +2401,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2240,7 +2468,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2256,7 +2488,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2272,7 +2508,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2289,6 +2529,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2353,6 +2597,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2368,7 +2616,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2384,7 +2636,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2400,7 +2656,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2416,7 +2676,7 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "integer range"
+                "value": "int range"
               },
               {
                 "name": "x-rb-default",
@@ -2450,7 +2710,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2466,7 +2730,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2482,7 +2750,11 @@
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2499,6 +2771,10 @@
               {
                 "name": "x-rb-type",
                 "value": "file"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               }
             ]
           },
@@ -2538,10 +2814,15 @@
             "arity": {
               "minimum": 0
             },
+            "description": "Пути к файлам (абсолютные или от текущей папки). Взаимоисключающи с --manifest",
             "metadata": [
               {
                 "name": "x-rb-type",
-                "value": "text"
+                "value": "str"
+              },
+              {
+                "name": "x-rb-default",
+                "value": null
               },
               {
                 "name": "x-rb-multiple",
@@ -2619,7 +2900,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2670,7 +2955,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2686,7 +2975,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2751,7 +3044,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2807,7 +3104,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2823,7 +3124,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "integer range"
+                    "value": "int range"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2839,7 +3144,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2856,7 +3165,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2873,7 +3186,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2923,7 +3240,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "integer range"
+                    "value": "int range"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2939,7 +3260,7 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
                   },
                   {
                     "name": "x-rb-default",
@@ -2959,7 +3280,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2976,7 +3301,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -2993,7 +3322,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3049,7 +3382,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "integer range"
+                    "value": "int range"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3065,7 +3402,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3081,7 +3422,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3097,7 +3442,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "integer range"
+                    "value": "int range"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3113,7 +3462,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3129,7 +3482,7 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
                   },
                   {
                     "name": "x-rb-default",
@@ -3149,7 +3502,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3166,7 +3523,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3183,7 +3544,11 @@
                 "metadata": [
                   {
                     "name": "x-rb-type",
-                    "value": "text"
+                    "value": "str"
+                  },
+                  {
+                    "name": "x-rb-default",
+                    "value": null
                   }
                 ]
               },
@@ -3256,7 +3621,7 @@
         "value": {
           "tool": "wp_bulk",
           "dist": "rb-wordpress-bulk-editor",
-          "package": "src"
+          "package": "rb_wordpress_bulk_editor"
         }
       },
       {

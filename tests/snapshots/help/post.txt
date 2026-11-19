@@ -1,5 +1,5 @@
 
- Usage: wp-bulk post [OPTIONS] [COMMAND] [ARGS]...
+ Usage: wp-bulk post [OPTIONS] COMMAND [ARGS]...
 
  Одна запись WordPress за вызов (адаптер Windmill): черновик/обновление, чтение.
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.cli.project import resolve_project
+from rb_wordpress_bulk_editor.cli.project import resolve_project
 
 
 class TestResolveExplicitPath:

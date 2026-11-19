@@ -10,8 +10,8 @@ import json
 
 import pytest
 
-from src.cli.project import ProjectContext
-from src.exceptions import ValidationError
+from rb_wordpress_bulk_editor.cli.project import ProjectContext
+from rb_wordpress_bulk_editor.exceptions import ValidationError
 
 
 def make_project(root, name="myproj") -> ProjectContext:

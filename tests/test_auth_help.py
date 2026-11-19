@@ -7,9 +7,9 @@ import re
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app
-from src.credentials import manager
-from src.utils import auth
+from rb_wordpress_bulk_editor.cli import app
+from rb_wordpress_bulk_editor.credentials import manager
+from rb_wordpress_bulk_editor.utils import auth
 
 HELP_ENV = {"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"}
 DOMAIN = "example.com"
