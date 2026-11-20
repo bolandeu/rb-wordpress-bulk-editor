@@ -87,3 +87,5 @@ data/**
 
 # Сервис-аккаунт Google — общий, в ~/Work/credentials, не в репозитории
 /credentials*
+.pdm-build/
+.cache/
