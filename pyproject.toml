@@ -157,6 +157,6 @@ dev = [
 commands = ["src/cli/*_commands.py"]
 
 [tool.uv.sources]
-rb-credentials = { path = "../rb-credentials" }
-rb-html-to-gutenberg = { path = "../rb-html-to-gutenberg" }
+rb-credentials = { path = "../rb-credentials", editable = true }
+rb-html-to-gutenberg = { path = "../rb-html-to-gutenberg", editable = true }
 

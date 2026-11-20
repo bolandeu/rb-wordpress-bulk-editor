@@ -712,7 +712,7 @@ wheels = [
 
 [[package]]
 name = "rb-credentials"
-source = { directory = "../rb-credentials" }
+source = { editable = "../rb-credentials" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -735,7 +735,7 @@ dev = [
 
 [[package]]
 name = "rb-html-to-gutenberg"
-source = { directory = "../rb-html-to-gutenberg" }
+source = { editable = "../rb-html-to-gutenberg" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
@@ -819,8 +819,8 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rb-credentials", directory = "../rb-credentials" },
-    { name = "rb-html-to-gutenberg", directory = "../rb-html-to-gutenberg" },
+    { name = "rb-credentials", editable = "../rb-credentials" },
+    { name = "rb-html-to-gutenberg", editable = "../rb-html-to-gutenberg" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "typer", specifier = ">=0.27,<0.29" },
 ]
