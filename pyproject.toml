@@ -7,7 +7,7 @@ name = "rb-wordpress-bulk-editor"
 # Версия — из git-тега vX.Y.Z (uv-dynamic-versioning); строку `version =` не добавлять.
 dynamic = ["version"]
 description = "WordPress bulk editor: Excel and WordPress in sync."
-requires-python = ">=3.11.5"  # soupsieve, the HTML parser dependency, has no fixed release for 3.11.0-3.11.4
+requires-python = ">=3.14"  # rb-html-to-gutenberg требует >=3.14
 dependencies = [
     "rb-credentials>=0.7.1,<1",
     "pandas>=2.2.0",
@@ -23,7 +23,7 @@ dependencies = [
     "PyYAML>=6.0",
     "markdown>=3.5.0",
     "beautifulsoup4>=4.12.0",
-    "rb-html-to-gutenberg>=0.4,<0.5",
+    "rb-html-to-gutenberg>=0.4",
     "platformdirs>=4.2",
 ]
 
@@ -157,10 +157,6 @@ dev = [
 commands = ["src/cli/*_commands.py"]
 
 [tool.uv.sources]
-rb-credentials = { index = "gitea" }
-rb-html-to-gutenberg = { index = "gitea" }
+rb-credentials = { path = "../rb-credentials" }
+rb-html-to-gutenberg = { path = "../rb-html-to-gutenberg" }
 
-[[tool.uv.index]]
-name = "gitea"
-url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple"
-explicit = true
