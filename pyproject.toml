@@ -156,6 +156,7 @@ dev = [
 # ищет команды: здесь они в src/cli/*_commands.py, а не в commands/*.py шаблона.
 commands = ["src/cli/*_commands.py"]
 
+# Siblings resolve from disk: a version range in `dependencies` plus a `path` source, never an index.
 [tool.uv.sources]
 rb-credentials = { path = "../rb-credentials", editable = true }
 rb-html-to-gutenberg = { path = "../rb-html-to-gutenberg", editable = true }
