@@ -16,49 +16,26 @@
 """
 
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from rich.markup import escape
+from rb_credentials.status import entry as _record
+from rb_credentials.status import problems, scrub
+from rb_credentials.status import report as _envelope
 
 from ..exceptions import CredentialsUnhealthy, ValidationError, WPBulkEditorError
 from . import manager
 
 WP_KIND = "wp"
-ALWAYS_PROBLEMS = frozenset({"invalid", "expired"})
-HEALTHY = frozenset({"ok", "unchecked"})
 # Кто побеждает, когда поля пришли из разных мест (как в цепочке разрешения).
 _SOURCE_RANK = {"env": 0, "keychain": 1, "file": 2}
 
 Checker = Callable[[str, str, str], Tuple[str, Optional[str]]]
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _scrub(message: Optional[str], secrets: List[str]) -> Optional[str]:
-    if message is None:
-        return None
-    for secret in secrets:
-        if secret:
-            message = message.replace(secret, "***")
-    return message
-
-
 def _blank(provider: str, required: bool, fields: List[str], source_ref: str) -> Dict[str, Any]:
-    return {
-        "provider": provider,
-        "required": required,
-        "fields": fields,
-        "source": "missing",
-        "source_ref": source_ref,
-        "status": "missing",
-        "expires_at": None,
-        "quota": None,
-        "message": None,
-    }
+    return _record(provider, required=required, fields=fields, source_ref=source_ref)
 
 
 # --- WordPress ---------------------------------------------------------------
@@ -137,7 +114,7 @@ def _wp_entry(
         return entry
     username, password = located["username"][0], located["password"][0]
     status, message = checker(domain, username, password)
-    entry.update(status=status, message=_scrub(message, [username, password]))
+    entry.update(status=status, message=scrub(message, [username, password]))
     return entry
 
 
@@ -191,12 +168,6 @@ def wordpress_entries(
 # --- отчёт -------------------------------------------------------------------
 
 
-def is_problem(entry: Dict[str, Any]) -> bool:
-    if entry["status"] in ALWAYS_PROBLEMS:
-        return True
-    return bool(entry["required"]) and entry["status"] not in HEALTHY
-
-
 def _kind(only: Optional[str]) -> Optional[str]:
     if only is None:
         return None
@@ -221,9 +192,9 @@ def status(
         credentials += wordpress_entries(
             check=check, only=only, project_env_file=project_env_file, project_active=project_active
         )
-    payload = {"tool": tool, "version": version, "checked_at": _now_iso(), "credentials": credentials}
-    problems = {e["provider"]: e["status"] for e in credentials if is_problem(e)}
-    return payload, CredentialsUnhealthy(problems) if problems else None
+    payload = _envelope(tool, version, credentials)
+    unhealthy = problems(payload)
+    return payload, CredentialsUnhealthy(unhealthy) if unhealthy else None
 
 
 def render(payload: Dict[str, Any], echo: Callable[[str], None]) -> None:

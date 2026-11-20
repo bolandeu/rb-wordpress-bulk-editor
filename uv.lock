@@ -983,6 +983,18 @@ wheels = [
 ]
 
 [[package]]
+name = "rb-credentials"
+version = "0.7.1"
+source = { registry = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/files/rb-credentials/0.7.1/rb_credentials-0.7.1.tar.gz", hash = "sha256:8fc5593f2fcc1bed99e6f55e894c9f27470baa2de7a9ee36becded18debfb63d" }
+wheels = [
+    { url = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/files/rb-credentials/0.7.1/rb_credentials-0.7.1-py3-none-any.whl", hash = "sha256:6bcfffe9f6d6f3a7cb848ef9d403d91b432a95ffd106d39f7c857b4b677227d2" },
+]
+
+[[package]]
 name = "rb-html-to-gutenberg"
 version = "0.4.1"
 source = { registry = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" }
@@ -1016,6 +1028,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
+    { name = "rb-credentials" },
     { name = "rb-html-to-gutenberg" },
     { name = "rich" },
     { name = "typer" },
@@ -1047,6 +1060,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rb-credentials", specifier = ">=0.7.1,<1", index = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" },
     { name = "rb-html-to-gutenberg", specifier = ">=0.4,<0.5", index = "https://homeserver.tailee01ab.ts.net:3000/api/packages/bolandeu/pypi/simple" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "typer", specifier = ">=0.27,<0.29" },
