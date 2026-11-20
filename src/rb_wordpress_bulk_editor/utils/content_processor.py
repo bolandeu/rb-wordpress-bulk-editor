@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 import markdown
-from html_to_gutenberg import HtmlToGutenberg
+from rb_html_to_gutenberg import HtmlToGutenberg
 from loguru import logger
 
 # Библиотека дублирует свои предупреждения в stdlib logging; без обработчика
