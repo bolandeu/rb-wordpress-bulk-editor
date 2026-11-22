@@ -624,12 +624,12 @@ WPBulkEditorError                       UNEXPECTED (1)
 
 ```bash
 uv sync --all-groups
-uvx --from "git+https://homeserver.tailee01ab.ts.net:3000/bolandeu/cli-generator.git@<тег шаблона>#subdirectory=gate" gate check   # гейт; строка и тег — только в .gitea/workflows/ci.yml
+uvx --from "git+https://github.com/bolandeu/cli-generator.git@<тег шаблона>#subdirectory=gate" gate check   # гейт; строка и тег — только в the gate check before a commit
 uv run pytest -q                     # покрытие включено (fail_under в pyproject)
 uv run pytest --snapshot-update      # после правки справки команды
 ```
 
-**Гейт — `gate check` (шаг `Gate` в `.gitea/workflows/ci.yml`; Standard cli-generator)**:
+**Гейт — `gate check` (шаг `Gate` в `the gate check before a commit`; Standard cli-generator)**:
 `uv lock --check`, ruff check + format, ty, pytest (покрытие, контракт справки, форма
 `auth status`), контракты, сборка wheel и `wp-bulk --version`/`--help` в чистом venv,
 `standard: *`, gitleaks по истории, osv-scanner по `uv.lock`. pytest гейт запускает с
