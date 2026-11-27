@@ -43,8 +43,8 @@ class ExcelReader:
         """Получить список всех листов"""
         if self._excel_file_obj is None:
             with pd.ExcelFile(self.excel_file) as xls:
-                return xls.sheet_names
-        return self._excel_file_obj.sheet_names
+                return list(xls.sheet_names)
+        return list(self._excel_file_obj.sheet_names)
 
     def classify_sheet(self, sheet_name: str) -> SheetType:
         """
@@ -267,7 +267,7 @@ class ExcelReader:
             Список названий колонок
         """
         df = self.read_sheet(sheet_name)
-        return df.columns.tolist()
+        return [str(column) for column in df.columns]
 
     def check_duplicate_ids(self, df: pd.DataFrame, sheet_name: str) -> List[str]:
         """
@@ -293,7 +293,7 @@ class ExcelReader:
                 "Это может привести к непредвиденному поведению."
             )
 
-        return duplicates
+        return list(duplicates)
 
     def validate_actions(self, df: pd.DataFrame, sheet_name: str) -> List[str]:
         """
@@ -320,4 +320,4 @@ class ExcelReader:
                 f"Допустимые: {VALID_ACTIONS}. Строки будут пропущены."
             )
 
-        return invalid_values
+        return list(invalid_values)

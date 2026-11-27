@@ -134,10 +134,13 @@ class HttpProvider:
     @staticmethod
     def _error_message(response: httpx.Response) -> str:
         """Сообщение об ошибке из JSON-тела, иначе первые 200 символов текста."""
+        text = str(response.text)[:200]  # текстовый ответ сервера пригодится как fallback в любом случае
         try:
-            return response.json().get("message", response.text[:200])
+            body = response.json()
         except Exception:
-            return response.text[:200]
+            return text
+        message = body.get("message") if isinstance(body, dict) else None
+        return message if isinstance(message, str) else text
 
     def raise_for_status(self, response: httpx.Response):
         """Превратить ошибочный статус в исключение проекта."""
@@ -161,6 +164,7 @@ class HttpProvider:
                 status=status,
             )
 
+        error: WordPressError
         if status >= 500:
             error = ServerError(
                 f"Ошибка сервера WordPress ({status}): {response.text[:200]}",
@@ -234,15 +238,18 @@ class HttpProvider:
         parse: Optional[Callable[[httpx.Response], Any]] = None,
         suppress_non_retryable_log: bool = False,
         **kwargs: Any,
-    ) -> Any:
+    ) -> Dict[str, Any]:
         """Запрос с ретраями и circuit breaker."""
-        return await self._with_circuit_breaker(
-            self._request_with_retry,
-            method,
-            endpoint,
-            parse=parse,
-            suppress_non_retryable_log=suppress_non_retryable_log,
-            **kwargs,
+        return cast(
+            Dict[str, Any],
+            await self._with_circuit_breaker(
+                self._request_with_retry,
+                method,
+                endpoint,
+                parse=parse,
+                suppress_non_retryable_log=suppress_non_retryable_log,
+                **kwargs,
+            ),
         )
 
     async def _with_circuit_breaker(self, retry_fn: Callable, *args: Any, **kwargs: Any):

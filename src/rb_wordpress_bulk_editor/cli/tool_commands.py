@@ -118,7 +118,7 @@ def validate(
 
     by_type = None
     if is_json:
-        checks = [check_tab(file, tab, rules) for tab in tabs]  # ty: ignore[not-iterable]  # is_json ⇒ tabs задан
+        checks = [check_tab(file, tab, rules) for tab in tabs or []]  # is_json ⇒ tabs задан
     else:
         output.vecho(ctx, "Проверка листов...")
         with ExcelReader(file, known_taxonomies=rules.taxonomies()) as reader:

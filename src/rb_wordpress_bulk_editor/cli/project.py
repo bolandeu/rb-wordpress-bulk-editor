@@ -108,7 +108,7 @@ class ProjectContext:
             files = [p for p in files if is_data_file(p)]
         return files
 
-    def _pick(self, files: list) -> Optional[Path]:
+    def _pick(self, files: list[Path]) -> Optional[Path]:
         """Из кандидатов одного формата: единственный, иначе названный по имени проекта."""
         if not files:
             return None

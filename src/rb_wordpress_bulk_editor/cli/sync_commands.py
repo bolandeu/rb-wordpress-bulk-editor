@@ -277,11 +277,11 @@ def _open_plan(
     if is_json_source(data_file):
         if config.sync.skip_tax:
             logger.info("--skip-tax: записи таксономий исключены из обработки")
-        plan = _JsonPlan(data_file, config, sheets_filter)
-        _preflight(plan, config, filters, site)
+        json_plan = _JsonPlan(data_file, config, sheets_filter)
+        _preflight(json_plan, config, filters, site)
         # media-наборов в JSON нет, но --delete-media действует и здесь.
         _confirm_irreversible(ctx, None, [], config, confirm)
-        yield plan
+        yield json_plan
         return
 
     with ExcelReader(data_file, known_taxonomies=known_taxonomies(config)) as reader:
@@ -415,7 +415,7 @@ async def _run_sync_engine(
     """
     started_at = datetime.now()
 
-    stats = {
+    stats: Dict[str, Any] = {
         "file": str(config.paths.excel_file),
         "started_at": started_at.isoformat(),
         "sheets": {},
@@ -560,7 +560,7 @@ async def _process_dataset(
         # набора: следующий таб должен видеть уже записанные изменения.
         writer = dataset.writer
         own_file = writer is not None and dataset.own_file
-        if own_file:
+        if own_file and writer is not None:
             writer.load()
 
         progress = Progress(total=len(records))
@@ -574,10 +574,10 @@ async def _process_dataset(
             # Сохраняем и на пути ошибки: у JSON writer свой на таб, и без
             # этого id уже созданных в WordPress записей пропали бы — повтор
             # прогона создал бы их заново.
-            if own_file:
+            if own_file and writer is not None:
                 writer.save()
 
-        stats = report.to_stats()
+        stats: Dict[str, Any] = dict(report.to_stats())
         stats["total"] += dropped
         stats["skipped"] += dropped
         return stats

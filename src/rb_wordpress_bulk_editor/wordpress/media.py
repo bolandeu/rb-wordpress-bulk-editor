@@ -35,7 +35,7 @@ class MediaEndpoint:
         """
         # 1. Пробуем нормальный JSON
         try:
-            result = response.json()
+            result: Dict[str, Any] = response.json()
             logger.debug(f"Response: {result.keys()}")
             return result
         except Exception as json_error:

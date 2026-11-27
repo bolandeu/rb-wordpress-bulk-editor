@@ -38,7 +38,7 @@ class ContentExporter:
         self.export_folder = export_folder
         self.concurrency = concurrency
         self.download_timeout = download_timeout
-        self.csv_data = []
+        self.csv_data: list[dict[str, Any]] = []
         self._semaphore = asyncio.Semaphore(concurrency)
         self.skip_post_type_patterns = skip_post_type_patterns or DEFAULT_SKIP_POST_TYPE_PATTERNS
 

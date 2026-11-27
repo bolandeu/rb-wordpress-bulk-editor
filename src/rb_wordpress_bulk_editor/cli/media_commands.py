@@ -286,10 +286,11 @@ def media_upload(
             outcomes[n] = outcome
 
     # К этому месту заполнены все outcomes (ни одного None) — отсюда ty: ignore.
-    uploaded_entries = [o["entry"] for o in outcomes if o["ok"]]  # ty: ignore[not-subscriptable]
-    failed_entries = [o["entry"] for o in outcomes if not o["ok"]]  # ty: ignore[not-subscriptable]
+    filled = [o for o in outcomes if o is not None]  # к этому месту заполнены все outcomes
+    uploaded_entries = [o["entry"] for o in filled if o["ok"]]
+    failed_entries = [o["entry"] for o in filled if not o["ok"]]
     if not uploaded_entries:
-        raise _all_failed_error(failed_entries, [o["error"] for o in outcomes if not o["ok"]])  # ty: ignore[not-subscriptable]
+        raise _all_failed_error(failed_entries, [o["error"] for o in filled if not o["ok"]])
 
     payload = {
         "uploaded": uploaded_entries,

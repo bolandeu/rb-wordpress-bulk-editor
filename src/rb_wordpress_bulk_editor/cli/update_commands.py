@@ -99,6 +99,7 @@ def update_from_wp(
 
     # Выбор наборов и структура файла проверяются до credentials:
     # ошибка в файле не должна требовать доступа к сайту.
+    names: Optional[List[str]]
     if is_json_source(file):
         names = require_json_tabs(file, sheets)
         for tab in names:

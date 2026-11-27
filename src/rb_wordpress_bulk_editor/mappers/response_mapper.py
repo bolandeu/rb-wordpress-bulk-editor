@@ -52,7 +52,7 @@ class ResponseMapper:
         Returns:
             Словарь с данными для Excel строки
         """
-        row = {}
+        row: Dict[str, Any] = {}
 
         # Action по умолчанию при fetch
         row["action"] = "skip"
@@ -206,7 +206,7 @@ class ResponseMapper:
         Returns:
             Словарь с данными для Excel строки
         """
-        row = {}
+        row: Dict[str, Any] = {}
 
         # Action по умолчанию при fetch
         row["action"] = "skip"

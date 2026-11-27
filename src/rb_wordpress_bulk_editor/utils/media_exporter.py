@@ -29,7 +29,7 @@ class MediaExporter:
         self.export_folder = export_folder
         self.download_files = download_files
         self.concurrency = concurrency
-        self.csv_data = []
+        self.csv_data: list[dict[str, Any]] = []
         self._semaphore = asyncio.Semaphore(concurrency)
 
     async def export_all_media(self) -> int:

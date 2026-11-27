@@ -21,7 +21,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ..exceptions import Conflict, NotFoundError, RecordNotFound, SeoNotSupported, ValidationError
 from .client import WordPressClient
@@ -227,7 +227,7 @@ def _choose_target(post_type: str, slug: str, found: List[Dict[str, Any]]) -> Op
             post_id=found[0]["id"],
             action="Передайте нужный id явно.",
         )
-    return found[0]["id"]
+    return int(found[0]["id"])
 
 
 async def resolve_featured(client: WordPressClient, featured: FeaturedSource) -> Dict[str, Any]:
@@ -292,7 +292,8 @@ async def upsert(client: WordPressClient, spec: UpsertInput) -> Dict[str, Any]:
     elif payload:
         item = await client.put(f"{API}/{base}/{target_id}", payload)
     else:
-        item = await _get_item(client, base, int(target_id))
+        # ветка `payload` пуста только при известном id
+        item = await _get_item(client, base, cast(int, target_id))
     item = await _with_raw_content(client, base, item)
 
     result = {

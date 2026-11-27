@@ -326,6 +326,7 @@ class TaxonomiesEndpoint:
             else:
                 parent = parent_id
 
+            term: Dict[str, Any]
             if pending_ancestor:
                 # Родитель сам ещё не существует — искать под ним нечего,
                 # термин тоже будет создан

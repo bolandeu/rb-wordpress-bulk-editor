@@ -17,7 +17,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, cast
 
 from rich.markup import escape
 from rb_credentials.status import entry as _record
@@ -35,7 +35,7 @@ Checker = Callable[[str, str, str], Tuple[str, Optional[str]]]
 
 
 def _blank(provider: str, required: bool, fields: List[str], source_ref: str) -> Dict[str, Any]:
-    return _record(provider, required=required, fields=fields, source_ref=source_ref)
+    return cast(Dict[str, Any], _record(provider, required=required, fields=fields, source_ref=source_ref))
 
 
 # --- WordPress ---------------------------------------------------------------
@@ -83,7 +83,7 @@ def _locate_project(
         elif source == "keychain":
             ref = f"keychain service {manager.keychain_service(resolved.domain)}"
         else:
-            names = _env_names(field, _LEGACY_ENV_VARS[field], dict(os.environ))
+            names = list(_env_names(field, _LEGACY_ENV_VARS[field], dict(os.environ)))
             ref = f"{'/'.join(names)} in {env_file}" if env_file else "/".join(names) + " in .env"
         found[field] = (value, kinds[source], ref)
     return resolved.domain, found

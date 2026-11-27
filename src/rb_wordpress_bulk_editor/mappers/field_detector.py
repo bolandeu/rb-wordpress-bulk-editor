@@ -28,7 +28,7 @@ class FieldDetector:
         """
         self.columns = columns
         self.known_taxonomies = known_taxonomies
-        self._analysis_cache = None
+        self._analysis_cache: Optional[Dict[str, List[str]]] = None
 
     def analyze(self) -> Dict[str, List[str]]:
         """
@@ -45,7 +45,7 @@ class FieldDetector:
         if self._analysis_cache is not None:
             return self._analysis_cache
 
-        result = {"system": [], "acf": [], "taxonomies": [], "nested": [], "content": []}
+        result: Dict[str, List[str]] = {"system": [], "acf": [], "taxonomies": [], "nested": [], "content": []}
 
         system_lower = {c.lower() for c in SYSTEM_COLUMNS}
 

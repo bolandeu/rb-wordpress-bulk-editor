@@ -62,7 +62,9 @@ class SiteSchema:
         """Привязана ли таксономия к типу записи (иначе WordPress проигнорирует поле)."""
         type_slug = self.types.get(type_name)
         taxonomy_slug = self.taxonomies.get(taxonomy_name)
-        return bool(type_slug and taxonomy_slug) and taxonomy_slug in self.attached.get(type_slug, set())
+        if type_slug is None or taxonomy_slug is None:
+            return False
+        return taxonomy_slug in self.attached.get(type_slug, set())
 
     def taxonomy_names(self) -> Set[str]:
         """Все имена таксономий сайта — для распознавания колонок."""

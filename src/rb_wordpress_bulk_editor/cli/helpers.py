@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import NoReturn, Optional
+from typing import Callable, NoReturn, Optional
 
 import typer
 
@@ -56,7 +56,13 @@ def resolve_excel_file(ctx: typer.Context, explicit: Optional[Path]) -> Optional
     return get_project(ctx).find_excel()
 
 
-def _require_file(ctx: typer.Context, explicit: Optional[Path], finder, label: str, hint: str) -> Path:
+def _require_file(
+    ctx: typer.Context,
+    explicit: Optional[Path],
+    finder: Callable[[ProjectContext], Optional[Path]],
+    label: str,
+    hint: str,
+) -> Path:
     """
     Общая логика require_*_file: явный путь > путь от корня проекта > авто-поиск.
 

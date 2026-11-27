@@ -132,8 +132,8 @@ class TaxonomySyncBase(BaseSync):
         Returns:
             Payload для WordPress API
         """
-        payload = {}
-        acf_data = {}
+        payload: Dict[str, Any] = {}
+        acf_data: Dict[str, Any] = {}
 
         # Обязательные поля
         if "name" in row and not is_missing(row["name"]):

@@ -8,7 +8,8 @@ from ..constants import TAXONOMY_DELIMITER
 def wp_rendered(field, default: str = "") -> str:
     """Извлечь rendered-значение из WordPress API поля (dict или строка)."""
     if isinstance(field, dict):
-        return field.get("rendered", default)
+        rendered = field.get("rendered", default)
+        return rendered if isinstance(rendered, str) else str(rendered)
     return str(field) if field else default
 
 

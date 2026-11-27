@@ -80,7 +80,8 @@ def get_options(ctx: Optional[typer.Context]) -> OutputOptions:
     """Опции вывода для этого запуска (хранятся в ctx.meta, общем для всей цепочки)."""
     if ctx is None:
         return OutputOptions()
-    return ctx.meta.setdefault(_META_KEY, OutputOptions())
+    options: OutputOptions = ctx.meta.setdefault(_META_KEY, OutputOptions())
+    return options
 
 
 def set_global_options(

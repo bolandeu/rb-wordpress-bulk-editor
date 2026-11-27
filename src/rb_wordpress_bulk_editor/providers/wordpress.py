@@ -172,7 +172,7 @@ class WordPressHttpProvider(HttpProvider):
         logger.debug(f"POST {endpoint} (binary upload, {len(content)} bytes)")
         # timeout=None в httpx означает «без таймаута», поэтому передаём его
         # только когда он действительно задан.
-        extra = {"timeout": timeout} if timeout is not None else {}
+        extra: Dict[str, Any] = {"timeout": timeout} if timeout is not None else {}
         return await self.request_json(
             "POST",
             endpoint,

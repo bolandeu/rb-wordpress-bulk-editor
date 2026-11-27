@@ -106,7 +106,7 @@ class ContentProcessor:
             gutenberg_content = conversion.blocks
 
             logger.info(f"Successfully processed content file: {filename}")
-            return gutenberg_content
+            return str(gutenberg_content)
 
         except FileNotFoundError:
             logger.error(f"Content file not found: {filename}")

@@ -441,11 +441,12 @@ def write_tab(
         RecordSourceError: существующий файл не JSON-файл данных (нет `tabs`).
     """
     path = Path(path)
+    document: Dict[str, Any]
     if path.exists():
         document = _load_tabs(path)
         _tabs_of(document, path)
     else:
-        document: Dict[str, Any] = {"project": project, "tabs": {}}
+        document = {"project": project, "tabs": {}}
     if project and not document.get("project"):
         document["project"] = project
     document["tabs"][tab_name] = records

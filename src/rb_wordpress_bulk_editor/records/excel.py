@@ -28,7 +28,7 @@ class ExcelRecordSource:
 
     def fields(self) -> List[str]:
         """Колонки листа."""
-        return self.reader.read_sheet(self.sheet_name).columns.tolist()
+        return [str(column) for column in self.reader.read_sheet(self.sheet_name).columns]
 
     def where(self, record: Record) -> str:
         """Место записи для сообщений: строка листа, как её видно в Excel.
